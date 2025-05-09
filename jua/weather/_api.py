@@ -13,6 +13,7 @@ from jua.types.weather._api_response_types import (
     ForecastResponse,
 )
 from jua.types.weather.forecast import ForecastData
+from jua.types.weather.raw_file_access import DirectoryResponse, FileResponse
 from jua.types.weather.weather import Coordinate
 from jua.weather.conversions import validate_init_time
 
@@ -24,6 +25,7 @@ class WeatherAPI:
     )
     _LATEST_FORECAST_ENDPOINT = "forecasting/{model_name}/forecasts/latest"
     _FORECAST_ENDPOINT = "forecasting/{model_name}/forecasts/{init_time}"
+    _BROWSE_FILES_ENDPOINT = "files/browse"
 
     def __init__(self, jua_client: JuaClient):
         self._api = API(jua_client)
@@ -118,3 +120,13 @@ class WeatherAPI:
         response_json = response.json()
         response = ForecastResponse(**response_json)
         return response.forecast
+
+    @validate_call
+    def browse_files(self, path: str = "") -> list[FileResponse | DirectoryResponse]:
+        response = self._api.get(self._BROWSE_FILES_ENDPOINT, params={"path": path})
+        response_json = response.json()
+        if "contents" in response_json:
+            return [
+                DirectoryResponse(**content) for content in response_json["contents"]
+            ]
+        return [FileResponse(**response_json)]
