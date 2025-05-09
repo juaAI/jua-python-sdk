@@ -1,0 +1,25 @@
+from datetime import datetime
+
+from pydantic import BaseModel
+
+from jua.types.weather.forecast import ForecastData
+
+
+class AvailableModelsResponse(BaseModel):
+    available_models: list[str]
+
+
+class AvailableInitTimesResponse(BaseModel):
+    init_times: list[datetime]
+
+
+class ForecastMetadataResponse(BaseModel):
+    forecast_url: str
+    model: str
+    init_time: datetime
+    available_forecasted_hours: int
+    available_variables: list[str]
+
+
+class ForecastResponse(BaseModel):
+    forecast: ForecastData

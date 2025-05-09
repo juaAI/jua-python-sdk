@@ -1,0 +1,32 @@
+[project]
+name = "jua-python-sdk"
+version = "0.1.0"
+description = "Access Jua's API with ease"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = [
+    "pandas>=2.2.3",
+    "pydantic>=2.10.6",
+    "pydantic-settings>=2.8.1",
+    "requests>=2.32.3",
+    "s3fs>=2025.3.2",
+    "xarray>=2025.4.0",
+    "zarr>=2.18.3",
+]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.8",
+]
+
+[tool.ruff]
+line-length = 88
+target-version = "py310"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "W"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"
