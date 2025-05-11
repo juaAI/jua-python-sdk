@@ -15,3 +15,10 @@ class JuaSettings(BaseSettings):
     model_config = SettingsConfigDict(
         env_file=".env", env_file_encoding="utf-8", extra="ignore"
     )
+
+    print_progress: bool = Field(default=True, env="JUA_PRINT_PROGRESS")
+
+    def should_print_progress(self, print_progress: bool | None = None) -> bool:
+        if print_progress is None:
+            return self.print_progress
+        return print_progress

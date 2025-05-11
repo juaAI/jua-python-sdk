@@ -1,20 +1,55 @@
 from pathlib import Path
 
+import numpy as np
 import xarray as xr
-from dask.diagnostics import ProgressBar
 from pydantic import validate_call
 
+from jua._utils.optional_progress_bar import OptionalProgressBar
 from jua.logging import get_logger
-from jua.weather.conversions import bytes_to_gb
+from jua.settings.jua_settings import JuaSettings
+from jua.weather.conversions import bytes_to_gb, to_timedelta
 from jua.weather.models import Model
 
 logger = get_logger(__name__)
 
 
+@xr.register_dataarray_accessor("jua")
+@xr.register_dataset_accessor("jua")
+class _LeadTimeSelector:
+    def __init__(self, xarray_obj: xr.DataArray | xr.Dataset):
+        self._xarray_obj = xarray_obj
+
+    # Lead time can be int, timedelta or slice
+    def sel_lead_time(
+        self, lead_time: int | np.timedelta64 | slice
+    ) -> xr.DataArray | xr.Dataset:
+        if not isinstance(lead_time, slice):
+            lead_time = to_timedelta(lead_time)
+
+        if isinstance(lead_time, slice):
+            # Make sure the slice values are timedeltas
+            start = lead_time.start
+            stop = lead_time.stop
+            if start is not None:
+                start = to_timedelta(start)
+            if stop is not None:
+                stop = to_timedelta(stop)
+            lead_time = slice(start, stop)
+
+        return self._xarray_obj.sel(prediction_timedelta=lead_time)
+
+
 class JuaDataset:
     _DOWLOAD_SIZE_WARNING_THRESHOLD_GB = 20
 
-    def __init__(self, dataset_name: str, raw_data: xr.Dataset, model: Model):
+    def __init__(
+        self,
+        settings: JuaSettings,
+        dataset_name: str,
+        raw_data: xr.Dataset,
+        model: Model,
+    ):
+        self._settings = settings
         self._dataset_name = dataset_name
         self._raw_data = raw_data
         self._model = model
@@ -39,7 +74,7 @@ class JuaDataset:
     def download(
         self,
         output_path: Path | None = None,
-        show_progress: bool = True,
+        show_progress: bool | None = None,
         overwrite: bool = False,
         always_download: bool = False,
     ) -> None:
@@ -71,12 +106,9 @@ class JuaDataset:
             f"{self._dataset_name} to {output_path}..."
         )
 
-        if show_progress:
+        with OptionalProgressBar(self._settings, show_progress):
             logger.info("Initializing dataset...")
             delayed = self._raw_data.to_zarr(output_path, mode="w", compute=False)
             logger.info("Downloading dataset...")
-            with ProgressBar():
-                delayed.compute()
-        else:
-            self._raw_data.to_zarr(output_path, mode="w", compute=True)
+            delayed.compute()
         logger.info(f"Dataset {self._dataset_name} downloaded to {output_path}.")

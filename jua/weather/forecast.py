@@ -3,12 +3,16 @@ from datetime import datetime
 import xarray as xr
 from pydantic import validate_call
 
+from jua._utils.optional_progress_bar import OptionalProgressBar
 from jua.client import JuaClient
+from jua.logging import get_logger
 from jua.types.weather._api_payload_types import ForecastRequestPayload
 from jua.types.weather._api_response_types import ForecastMetadataResponse
 from jua.weather._api import WeatherAPI
 from jua.weather._jua_dataset import JuaDataset
 from jua.weather.models import Model
+
+logger = get_logger(__name__)
 
 
 class Forecast:
@@ -31,6 +35,7 @@ class Forecast:
 
         self._FORECAST_ADAPTERS = {
             Model.EPT2: self._v3_data_adapter,
+            Model.EPT1_5: self._v2_data_adapter,
         }
 
     def get_latest(
@@ -71,33 +76,93 @@ class Forecast:
         return self.get_forecast_file()
 
     @validate_call
-    def get_forecast_file(self, init_time: datetime | None = None) -> JuaDataset:
+    def get_forecast_file(
+        self,
+        init_time: datetime | None = None,
+        print_progress: bool | None = None,
+    ) -> JuaDataset:
         if not self._has_forecast_file_access:
             raise ValueError(
-                "This model does not have forecast file access. Please check the model documentation."
+                "This model does not have forecast file access. "
+                "Please check the model documentation."
             )
 
         if init_time is None:
             init_time = self.get_latest_metadata().init_time
 
-        return self._FORECAST_ADAPTERS[self._model](init_time)
-
-    def _open_dataset(self, url: str) -> xr.Dataset:
-        return xr.open_dataset(
-            url,
-            engine="zarr",
-            decode_timedelta=True,
-            storage_options={"auth": self._client.settings.auth.get_basic_auth()},
+        return self._FORECAST_ADAPTERS[self._model](
+            init_time, print_progress=print_progress
         )
 
-    def _v3_data_adapter(self, init_time: datetime) -> JuaDataset:
+    def _open_dataset(self, url: str, print_progress: bool | None = None) -> xr.Dataset:
+        logger.info(f"Opening dataset from {url}")
+        with OptionalProgressBar(self._client.settings, print_progress):
+            return xr.open_dataset(
+                url,
+                engine="zarr",
+                decode_timedelta=True,
+                storage_options={"auth": self._client.settings.auth.get_basic_auth()},
+            )
+
+    def _open_dataset_multiple(
+        self, urls: list[str], print_progress: bool | None = None
+    ) -> xr.Dataset:
+        logger.info("Opening dataset.")
+        with OptionalProgressBar(self._client.settings, print_progress):
+            return xr.open_mfdataset(
+                urls,
+                engine="zarr",
+                decode_timedelta=True,
+                storage_options={"auth": self._client.settings.auth.get_basic_auth()},
+                parallel=True,
+            )
+
+    def _v3_data_adapter(
+        self, init_time: datetime, print_progress: bool | None = None
+    ) -> JuaDataset:
         data_base_url = self._client.settings.data_base_url
         model_name = self._MODEL_NAME_MAPPINGS[self._model]
         init_time_str = init_time.strftime("%Y%m%d%H")
         dataset_name = f"{init_time_str}.zarr"
         data_url = f"{data_base_url}/forecasts/{model_name}/{dataset_name}"
 
-        raw_data = self._open_dataset(data_url)
+        raw_data = self._open_dataset(data_url, print_progress=print_progress)
         # Rename coordinate prediction_timedelta to leadtime
-        raw_data = raw_data.rename({"prediction_timedelta": "lead_time"})
-        return JuaDataset(dataset_name, raw_data=raw_data, model=self._model)
+        # raw_data = raw_data.rename({"prediction_timedelta": "lead_time"})
+        return JuaDataset(
+            settings=self._client.settings,
+            dataset_name=dataset_name,
+            raw_data=raw_data,
+            model=self._model,
+        )
+
+    def _v2_data_adapter(
+        self, init_time: datetime, print_progress: bool | None = None
+    ) -> JuaDataset:
+        data_base_url = self._client.settings.data_base_url
+        model_name = self._MODEL_NAME_MAPPINGS[self._model]
+        init_time_str = init_time.strftime("%Y%m%d%H")
+        # This is a bit hacky:
+        # For EPT1.5, get_metadata will result in an error
+        # if the forecast is no longer in cache.
+        # For now, we try and if it fails default to 480 hours
+        try:
+            max_available_hours = self.get_metadata(
+                init_time=init_time
+            ).available_forecasted_hours
+        except Exception:
+            max_available_hours = 480
+
+        zarr_urls = [
+            f"{data_base_url}/forecasts/{model_name}/{init_time_str}/{hour}.zarr"
+            for hour in range(max_available_hours + 1)
+        ]
+
+        raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
+        dataset_name = f"{init_time_str}.zarr"
+        return JuaDataset(
+            settings=self._client.settings,
+            dataset_name=dataset_name,
+            raw_data=raw_data,
+            model=self._model,
+        )

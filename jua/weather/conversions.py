@@ -1,5 +1,7 @@
 from datetime import datetime
 
+import numpy as np
+
 
 def validate_init_time(init_time: datetime | str) -> datetime:
     as_datetime = (
@@ -20,3 +22,20 @@ def init_time_str_to_datetime(init_time_str: str) -> datetime:
 
 def bytes_to_gb(bytes: int) -> float:
     return bytes / 1024 / 1024 / 1024
+
+
+def to_timedelta(hours: int | np.timedelta64) -> np.timedelta64:
+    """
+    Convert various timedelta representations to a NumPy timedelta64 object.
+
+    Args:
+        hours: The number of hours to convert to a timedelta
+
+    Returns:
+        np.timedelta64: A NumPy timedelta64 object representing the input hours
+    """
+    if isinstance(hours, int):
+        return np.timedelta64(hours, "h").astype("timedelta64[ns]")
+    if isinstance(hours, np.timedelta64):
+        return hours
+    raise ValueError(f"unexpected timedelta type: {hours}")

@@ -90,14 +90,17 @@ class WeatherAPI:
     @validate_call
     def get_forecast_metadata(
         self, model_name: str, init_time: datetime | str
-    ) -> ForecastData:
+    ) -> ForecastMetadataResponse:
         init_time = validate_init_time(init_time)
+        init_time_str = init_time.isoformat()
         response = self._api.get(
-            self._FORECAST_ENDPOINT.format(model_name=model_name, init_time=init_time)
+            self._FORECAST_ENDPOINT.format(
+                model_name=model_name, init_time=init_time_str
+            )
         )
         response_json = response.json()
-        response = ForecastResponse(**response_json)
-        return response.forecast
+        response = ForecastMetadataResponse(**response_json)
+        return response
 
     @validate_call
     def get_forecast(
