@@ -3,11 +3,21 @@ from jua.weather.forecast import Forecast
 
 
 class Model:
-    def __init__(self, client: JuaClient, model_name: str):
+    def __init__(
+        self,
+        client: JuaClient,
+        model_name: str,
+        has_forecast_file_access: bool,
+        has_hindcast_file_access: bool,
+    ):
         self._client = client
         self._model_name = model_name
 
-        self._forecast = Forecast(client, model_name)
+        self._forecast = Forecast(
+            client,
+            model=model_name,
+            has_forecast_file_access=has_forecast_file_access,
+        )
 
     @property
     def model_name(self) -> str:

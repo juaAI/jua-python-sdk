@@ -1,6 +1,7 @@
 import json
 from pathlib import Path
 
+from aiohttp import BasicAuth
 from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -72,3 +73,6 @@ class AuthenticationSettings(BaseSettings):
     def is_authenticated(self) -> bool:
         """Check if authentication credentials are properly set."""
         return bool(self.api_key_id and self.api_key_secret)
+
+    def get_basic_auth(self) -> BasicAuth:
+        return BasicAuth(login=self.api_key_id, password=self.api_key_secret)

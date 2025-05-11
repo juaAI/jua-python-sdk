@@ -3,15 +3,16 @@ name = "jua-python-sdk"
 version = "0.1.0"
 description = "Access Jua's API with ease"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
+    "dask>=2025.4.1",
     "pandas>=2.2.3",
     "pydantic>=2.10.6",
     "pydantic-settings>=2.8.1",
     "requests>=2.32.3",
     "s3fs>=2025.3.2",
     "xarray>=2025.4.0",
-    "zarr>=2.18.3",
+    "zarr>=3.0.0",
 ]
 
 [dependency-groups]

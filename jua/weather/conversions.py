@@ -16,3 +16,7 @@ def datetime_to_init_time_str(dt: datetime) -> str:
 
 def init_time_str_to_datetime(init_time_str: str) -> datetime:
     return datetime.strptime(init_time_str, "%Y%m%d%H")
+
+
+def bytes_to_gb(bytes: int) -> float:
+    return bytes / 1024 / 1024 / 1024
