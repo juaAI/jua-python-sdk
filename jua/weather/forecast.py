@@ -11,8 +11,24 @@ from jua.types.weather._api_response_types import ForecastMetadataResponse
 from jua.weather._api import WeatherAPI
 from jua.weather._jua_dataset import JuaDataset
 from jua.weather.models import Model
+from jua.weather.variables import Variables
 
 logger = get_logger(__name__)
+
+_MAP_EPT2_TO_NEW_VARIABLES = {
+    v.value.name_ept2: v.value.name for v in Variables if v.value.name_ept2
+}
+_MAP_EPT1_5_TO_NEW_VARIABLES = {
+    v.value.name_ept1_5: str(v.value) for v in Variables if v.value.name_ept1_5
+}
+
+
+def _rename_variables_ept2(ds: xr.Dataset) -> xr.Dataset:
+    return ds.rename(_MAP_EPT2_TO_NEW_VARIABLES)
+
+
+def _rename_variables_ept1_5(ds: xr.Dataset) -> xr.Dataset:
+    return ds.rename(_MAP_EPT1_5_TO_NEW_VARIABLES)
 
 
 class Forecast:
@@ -72,11 +88,11 @@ class Forecast:
     def get_available_init_times(self) -> list[datetime]:
         return self._api.get_available_init_times(model_name=self._model_name)
 
-    def get_latest_forecast_file(self) -> JuaDataset:
-        return self.get_forecast_file()
+    def get_latest_forecast_as_dataset(self) -> JuaDataset:
+        return self.get_forecast_as_dataset()
 
     @validate_call
-    def get_forecast_file(
+    def get_forecast_as_dataset(
         self,
         init_time: datetime | None = None,
         print_progress: bool | None = None,
@@ -128,7 +144,7 @@ class Forecast:
 
         raw_data = self._open_dataset(data_url, print_progress=print_progress)
         # Rename coordinate prediction_timedelta to leadtime
-        # raw_data = raw_data.rename({"prediction_timedelta": "lead_time"})
+        raw_data = _rename_variables_ept2(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,
@@ -158,8 +174,9 @@ class Forecast:
             for hour in range(max_available_hours + 1)
         ]
 
-        raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
         dataset_name = f"{init_time_str}.zarr"
+        raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
+        raw_data = _rename_variables_ept1_5(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,

@@ -1,4 +1,5 @@
 from pathlib import Path
+from typing import TYPE_CHECKING, Protocol, TypeVar
 
 import numpy as np
 import xarray as xr
@@ -12,7 +13,80 @@ from jua.weather.models import Model
 
 logger = get_logger(__name__)
 
+# Store original sel methods
+_original_dataset_sel = xr.Dataset.sel
+_original_dataarray_sel = xr.DataArray.sel
 
+
+# Override Dataset.sel method
+def _patched_dataset_sel(self, *args, **kwargs):
+    """
+    This is a patch to the xarray.Dataset.sel method to convert the prediction_timedelta
+    argument to a timedelta.
+    """
+    # Check if prediction_timedelta is in kwargs
+    if "prediction_timedelta" in kwargs and not isinstance(
+        kwargs["prediction_timedelta"], slice
+    ):
+        # Convert to timedelta
+        kwargs["prediction_timedelta"] = to_timedelta(kwargs["prediction_timedelta"])
+    elif "prediction_timedelta" in kwargs and isinstance(
+        kwargs["prediction_timedelta"], slice
+    ):
+        # Handle slice case
+        start = kwargs["prediction_timedelta"].start
+        stop = kwargs["prediction_timedelta"].stop
+        step = kwargs["prediction_timedelta"].step
+
+        if start is not None:
+            start = to_timedelta(start)
+        if stop is not None:
+            stop = to_timedelta(stop)
+        if step is not None:
+            step = to_timedelta(step)
+
+        kwargs["prediction_timedelta"] = slice(start, stop, step)
+
+    # Call the original method
+    return _original_dataset_sel(self, *args, **kwargs)
+
+
+# Override DataArray.sel method
+def _patched_dataarray_sel(self, *args, **kwargs):
+    # Check if prediction_timedelta is in kwargs
+    if "prediction_timedelta" in kwargs and not isinstance(
+        kwargs["prediction_timedelta"], slice
+    ):
+        # Convert to timedelta
+        kwargs["prediction_timedelta"] = to_timedelta(kwargs["prediction_timedelta"])
+    elif "prediction_timedelta" in kwargs and isinstance(
+        kwargs["prediction_timedelta"], slice
+    ):
+        # Handle slice case
+        start = kwargs["prediction_timedelta"].start
+        stop = kwargs["prediction_timedelta"].stop
+        step = kwargs["prediction_timedelta"].step
+
+        if start is not None:
+            start = to_timedelta(start)
+        if stop is not None:
+            stop = to_timedelta(stop)
+        if step is not None:
+            step = to_timedelta(step)
+
+        kwargs["prediction_timedelta"] = slice(start, stop, step)
+
+    # Call the original method
+    return _original_dataarray_sel(self, *args, **kwargs)
+
+
+# Apply the patches
+xr.Dataset.sel = _patched_dataset_sel
+xr.DataArray.sel = _patched_dataarray_sel
+# TODO: Keeping the code below for reference, might want to remove
+
+
+# Define the actual implementation
 @xr.register_dataarray_accessor("jua")
 @xr.register_dataset_accessor("jua")
 class _LeadTimeSelector:
@@ -20,23 +94,55 @@ class _LeadTimeSelector:
         self._xarray_obj = xarray_obj
 
     # Lead time can be int, timedelta or slice
-    def sel_lead_time(
-        self, lead_time: int | np.timedelta64 | slice
+    def sel(
+        self,
+        prediction_timedelta: int | np.timedelta64 | slice | None = None,
+        time: np.datetime64 | slice | None = None,
+        latitude: float | slice | None = None,
+        longitude: float | slice | None = None,
+        **kwargs,
     ) -> xr.DataArray | xr.Dataset:
-        if not isinstance(lead_time, slice):
-            lead_time = to_timedelta(lead_time)
+        jua_args = {}
+        if prediction_timedelta is not None:
+            jua_args["prediction_timedelta"] = prediction_timedelta
+        if time is not None:
+            jua_args["time"] = time
+        if latitude is not None:
+            jua_args["latitude"] = latitude
+        if longitude is not None:
+            jua_args["longitude"] = longitude
+        return self._xarray_obj.sel(**jua_args, **kwargs)
 
-        if isinstance(lead_time, slice):
-            # Make sure the slice values are timedeltas
-            start = lead_time.start
-            stop = lead_time.stop
-            if start is not None:
-                start = to_timedelta(start)
-            if stop is not None:
-                stop = to_timedelta(stop)
-            lead_time = slice(start, stop)
 
-        return self._xarray_obj.sel(prediction_timedelta=lead_time)
+# For type checking only
+if TYPE_CHECKING:
+    T = TypeVar("T", bound=xr.DataArray | xr.Dataset)
+
+    class JuaAccessorProtocol(Protocol[T]):
+        def __init__(self, xarray_obj: T) -> None: ...
+
+        def sel(
+            self,
+            prediction_timedelta: int | np.timedelta64 | slice | None = None,
+            time: np.datetime64 | slice | None = None,
+            latitude: float | slice | None = None,
+            longitude: float | slice | None = None,
+            **kwargs,
+        ) -> T: ...
+
+    # Define enhanced types
+    class TypedDataArray(xr.DataArray):
+        jua: JuaAccessorProtocol["TypedDataArray"]
+
+    class TypedDataset(xr.Dataset):
+        jua: JuaAccessorProtocol["TypedDataset"]
+
+        # This is the key addition - make __getitem__ return the TypedDataArray
+        def __getitem__(self, key: any) -> "TypedDataArray": ...
+
+    # Monkey patch the xarray types
+    xr.DataArray = TypedDataArray  # type: ignore
+    xr.Dataset = TypedDataset  # type: ignore
 
 
 class JuaDataset:
@@ -69,6 +175,9 @@ class JuaDataset:
 
     def to_xarray(self) -> xr.Dataset:
         return self._raw_data
+
+    def __getitem__(self, key: any) -> xr.DataArray:
+        return self._raw_data[str(key)]
 
     @validate_call
     def download(
