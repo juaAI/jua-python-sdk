@@ -9,7 +9,7 @@ from jua.client import JuaClient
 from jua.logging import get_logger
 from jua.weather._api import WeatherAPI
 from jua.weather._jua_dataset import JuaDataset, rename_variables
-from jua.weather.models import Model
+from jua.weather.models import Models
 
 logger = get_logger(__name__)
 
@@ -30,12 +30,12 @@ class HindcastMetadata:
 
 class Hindcast:
     _MODEL_METADATA = {
-        Model.EPT2: HindcastMetadata(
+        Models.EPT2: HindcastMetadata(
             start_date=datetime(2023, 1, 1),
             end_date=datetime(2024, 12, 28),
             available_regions=[Region(region="Global", coverage="")],
         ),
-        Model.EPT1_5: HindcastMetadata(
+        Models.EPT1_5: HindcastMetadata(
             start_date=datetime(2022, 1, 1),
             end_date=datetime(2024, 7, 31),
             available_regions=[
@@ -43,14 +43,14 @@ class Hindcast:
                 Region(region="North America", coverage="Various"),
             ],
         ),
-        Model.EPT1_5_EARLY: HindcastMetadata(
+        Models.EPT1_5_EARLY: HindcastMetadata(
             start_date=datetime(2022, 1, 1),
             end_date=datetime(2024, 7, 31),
             available_regions=[
                 Region(region="Europe", coverage=""),
             ],
         ),
-        Model.ECMWF_AIFS025_SINGLE: HindcastMetadata(
+        Models.ECMWF_AIFS025_SINGLE: HindcastMetadata(
             start_date=datetime(2023, 1, 2),
             end_date=datetime(2024, 12, 27),
             available_regions=[
@@ -59,17 +59,17 @@ class Hindcast:
         ),
     }
 
-    def __init__(self, client: JuaClient, model: Model):
+    def __init__(self, client: JuaClient, model: Models):
         self._client = client
         self._model = model
         self._model_name = model.value
         self._api = WeatherAPI(client)
 
         self._HINDCAST_ADAPTERS = {
-            Model.EPT2: self._ept2_adapter,
-            Model.EPT1_5: self._ept15_adapter,
-            Model.EPT1_5_EARLY: self._ept_15_early_adapter,
-            Model.ECMWF_AIFS025_SINGLE: self._aifs025_adapter,
+            Models.EPT2: self._ept2_adapter,
+            Models.EPT1_5: self._ept15_adapter,
+            Models.EPT1_5_EARLY: self._ept_15_early_adapter,
+            Models.ECMWF_AIFS025_SINGLE: self._aifs025_adapter,
         }
 
     @property

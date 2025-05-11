@@ -4,7 +4,7 @@ from pathlib import Path
 import matplotlib.pyplot as plt
 
 from jua.client import JuaClient
-from jua.weather.models import Model
+from jua.weather.models import Models
 from jua.weather.variables import Variables
 
 logging.basicConfig(level=logging.INFO)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     client = JuaClient()
-    model = client.weather.get_model(Model.EPT1_5_EARLY)
+    model = client.weather.get_model(Models.EPT1_5_EARLY)
 
     start_date = model.hindcast.metadata.start_date
     end_date = model.hindcast.metadata.end_date

@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 
 from jua.client import JuaClient
 from jua.types.weather.weather import Coordinate
-from jua.weather.models import Model
+from jua.weather.models import Models
 from jua.weather.variables import Variables
 
 logging.basicConfig(level=logging.INFO)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     client = JuaClient()
-    model = client.weather.get_model(Model.EPT1_5)
+    model = client.weather.get_model(Models.EPT1_5)
 
     print(model.forecast.get_latest_metadata())
     print(model.forecast.get_available_init_times()[-1])

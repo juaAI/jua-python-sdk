@@ -1,7 +1,7 @@
 from jua.client import JuaClient
 from jua.weather.forecast import Forecast
 from jua.weather.hindcast import Hindcast
-from jua.weather.models import Model as ModelEnum
+from jua.weather.models import Models as ModelEnum
 
 
 class Model:

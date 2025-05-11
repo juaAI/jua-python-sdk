@@ -1,7 +1,7 @@
 from jua.client import JuaClient
 from jua.logging import get_logger
 from jua.weather._model import Model
-from jua.weather.models import Model as ModelEnum
+from jua.weather.models import Models as ModelEnum
 
 logger = get_logger(__name__)
 

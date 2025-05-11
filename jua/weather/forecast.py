@@ -14,22 +14,22 @@ from jua.types.weather.weather import Coordinate
 from jua.weather._api import WeatherAPI
 from jua.weather._jua_dataset import JuaDataset, rename_variables
 from jua.weather._model_meta import get_model_meta_info
-from jua.weather.models import Model
+from jua.weather.models import Models
 
 logger = get_logger(__name__)
 
 
 class Forecast:
-    def __init__(self, client: JuaClient, model: Model):
+    def __init__(self, client: JuaClient, model: Models):
         self._client = client
         self._model = model
         self._model_name = model.value
         self._api = WeatherAPI(client)
 
         self._FORECAST_ADAPTERS = {
-            Model.EPT2: self._v3_data_adapter,
-            Model.EPT1_5: self._v2_data_adapter,
-            Model.EPT1_5_EARLY: self._v2_data_adapter,
+            Models.EPT2: self._v3_data_adapter,
+            Models.EPT1_5: self._v2_data_adapter,
+            Models.EPT1_5_EARLY: self._v2_data_adapter,
         }
 
     @property

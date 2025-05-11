@@ -16,7 +16,7 @@ from jua.weather._xarray_patches import (
     as_typed_dataset,
 )
 from jua.weather.conversions import bytes_to_gb
-from jua.weather.models import Model
+from jua.weather.models import Models
 from jua.weather.variables import rename_variable
 
 logger = get_logger(__name__)
@@ -35,7 +35,7 @@ class JuaDataset:
         settings: JuaSettings,
         dataset_name: str,
         raw_data: xr.Dataset,
-        model: Model,
+        model: Models,
     ):
         self._settings = settings
         self._dataset_name = dataset_name

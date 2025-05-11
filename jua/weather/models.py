@@ -3,7 +3,7 @@
 from enum import Enum
 
 
-class Model(str, Enum):
+class Models(str, Enum):
     EPT1_5 = "ept1_5"
     EPT1_5_EARLY = "ept1_5_early"
     EPT2 = "ept2"

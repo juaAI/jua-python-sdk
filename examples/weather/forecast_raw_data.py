@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from jua.client import JuaClient
-from jua.weather.models import Model
+from jua.weather.models import Models
 from jua.weather.variables import Variables
 
 logging.basicConfig(level=logging.INFO)
@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     client = JuaClient()
-    model = client.weather.get_model(Model.EPT2)
+    model = client.weather.get_model(Models.EPT2)
 
     # Let' access the full, global dataset
     dataset = model.forecast.get_latest_forecast_as_dataset()
