@@ -6,12 +6,12 @@ class Variable:
         self,
         name: str,
         unit: str,
-        name_ept1_5: str | None = None,
+        emcwf_code: str | None = None,
         name_ept2: str | None = None,
     ):
         self.name = name
         self.unit = unit
-        self.name_ept1_5 = name_ept1_5
+        self.emcwf_code = emcwf_code
         self.name_ept2 = name_ept2
 
     def __eq__(self, other):
@@ -20,7 +20,7 @@ class Variable:
         return (
             self.name == other.name
             and self.unit == other.unit
-            and self.name_ept1_5 == other.name_ept1_5
+            and self.emcwf_code == other.emcwf_code
             and self.name_ept2 == other.name_ept2
         )
 
@@ -30,11 +30,11 @@ class Variable:
     def __repr__(self):
         return (
             f"Variable(name={self.name}, unit={self.unit}, "
-            f"name_ept1_5={self.name_ept1_5}, name_ept2={self.name_ept2})"
+            f"name_ept1_5={self.emcwf_code}, name_ept2={self.name_ept2})"
         )
 
     def __hash__(self):
-        return hash((self.name, self.unit, self.name_ept1_5, self.name_ept2))
+        return hash((self.name, self.unit, self.emcwf_code, self.name_ept2))
 
 
 class Variables(Enum):
@@ -95,3 +95,21 @@ class Variables(Enum):
         if isinstance(other, Variable):
             return self.value.name == other.value.name
         return NotImplemented
+
+
+_RENAMING_DICT = {
+    **{
+        v.value.emcwf_code: v.value.name
+        for v in Variables
+        if v.value.emcwf_code is not None
+    },
+    **{
+        v.value.name_ept2: v.value.name
+        for v in Variables
+        if v.value.name_ept2 is not None
+    },
+}
+
+
+def rename_variable(variable: str) -> str:
+    return _RENAMING_DICT.get(variable, variable)

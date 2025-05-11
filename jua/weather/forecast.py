@@ -8,70 +8,98 @@ from jua.client import JuaClient
 from jua.logging import get_logger
 from jua.types.weather._api_payload_types import ForecastRequestPayload
 from jua.types.weather._api_response_types import ForecastMetadataResponse
+from jua.types.weather.forecast import ForecastData
+from jua.types.weather.weather import Coordinate
 from jua.weather._api import WeatherAPI
-from jua.weather._jua_dataset import JuaDataset
+from jua.weather._jua_dataset import (
+    JuaDataset,
+    rename_variables_ept1_5,
+    rename_variables_ept2,
+)
 from jua.weather.models import Model
-from jua.weather.variables import Variables
 
 logger = get_logger(__name__)
-
-_MAP_EPT2_TO_NEW_VARIABLES = {
-    v.value.name_ept2: v.value.name for v in Variables if v.value.name_ept2
-}
-_MAP_EPT1_5_TO_NEW_VARIABLES = {
-    v.value.name_ept1_5: str(v.value) for v in Variables if v.value.name_ept1_5
-}
-
-
-def _rename_variables_ept2(ds: xr.Dataset) -> xr.Dataset:
-    return ds.rename(_MAP_EPT2_TO_NEW_VARIABLES)
-
-
-def _rename_variables_ept1_5(ds: xr.Dataset) -> xr.Dataset:
-    return ds.rename(_MAP_EPT1_5_TO_NEW_VARIABLES)
 
 
 class Forecast:
     _MODEL_NAME_MAPPINGS = {
         Model.EPT2: "ept-2",
         Model.EPT1_5: "ept-1.5",
+        Model.EPT1_5_EARLY: "ept-1.5-early",
     }
 
-    def __init__(
-        self,
-        client: JuaClient,
-        model: Model,
-        has_forecast_file_access: bool,
-    ):
+    def __init__(self, client: JuaClient, model: Model):
         self._client = client
         self._model = model
         self._model_name = model.value
         self._api = WeatherAPI(client)
-        self._has_forecast_file_access = has_forecast_file_access
 
         self._FORECAST_ADAPTERS = {
             Model.EPT2: self._v3_data_adapter,
             Model.EPT1_5: self._v2_data_adapter,
+            Model.EPT1_5_EARLY: self._v2_data_adapter,
         }
+
+    def is_file_access_available(self) -> bool:
+        return self._model in self._FORECAST_ADAPTERS
 
     def get_latest(
         self,
         lat: float | None = None,
         lon: float | None = None,
-        payload: ForecastRequestPayload | None = None,
-    ):
+        points: list[Coordinate] | None = None,
+        min_lead_time: int = 0,
+        max_lead_time: int = 0,
+        variables: list[str] | None = None,
+        full: bool = False,
+    ) -> ForecastData:
         return self._api.get_latest_forecast(
-            model_name=self._model_name, lat=lat, lon=lon, payload=payload
+            model_name=self._model_name,
+            lat=lat,
+            lon=lon,
+            payload=ForecastRequestPayload(
+                points=points,
+                min_lead_time=min_lead_time,
+                max_lead_time=max_lead_time,
+                variables=variables,
+                full=full,
+            ),
         )
 
     def get(
         self,
+        init_time: datetime | str | None = None,
         lat: float | None = None,
         lon: float | None = None,
-        payload: ForecastRequestPayload | None = None,
-    ):
+        points: list[Coordinate] | None = None,
+        min_lead_time: int = 0,
+        max_lead_time: int = 0,
+        variables: list[str] | None = None,
+        full: bool = False,
+    ) -> ForecastData:
+        if not init_time:
+            return self.get_latest(
+                lat=lat,
+                lon=lon,
+                points=points,
+                min_lead_time=min_lead_time,
+                max_lead_time=max_lead_time,
+                variables=variables,
+                full=full,
+            )
+
         return self._api.get_forecast(
-            model_name=self._model_name, lat=lat, lon=lon, payload=payload
+            init_time=init_time,
+            model_name=self._model_name,
+            lat=lat,
+            lon=lon,
+            payload=ForecastRequestPayload(
+                points=points,
+                min_lead_time=min_lead_time,
+                max_lead_time=max_lead_time,
+                variables=variables,
+                full=full,
+            ),
         )
 
     def get_latest_metadata(self) -> ForecastMetadataResponse:
@@ -97,7 +125,7 @@ class Forecast:
         init_time: datetime | None = None,
         print_progress: bool | None = None,
     ) -> JuaDataset:
-        if not self._has_forecast_file_access:
+        if not self.is_file_access_available():
             raise ValueError(
                 "This model does not have forecast file access. "
                 "Please check the model documentation."
@@ -144,7 +172,7 @@ class Forecast:
 
         raw_data = self._open_dataset(data_url, print_progress=print_progress)
         # Rename coordinate prediction_timedelta to leadtime
-        raw_data = _rename_variables_ept2(raw_data)
+        raw_data = rename_variables_ept2(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,
@@ -176,7 +204,7 @@ class Forecast:
 
         dataset_name = f"{init_time_str}.zarr"
         raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
-        raw_data = _rename_variables_ept1_5(raw_data)
+        raw_data = rename_variables_ept1_5(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,

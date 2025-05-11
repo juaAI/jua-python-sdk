@@ -5,6 +5,7 @@ from pydantic import validate_call
 from jua._api import API
 from jua._utils.remove_none_from_dict import remove_none_from_dict
 from jua.client import JuaClient
+from jua.errors.jua_error import JuaError
 from jua.types.weather._api_payload_types import ForecastRequestPayload
 from jua.types.weather._api_response_types import (
     AvailableInitTimesResponse,
@@ -25,10 +26,17 @@ class WeatherAPI:
     )
     _LATEST_FORECAST_ENDPOINT = "forecasting/{model_name}/forecasts/latest"
     _FORECAST_ENDPOINT = "forecasting/{model_name}/forecasts/{init_time}"
+    _FORECAST_ENDPOINT_LAT_LON = (
+        "forecasting/{model_name}/forecasts/{init_time}/{lat},{lon}"
+    )
     _BROWSE_FILES_ENDPOINT = "files/browse"
 
     def __init__(self, jua_client: JuaClient):
         self._api = API(jua_client)
+
+    def _encode_init_time(self, init_time: datetime) -> str:
+        # Format should be "2025-05-11T12:43:14.456Z"
+        return init_time.isoformat() + "Z"
 
     def _get_payload_raise_error(
         self,
@@ -36,12 +44,19 @@ class WeatherAPI:
         lon: float | None,
         payload: ForecastRequestPayload | None,
     ):
-        if (lat is None and lon is None) and payload is None:
+        if (lat is None and lon is None) and (
+            payload is None or payload.points is None
+        ):
             raise ValueError("Either lat and lon or payload must be provided")
-        if (lat is not None and lon is not None) and payload is not None:
+        if (lat is not None and lon is not None) and (
+            payload is not None and payload.points is not None
+        ):
             raise ValueError("Only one of lat and lon or payload must be provided")
         if lat is not None and lon is not None:
-            payload = ForecastRequestPayload(points=[Coordinate(lat=lat, lon=lon)])
+            if payload is None:
+                payload = ForecastRequestPayload(points=[Coordinate(lat=lat, lon=lon)])
+            else:
+                payload.points = [Coordinate(lat=lat, lon=lon)]
         return payload
 
     @validate_call
@@ -78,7 +93,6 @@ class WeatherAPI:
         payload: ForecastRequestPayload | None = None,
     ) -> ForecastData:
         payload = self._get_payload_raise_error(lat, lon, payload)
-
         response = self._api.post(
             self._LATEST_FORECAST_ENDPOINT.format(model_name=model_name),
             data=remove_none_from_dict(payload.model_dump()),
@@ -116,9 +130,20 @@ class WeatherAPI:
 
         payload = self._get_payload_raise_error(lat, lon, payload)
         init_time = validate_init_time(init_time)
-        response = self._api.post(
-            self._FORECAST_ENDPOINT.format(model_name=model_name, init_time=init_time),
-            data=remove_none_from_dict(payload.model_dump()),
+        payload_points = payload.points
+        if len(payload_points) > 1:
+            raise JuaError("Only one point is supported for past forecasts")
+        lat = payload_points[0].lat
+        lon = payload_points[0].lon
+
+        params = remove_none_from_dict(payload.model_dump())
+        del params["points"]
+
+        response = self._api.get(
+            self._FORECAST_ENDPOINT_LAT_LON.format(
+                model_name=model_name, init_time=init_time, lat=lat, lon=lon
+            ),
+            params=params,
         )
         response_json = response.json()
         response = ForecastResponse(**response_json)

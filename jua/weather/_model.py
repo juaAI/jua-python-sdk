@@ -1,5 +1,6 @@
 from jua.client import JuaClient
 from jua.weather.forecast import Forecast
+from jua.weather.hindcast import Hindcast
 
 
 class Model:
@@ -7,8 +8,6 @@ class Model:
         self,
         client: JuaClient,
         model_name: str,
-        has_forecast_file_access: bool,
-        has_hindcast_file_access: bool,
     ):
         self._client = client
         self._model_name = model_name
@@ -16,7 +15,11 @@ class Model:
         self._forecast = Forecast(
             client,
             model=model_name,
-            has_forecast_file_access=has_forecast_file_access,
+        )
+
+        self._hindcast = Hindcast(
+            client,
+            model=model_name,
         )
 
     @property
@@ -26,6 +29,10 @@ class Model:
     @property
     def forecast(self) -> Forecast:
         return self._forecast
+
+    @property
+    def hindcast(self) -> Hindcast:
+        return self._hindcast
 
     def __repr__(self) -> str:
         return f"<Model name='{self.model_name}'>"

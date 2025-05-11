@@ -7,6 +7,9 @@ import xarray as xr
 from pydantic import BaseModel
 from pydantic.dataclasses import dataclass
 
+from jua.weather._xarray_patches import TypedDataset, as_typed_dataset
+from jua.weather.variables import rename_variable
+
 
 @dataclass
 class Point:
@@ -22,7 +25,7 @@ class PointResponse(BaseModel, extra="allow"):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
         self._variables = {
-            k: v
+            rename_variable(k): v
             for k, v in kwargs.items()
             if k not in {"requested_latlon", "returned_latlon"}
         }
@@ -38,6 +41,14 @@ class PointResponse(BaseModel, extra="allow"):
             return None
         return self.variables[key]
 
+    def __repr__(self):
+        variables = "\n".join([f"{k}: {v}" for k, v in self.variables.items()])
+        return (
+            f"PointResponse(\nrequested_latlon={self.requested_latlon}\n"
+            f"returned_latlon={self.returned_latlon}\n"
+            f"{variables}\n)"
+        )
+
 
 @dataclass
 class ForecastData:
@@ -49,7 +60,7 @@ class ForecastData:
     times: List[datetime]
     points: List[PointResponse]
 
-    def to_xarray(self) -> xr.Dataset | None:
+    def to_xarray(self) -> TypedDataset | None:
         if len(self.points) == 0:
             return None
 
@@ -103,7 +114,7 @@ class ForecastData:
             .set_index(point=["returned_lat", "returned_lon"])
         )
 
-        return ds
+        return as_typed_dataset(ds)
 
     def to_pandas(self) -> pd.DataFrame | None:
         ds = self.to_xarray()
