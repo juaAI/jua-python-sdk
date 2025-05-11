@@ -23,18 +23,22 @@ def main():
 
     hindcast = model.hindcast.get_hindcast_as_dataset()
     time = "2024-02-01T06:00:00.000000000"
+    hindcast.download(
+        start_date=time,
+        end_date=time,
+        always_download=True,
+        overwrite=True,
+    )
 
     print(hindcast.to_xarray())
-    print(hindcast.to_xarray().time.values)
-
     # get the data for the time
     data = (
         hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
         .jua.sel(time=time, prediction_timedelta=0, method="nearest")
         # Only plot a small part of the data for faster plotting
-        .isel(latitude=slice(0, 1000), longitude=slice(0, 1000))
+        # Note that the latitude must be inverted
+        .sel(latitude=slice(71, 36), longitude=slice(0, 50))
     )
-    print(data)
     data.plot()
     plt.show()
 
@@ -42,7 +46,7 @@ def main():
     output_path = Path(
         "~/data/ept15_early_air_temperature_2024-02-01.zarr"
     ).expanduser()
-    data.to_zarr(output_path, mode="w", zarr_format=2)
+    data.to_zarr(output_path, mode="w", zarr_format=hindcast.zarr_version)
 
 
 if __name__ == "__main__":

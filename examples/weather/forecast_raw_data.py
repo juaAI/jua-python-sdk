@@ -19,6 +19,10 @@ def main():
     dataset = model.forecast.get_latest_forecast_as_dataset()
     print(dataset.to_xarray())
 
+    # Example of downloading the dataset
+    if False:
+        dataset.download(overwrite=True)
+
     # Fenerate a plot for air temperature and wind speed for 0, 12, and 24 hours
     rows = 2
     cols = 3

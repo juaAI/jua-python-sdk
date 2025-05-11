@@ -4,6 +4,7 @@ import xarray as xr
 from pydantic import validate_call
 
 from jua._utils.optional_progress_bar import OptionalProgressBar
+from jua._utils.spinner import Spinner
 from jua.client import JuaClient
 from jua.logging import get_logger
 from jua.types.weather._api_payload_types import ForecastRequestPayload
@@ -30,6 +31,10 @@ class Forecast:
             Model.EPT1_5: self._v2_data_adapter,
             Model.EPT1_5_EARLY: self._v2_data_adapter,
         }
+
+    @property
+    def zarr_version(self) -> int:
+        return get_model_meta_info(self._model).forecast_zarr_version
 
     def is_file_access_available(self) -> bool:
         return self._model in self._FORECAST_ADAPTERS
@@ -131,7 +136,10 @@ class Forecast:
 
     def _open_dataset(self, url: str, print_progress: bool | None = None) -> xr.Dataset:
         logger.info(f"Opening dataset from {url}")
-        with OptionalProgressBar(self._client.settings, print_progress):
+        with Spinner(
+            "Opening dataset...",
+            disable=not self._client.settings.should_print_progress(),
+        ):
             return xr.open_dataset(
                 url,
                 engine="zarr",
@@ -158,8 +166,8 @@ class Forecast:
         data_base_url = self._client.settings.data_base_url
         model_name = get_model_meta_info(self._model).forecast_name_mapping
         init_time_str = init_time.strftime("%Y%m%d%H")
-        dataset_name = f"{init_time_str}.zarr"
-        data_url = f"{data_base_url}/forecasts/{model_name}/{dataset_name}"
+        dataset_name = f"{init_time_str}"
+        data_url = f"{data_base_url}/forecasts/{model_name}/{dataset_name}.zarr"
 
         raw_data = self._open_dataset(data_url, print_progress=print_progress)
         # Rename coordinate prediction_timedelta to leadtime
@@ -193,7 +201,7 @@ class Forecast:
             for hour in range(max_available_hours + 1)
         ]
 
-        dataset_name = f"{init_time_str}.zarr"
+        dataset_name = f"{init_time_str}"
         raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
         raw_data = rename_variables(raw_data)
         return JuaDataset(

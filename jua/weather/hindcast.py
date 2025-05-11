@@ -126,7 +126,7 @@ class Hindcast:
         raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,
-            dataset_name="hindcast-2023-01-01-to-2024-12-28.zarr",
+            dataset_name="hindcast-2023-01-01-to-2024-12-28",
             raw_data=raw_data,
             model=self._model,
         )
@@ -140,7 +140,7 @@ class Hindcast:
         raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,
-            dataset_name="hindcast-2024-europe.zarr",
+            dataset_name="hindcast-2024-europe",
             raw_data=raw_data,
             model=self._model,
         )
@@ -160,7 +160,7 @@ class Hindcast:
         raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,
-            dataset_name="hindcast-ept-1.5-europe-north-america.zarr",
+            dataset_name="hindcast-ept-1.5-europe-north-america",
             raw_data=raw_data,
             model=self._model,
         )
@@ -175,7 +175,7 @@ class Hindcast:
         # Should already have the correct variable names
         return JuaDataset(
             settings=self._client.settings,
-            dataset_name="hindcast-aifs025-global.zarr",
+            dataset_name="hindcast-aifs025-global",
             raw_data=raw_data,
             model=self._model,
         )

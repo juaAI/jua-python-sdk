@@ -1,14 +1,14 @@
 from datetime import datetime
 from pathlib import Path
-from typing import Any
 
-import numpy as np
 import xarray as xr
 from pydantic import validate_call
 
 from jua._utils.optional_progress_bar import OptionalProgressBar
+from jua._utils.spinner import Spinner
 from jua.logging import get_logger
 from jua.settings.jua_settings import JuaSettings
+from jua.weather._model_meta import get_model_meta_info
 from jua.weather._xarray_patches import (
     TypedDataArray,
     TypedDataset,
@@ -17,7 +17,7 @@ from jua.weather._xarray_patches import (
 )
 from jua.weather.conversions import bytes_to_gb
 from jua.weather.models import Model
-from jua.weather.variables import Variables, rename_variable
+from jua.weather.variables import rename_variable
 
 logger = get_logger(__name__)
 
@@ -25,13 +25,6 @@ logger = get_logger(__name__)
 def rename_variables(ds: xr.Dataset) -> xr.Dataset:
     output_variable_names = {k: rename_variable(k) for k in ds.variables}
     return ds.rename(output_variable_names)
-
-
-def _potential_slice_to_str(maybe_slice: slice | Any) -> str:
-    if isinstance(maybe_slice, slice):
-        return f"{maybe_slice.start}-{maybe_slice.stop}"
-    else:
-        return str(maybe_slice)
 
 
 class JuaDataset:
@@ -57,10 +50,12 @@ class JuaDataset:
     def nbytes_gb(self) -> float:
         return bytes_to_gb(self.nbytes)
 
+    @property
+    def zarr_version(self) -> int:
+        return get_model_meta_info(self._model).forecast_zarr_version
+
     def _get_default_output_path(self) -> Path:
-        return (
-            Path.home() / ".jua" / "datasets" / self._model.value / self._dataset_name
-        )
+        return Path.home() / ".jua" / "datasets" / self._model.value
 
     def to_xarray(self) -> TypedDataset:
         return as_typed_dataset(self._raw_data)
@@ -71,11 +66,8 @@ class JuaDataset:
     @validate_call(config={"arbitrary_types_allowed": True})
     def download(
         self,
-        variables: list[Variables] | None = None,
-        time: datetime | slice | None = None,
-        prediction_timedelta: np.timedelta64 | int | slice | None = None,
-        latitude: float | slice | None = None,
-        longitude: float | slice | None = None,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         output_path: Path | None = None,
         show_progress: bool | None = None,
         overwrite: bool = False,
@@ -85,16 +77,13 @@ class JuaDataset:
             output_path = self._get_default_output_path()
 
         output_name = self._dataset_name
-        if time is not None:
-            output_name += f"-time={_potential_slice_to_str(time)}"
-        if prediction_timedelta is not None:
-            output_name += (
-                f"-prediction_timedelta={_potential_slice_to_str(prediction_timedelta)}"
-            )
-        if latitude is not None:
-            output_name += f"-latitude={_potential_slice_to_str(latitude)}"
-        if longitude is not None:
-            output_name += f"-longitude={_potential_slice_to_str(longitude)}"
+
+        if start_date is not None and end_date is not None:
+            output_name += f"-from-{start_date.isoformat()}-to-{end_date.isoformat()}"
+        elif start_date is not None:
+            output_name += f"-since-{start_date.isoformat()}"
+        elif end_date is not None:
+            output_name += f"-before-{end_date.isoformat()}"
 
         if output_path.suffix != ".zarr":
             output_path = output_path / f"{output_name}.zarr"
@@ -106,17 +95,14 @@ class JuaDataset:
             )
             return
 
-        if variables is None:
-            data_to_download = self._raw_data
+        if start_date is not None and end_date is not None:
+            data_to_download = self._raw_data.sel(time=slice(start_date, end_date))
+        elif start_date is not None:
+            data_to_download = self._raw_data.sel(time=slice(start_date, None))
+        elif end_date is not None:
+            data_to_download = self._raw_data.sel(time=slice(None, end_date))
         else:
-            data_to_download = self._raw_data[[str(v) for v in variables]]
-
-        data_to_download = data_to_download.sel(
-            time=time,
-            latitude=latitude,
-            longitude=longitude,
-            prediction_timedelta=prediction_timedelta,
-        )
+            data_to_download = self._raw_data
 
         download_size_gb = bytes_to_gb(data_to_download.nbytes)
         if (
@@ -137,9 +123,14 @@ class JuaDataset:
             f"{self._dataset_name} to {output_path}..."
         )
 
+        with Spinner("Preparing download. This might take a while..."):
+            zarr_version = get_model_meta_info(self._model).forecast_zarr_version
+            logger.info(f"Initializing dataset (zarr_format={zarr_version})...")
+            delayed = data_to_download.to_zarr(
+                output_path, mode="w", zarr_format=zarr_version, compute=False
+            )
+
         with OptionalProgressBar(self._settings, show_progress):
-            logger.info("Initializing dataset...")
-            delayed = data_to_download.to_zarr(output_path, mode="w", compute=False)
             logger.info("Downloading dataset...")
             delayed.compute()
         logger.info(f"Dataset {self._dataset_name} downloaded to {output_path}.")
