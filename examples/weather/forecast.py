@@ -13,7 +13,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     client = JuaClient()
-    model = client.weather.get_model(Model.EPT2)
+    model = client.weather.get_model(Model.EPT1_5)
 
     print(model.forecast.get_latest_metadata())
     print(model.forecast.get_available_init_times()[-1])
