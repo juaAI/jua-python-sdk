@@ -1,30 +1,31 @@
 from jua.client import JuaClient
 from jua.weather.forecast import Forecast
 from jua.weather.hindcast import Hindcast
+from jua.weather.models import Model as ModelEnum
 
 
 class Model:
     def __init__(
         self,
         client: JuaClient,
-        model_name: str,
+        model: ModelEnum,
     ):
         self._client = client
-        self._model_name = model_name
+        self._model = model
 
         self._forecast = Forecast(
             client,
-            model=model_name,
+            model=model,
         )
 
         self._hindcast = Hindcast(
             client,
-            model=model_name,
+            model=model,
         )
 
     @property
     def model_name(self) -> str:
-        return self._model_name
+        return self._model.value
 
     @property
     def forecast(self) -> Forecast:

@@ -11,23 +11,14 @@ from jua.types.weather._api_response_types import ForecastMetadataResponse
 from jua.types.weather.forecast import ForecastData
 from jua.types.weather.weather import Coordinate
 from jua.weather._api import WeatherAPI
-from jua.weather._jua_dataset import (
-    JuaDataset,
-    rename_variables_ept1_5,
-    rename_variables_ept2,
-)
+from jua.weather._jua_dataset import JuaDataset, rename_variables
+from jua.weather._model_meta import get_model_meta_info
 from jua.weather.models import Model
 
 logger = get_logger(__name__)
 
 
 class Forecast:
-    _MODEL_NAME_MAPPINGS = {
-        Model.EPT2: "ept-2",
-        Model.EPT1_5: "ept-1.5",
-        Model.EPT1_5_EARLY: "ept-1.5-early",
-    }
-
     def __init__(self, client: JuaClient, model: Model):
         self._client = client
         self._model = model
@@ -165,14 +156,14 @@ class Forecast:
         self, init_time: datetime, print_progress: bool | None = None
     ) -> JuaDataset:
         data_base_url = self._client.settings.data_base_url
-        model_name = self._MODEL_NAME_MAPPINGS[self._model]
+        model_name = get_model_meta_info(self._model).forecast_name_mapping
         init_time_str = init_time.strftime("%Y%m%d%H")
         dataset_name = f"{init_time_str}.zarr"
         data_url = f"{data_base_url}/forecasts/{model_name}/{dataset_name}"
 
         raw_data = self._open_dataset(data_url, print_progress=print_progress)
         # Rename coordinate prediction_timedelta to leadtime
-        raw_data = rename_variables_ept2(raw_data)
+        raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,
@@ -184,7 +175,7 @@ class Forecast:
         self, init_time: datetime, print_progress: bool | None = None
     ) -> JuaDataset:
         data_base_url = self._client.settings.data_base_url
-        model_name = self._MODEL_NAME_MAPPINGS[self._model]
+        model_name = get_model_meta_info(self._model).forecast_name_mapping
         init_time_str = init_time.strftime("%Y%m%d%H")
         # This is a bit hacky:
         # For EPT1.5, get_metadata will result in an error
@@ -204,7 +195,7 @@ class Forecast:
 
         dataset_name = f"{init_time_str}.zarr"
         raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
-        raw_data = rename_variables_ept1_5(raw_data)
+        raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,

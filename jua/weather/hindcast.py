@@ -8,11 +8,7 @@ from jua._utils.optional_progress_bar import OptionalProgressBar
 from jua.client import JuaClient
 from jua.logging import get_logger
 from jua.weather._api import WeatherAPI
-from jua.weather._jua_dataset import (
-    JuaDataset,
-    rename_variables_ept1_5,
-    rename_variables_ept2,
-)
+from jua.weather._jua_dataset import JuaDataset, rename_variables
 from jua.weather.models import Model
 
 logger = get_logger(__name__)
@@ -40,23 +36,23 @@ class Hindcast:
             available_regions=[Region(region="Global", coverage="")],
         ),
         Model.EPT1_5: HindcastMetadata(
-            start_date=datetime(2024, 1, 1),
-            end_date=datetime(2024, 1, 1),
+            start_date=datetime(2022, 1, 1),
+            end_date=datetime(2024, 7, 31),
             available_regions=[
                 Region(region="Europe", coverage="36°-72°N, -15°-35°E"),
                 Region(region="North America", coverage="Various"),
             ],
         ),
         Model.EPT1_5_EARLY: HindcastMetadata(
-            start_date=datetime(2024, 1, 1),
-            end_date=datetime(2024, 1, 1),
+            start_date=datetime(2022, 1, 1),
+            end_date=datetime(2024, 7, 31),
             available_regions=[
                 Region(region="Europe", coverage=""),
             ],
         ),
         Model.ECMWF_AIFS025_SINGLE: HindcastMetadata(
-            start_date=datetime(2024, 1, 1),
-            end_date=datetime(2024, 1, 1),
+            start_date=datetime(2023, 1, 2),
+            end_date=datetime(2024, 12, 27),
             available_regions=[
                 Region(region="Global", coverage=""),
             ],
@@ -76,13 +72,16 @@ class Hindcast:
             Model.ECMWF_AIFS025_SINGLE: self._aifs025_adapter,
         }
 
+    @property
+    def metadata(self) -> HindcastMetadata:
+        return self._MODEL_METADATA[self._model]
+
     def is_file_access_available(self) -> bool:
         return self._model in self._HINDCAST_ADAPTERS
 
     @validate_call
     def get_hindcast_as_dataset(
         self,
-        init_time: datetime | None = None,
         print_progress: bool | None = None,
     ) -> JuaDataset:
         if not self.is_file_access_available():
@@ -91,9 +90,7 @@ class Hindcast:
                 "Please check the model documentation."
             )
 
-        return self._HINDCAST_ADAPTERS[self._model](
-            init_time, print_progress=print_progress
-        )
+        return self._HINDCAST_ADAPTERS[self._model](print_progress=print_progress)
 
     def _open_dataset(self, url: str, print_progress: bool | None = None) -> xr.Dataset:
         logger.info(f"Opening dataset from {url}")
@@ -126,7 +123,7 @@ class Hindcast:
 
         raw_data = self._open_dataset(data_url, print_progress=print_progress)
         # Rename coordinate prediction_timedelta to leadtime
-        raw_data = rename_variables_ept2(raw_data)
+        raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name="hindcast-2023-01-01-to-2024-12-28.zarr",
@@ -140,7 +137,7 @@ class Hindcast:
 
         raw_data = self._open_dataset(data_url, print_progress=print_progress)
         # Rename coordinate prediction_timedelta to leadtime
-        raw_data = rename_variables_ept1_5(raw_data)
+        raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name="hindcast-2024-europe.zarr",
@@ -160,7 +157,7 @@ class Hindcast:
         ]
 
         raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
-        raw_data = rename_variables_ept1_5(raw_data)
+        raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name="hindcast-ept-1.5-europe-north-america.zarr",
@@ -170,7 +167,9 @@ class Hindcast:
 
     def _aifs025_adapter(self, print_progress: bool | None = None) -> JuaDataset:
         data_base_url = self._client.settings.data_base_url
-        zarr_url = f"{data_base_url}/aifs/v1/global/2023-01-02-to-2024-12-27.zarr/"
+        zarr_url = (
+            f"{data_base_url}/hindcasts/aifs/v1/global/2023-01-02-to-2024-12-27.zarr/"
+        )
 
         raw_data = self._open_dataset(zarr_url, print_progress=print_progress)
         # Should already have the correct variable names

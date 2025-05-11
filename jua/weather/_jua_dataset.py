@@ -1,5 +1,8 @@
+from datetime import datetime
 from pathlib import Path
+from typing import Any
 
+import numpy as np
 import xarray as xr
 from pydantic import validate_call
 
@@ -14,24 +17,21 @@ from jua.weather._xarray_patches import (
 )
 from jua.weather.conversions import bytes_to_gb
 from jua.weather.models import Model
-from jua.weather.variables import Variables
+from jua.weather.variables import Variables, rename_variable
 
 logger = get_logger(__name__)
 
-_MAP_EPT2_TO_NEW_VARIABLES = {
-    v.value.name_ept2: v.value.name for v in Variables if v.value.name_ept2
-}
-_MAP_EPT1_5_TO_NEW_VARIABLES = {
-    v.value.emcwf_code: str(v.value) for v in Variables if v.value.emcwf_code
-}
+
+def rename_variables(ds: xr.Dataset) -> xr.Dataset:
+    output_variable_names = {k: rename_variable(k) for k in ds.variables}
+    return ds.rename(output_variable_names)
 
 
-def rename_variables_ept2(ds: xr.Dataset) -> xr.Dataset:
-    return ds.rename(_MAP_EPT2_TO_NEW_VARIABLES)
-
-
-def rename_variables_ept1_5(ds: xr.Dataset) -> xr.Dataset:
-    return ds.rename(_MAP_EPT1_5_TO_NEW_VARIABLES)
+def _potential_slice_to_str(maybe_slice: slice | Any) -> str:
+    if isinstance(maybe_slice, slice):
+        return f"{maybe_slice.start}-{maybe_slice.stop}"
+    else:
+        return str(maybe_slice)
 
 
 class JuaDataset:
@@ -68,9 +68,14 @@ class JuaDataset:
     def __getitem__(self, key: any) -> TypedDataArray:
         return as_typed_dataarray(self._raw_data[str(key)])
 
-    @validate_call
+    @validate_call(config={"arbitrary_types_allowed": True})
     def download(
         self,
+        variables: list[Variables] | None = None,
+        time: datetime | slice | None = None,
+        prediction_timedelta: np.timedelta64 | int | slice | None = None,
+        latitude: float | slice | None = None,
+        longitude: float | slice | None = None,
         output_path: Path | None = None,
         show_progress: bool | None = None,
         overwrite: bool = False,
@@ -79,6 +84,21 @@ class JuaDataset:
         if output_path is None:
             output_path = self._get_default_output_path()
 
+        output_name = self._dataset_name
+        if time is not None:
+            output_name += f"-time={_potential_slice_to_str(time)}"
+        if prediction_timedelta is not None:
+            output_name += (
+                f"-prediction_timedelta={_potential_slice_to_str(prediction_timedelta)}"
+            )
+        if latitude is not None:
+            output_name += f"-latitude={_potential_slice_to_str(latitude)}"
+        if longitude is not None:
+            output_name += f"-longitude={_potential_slice_to_str(longitude)}"
+
+        if output_path.suffix != ".zarr":
+            output_path = output_path / f"{output_name}.zarr"
+
         if output_path.exists() and not overwrite:
             logger.warning(
                 f"Dataset {self._dataset_name} already exists at {output_path}. "
@@ -86,7 +106,19 @@ class JuaDataset:
             )
             return
 
-        download_size_gb = bytes_to_gb(self._raw_data.nbytes)
+        if variables is None:
+            data_to_download = self._raw_data
+        else:
+            data_to_download = self._raw_data[[str(v) for v in variables]]
+
+        data_to_download = data_to_download.sel(
+            time=time,
+            latitude=latitude,
+            longitude=longitude,
+            prediction_timedelta=prediction_timedelta,
+        )
+
+        download_size_gb = bytes_to_gb(data_to_download.nbytes)
         if (
             not always_download
             and download_size_gb > self._DOWLOAD_SIZE_WARNING_THRESHOLD_GB
@@ -99,6 +131,7 @@ class JuaDataset:
             if yn.lower() != "y":
                 logger.info("Skipping download.")
                 return
+
         logger.info(
             f"Downloading {download_size_gb:.2f}GB dataset "
             f"{self._dataset_name} to {output_path}..."
@@ -106,7 +139,7 @@ class JuaDataset:
 
         with OptionalProgressBar(self._settings, show_progress):
             logger.info("Initializing dataset...")
-            delayed = self._raw_data.to_zarr(output_path, mode="w", compute=False)
+            delayed = data_to_download.to_zarr(output_path, mode="w", compute=False)
             logger.info("Downloading dataset...")
             delayed.compute()
         logger.info(f"Dataset {self._dataset_name} downloaded to {output_path}.")

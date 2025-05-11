@@ -21,8 +21,7 @@ class Weather:
     def __init__(self, client: JuaClient) -> None:
         self._client = client
         self._lazy_models = {
-            model: _LayzModelWrapper(client=client, model_name=model)
-            for model in ModelEnum
+            model: _LayzModelWrapper(client=client, model=model) for model in ModelEnum
         }
 
     def __getitem__(self, model: ModelEnum) -> Model:
