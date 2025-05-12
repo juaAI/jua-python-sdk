@@ -7,13 +7,37 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class AuthenticationSettings(BaseSettings):
-    """
-    Authentication settings for JUA API.
+    """Authentication settings for JUA API.
 
-    Credential sources (in order of priority):
-    1. Environment variables (JUA_API_KEY_ID, JUA_API_KEY_SECRET)
-    2. .env file in current directory
-    3. JSON file at secrets_path or ~/.jua/api-key.json
+    Manages API credentials for authenticating with the Jua platform. Credentials
+    can be provided from multiple sources with the following priority order:
+
+    1. Direct initialization via constructor arguments
+    2. Environment variables (JUA_API_KEY_ID, JUA_API_KEY_SECRET)
+    3. .env file in the current directory
+    4. JSON file at the specified secrets_path or default location
+       (~/.jua/<environment>/api-key.json)
+
+    Attributes:
+        api_key_id: API key identifier for authentication with Jua services.
+        api_key_secret: Secret key that pairs with the api_key_id.
+        environment: Environment name used to determine configuration settings
+            and default secrets file location.
+        secrets_path: Optional custom path to load API credentials from a JSON file.
+            If provided, overrides the default location.
+
+    Examples:
+        Create with explicit credentials:
+        >>> auth = AuthenticationSettings(
+            api_key_id="your_id",
+            api_key_secret="your_secret",
+        )
+
+        Create using credentials from .env file or environment variables:
+        >>> auth = AuthenticationSettings()
+
+        Create with custom JSON file location:
+        >>> auth = AuthenticationSettings(secrets_path="/path/to/secrets.json")
     """
 
     api_key_id: str | None = Field(
@@ -61,7 +85,12 @@ class AuthenticationSettings(BaseSettings):
             self._load_from_json_file()
 
     def _load_from_json_file(self) -> None:
-        """Load credentials from JSON file if needed."""
+        """Load credentials from JSON file if needed.
+
+        Attempts to read API credentials from either the specified secrets_path
+        or the default location (~/.jua/<environment>/api-key.json). Silently
+        fails if the file doesn't exist or contains invalid JSON.
+        """
         # Determine the secrets file path
         if self.secrets_path:
             file_path = Path(self.secrets_path)
@@ -83,8 +112,20 @@ class AuthenticationSettings(BaseSettings):
 
     @property
     def is_authenticated(self) -> bool:
-        """Check if authentication credentials are properly set."""
+        """Check if authentication credentials are properly set.
+
+        Returns:
+            True if both api_key_id and api_key_secret are non-empty,
+            False otherwise.
+        """
         return bool(self.api_key_id and self.api_key_secret)
 
     def get_basic_auth(self) -> BasicAuth:
+        """Get BasicAuth object for HTTP authentication.
+
+        Constructs an aiohttp.BasicAuth object using the API credentials.
+
+        Returns:
+            BasicAuth object that can be used with aiohttp client requests.
+        """
         return BasicAuth(login=self.api_key_id, password=self.api_key_secret)

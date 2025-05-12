@@ -5,6 +5,34 @@ from jua.settings.authentication import AuthenticationSettings
 
 
 class JuaSettings(BaseSettings):
+    """Settings for configuring the Jua SDK client.
+
+    This class contains all configuration options for the Jua API client,
+    including API endpoints, authentication, and behavior preferences.
+    Settings can be provided via environment variables prefixed with 'JUA_',
+    a .env file, or directly in code.
+
+    Attributes:
+        api_url: Base URL for the JUA API endpoints.
+        api_version: Version of the API to use (e.g., "v1").
+        data_base_url: Base URL for data access services.
+        auth: Authentication configuration including API keys.
+        print_progress: Whether to display progress bars during operations.
+
+    Examples:
+        Create with defaults:
+        >>> settings = JuaSettings()
+
+        Override specific settings:
+        >>> settings = JuaSettings(
+            api_url="https://api.example.com",
+            print_progress=False,
+        )
+
+        Load from environment variables:
+        JUA_API_URL=https://api.example.com JUA_PRINT_PROGRESS=false python script.py
+    """
+
     api_url: str = Field(
         default="https://api.jua.sh", description="Base URL for the JUA API"
     )
@@ -34,14 +62,17 @@ class JuaSettings(BaseSettings):
     )
 
     def should_print_progress(self, print_progress: bool | None = None) -> bool:
-        """
-        Determine if progress should be printed.
+        """Determine if progress information should be displayed.
+
+        This method considers both the global setting and any request-specific
+        override to determine if progress information should be displayed.
 
         Args:
-            print_progress: Optional override for the print_progress setting
+            print_progress: If provided, overrides the instance's print_progress
+                setting. When None, uses the instance setting.
 
         Returns:
-            Boolean indicating whether progress should be printed
+            True if progress should be displayed, False otherwise.
         """
         if print_progress is None:
             return self.print_progress

@@ -1,4 +1,16 @@
 def remove_none_from_dict(d: dict, max_recursion: int = 10) -> dict:
+    """Recursively remove None values from a dictionary.
+
+    Traverses through dictionaries and lists within the input dictionary
+    to remove all None values while preserving structure.
+
+    Args:
+        d: Dictionary to process.
+        max_recursion: Maximum recursion depth. Defaults to 10.
+
+    Returns:
+        New dictionary with all None values removed.
+    """
     if max_recursion == 0:
         return d
     cleaned_dict = {}

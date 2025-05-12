@@ -2,7 +2,14 @@ from jua.errors.jua_error import JuaError
 
 
 class NotAuthenticatedError(JuaError):
+    """Error raised when API requests fail due to missing or invalid authentication."""
+
     def __init__(self, status_code: int | None = None):
+        """Initialize with optional status code.
+
+        Args:
+            status_code: HTTP status code from the failed request.
+        """
         super().__init__(
             "Not authenticated",
             details="Please check your API key and try again.",
@@ -17,7 +24,14 @@ class NotAuthenticatedError(JuaError):
 
 
 class UnauthorizedError(JuaError):
+    """Error raised when API requests are rejected due to insufficient permissions."""
+
     def __init__(self, status_code: int | None = None):
+        """Initialize with optional status code.
+
+        Args:
+            status_code: HTTP status code from the failed request.
+        """
         super().__init__(
             "Unauthorized",
             details="Please check your API key and try again.",
@@ -25,7 +39,14 @@ class UnauthorizedError(JuaError):
 
 
 class NotFoundError(JuaError):
+    """Error raised when a requested resource does not exist."""
+
     def __init__(self, status_code: int | None = None):
+        """Initialize with optional status code.
+
+        Args:
+            status_code: HTTP status code from the failed request.
+        """
         super().__init__(
             "Not found",
             details="The requested resource was not found.",

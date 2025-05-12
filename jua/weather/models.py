@@ -4,6 +4,19 @@ from enum import Enum
 
 
 class Models(str, Enum):
+    """Weather forecast models available through the Jua API.
+
+    This enum defines the set of weather models that can be requested
+    when fetching forecasts or hindcasts. Use these constants when
+    specifying which model to use with weather data functions.
+
+    Examples:
+        >>> from jua.weather.models import Models
+        >>> # Request forecast from a specific model
+        >>> model = client.weather.get_model(Models.EPT1_5)
+        >>> model.forecast.get_latest()
+    """
+
     EPT1_5 = "ept1_5"
     EPT1_5_EARLY = "ept1_5_early"
     EPT2 = "ept2"

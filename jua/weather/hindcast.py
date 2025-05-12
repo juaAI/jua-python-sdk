@@ -18,12 +18,27 @@ logger = get_logger(__name__)
 
 @dataclass
 class Region:
+    """Geographic region with associated coverage information.
+
+    Attributes:
+        region: Name of the geographic region (e.g., "Europe", "Global").
+        coverage: String description of the region's coordinate boundaries.
+    """
+
     region: str
     coverage: str
 
 
 @dataclass
 class HindcastMetadata:
+    """Metadata describing the available hindcast data for a model.
+
+    Attributes:
+        start_date: Beginning date of available hindcast data.
+        end_date: End date of available hindcast data.
+        available_regions: List of geographic regions covered by the hindcast.
+    """
+
     start_date: datetime
     end_date: datetime
 
@@ -31,6 +46,15 @@ class HindcastMetadata:
 
 
 class Hindcast:
+    """Access to historical weather data (hindcasts) for a specific model.
+
+    This class provides methods to retrieve hindcast data from Jua's archive
+    of historical model runs.
+
+    Not all models have hindcast data available. Use the is_file_access_available()
+    method to check if a model supports hindcasts.
+    """
+
     _MODEL_METADATA = {
         Models.EPT2: HindcastMetadata(
             start_date=datetime(2023, 1, 1),
@@ -62,6 +86,12 @@ class Hindcast:
     }
 
     def __init__(self, client: JuaClient, model: Models):
+        """Initialize hindcast access for a specific model.
+
+        Args:
+            client: JuaClient instance for authentication and settings.
+            model: Weather model to access hindcast data for.
+        """
         self._client = client
         self._model = model
         self._model_name = model.value
@@ -75,15 +105,29 @@ class Hindcast:
         }
 
     def _raise_if_no_file_access(self):
+        """Check for hindcast availability and raise error if unavailable."""
         if not self.is_file_access_available():
             raise ModelHasNoHindcastData(self._model_name)
 
     @property
     def metadata(self) -> HindcastMetadata:
+        """Get metadata about the available hindcast data for this model.
+
+        Returns:
+            HindcastMetadata with date ranges and available regions.
+
+        Raises:
+            ModelHasNoHindcastData: If the model doesn't support hindcasts.
+        """
         self._raise_if_no_file_access()
         return self._MODEL_METADATA[self._model]
 
     def is_file_access_available(self) -> bool:
+        """Check if hindcast data is available for this model.
+
+        Returns:
+            True if hindcast data is available, False otherwise.
+        """
         return self._model in self._HINDCAST_ADAPTERS
 
     @validate_call
@@ -91,6 +135,22 @@ class Hindcast:
         self,
         print_progress: bool | None = None,
     ) -> JuaDataset:
+        """Retrieve the complete hindcast dataset for this model.
+
+        This method loads the full hindcast dataset for the model, which may
+        take some time to load.
+        Note: The data is not being downloaded.
+
+        Args:
+            print_progress: Whether to display a progress bar during data loading.
+                If None, uses the client's default setting.
+
+        Returns:
+            JuaDataset containing the hindcast data.
+
+        Raises:
+            ModelHasNoHindcastData: If the model doesn't support hindcasts.
+        """
         self._raise_if_no_file_access()
 
         return self._HINDCAST_ADAPTERS[self._model](print_progress=print_progress)
@@ -98,6 +158,15 @@ class Hindcast:
     def _open_dataset(
         self, url: str | list[str], print_progress: bool | None = None
     ) -> xr.Dataset:
+        """Open a dataset from the given URL with appropriate chunking.
+
+        Args:
+            url: URL or list of URLs to the dataset files.
+            print_progress: Whether to display a progress bar.
+
+        Returns:
+            Opened xarray Dataset.
+        """
         chunks = get_model_meta_info(self._model).hindcast_chunks
         return open_dataset(
             self._client,
@@ -107,6 +176,7 @@ class Hindcast:
         )
 
     def _ept2_adapter(self, print_progress: bool | None = None) -> JuaDataset:
+        """Load EPT2 hindcast dataset."""
         data_base_url = self._client.settings.data_base_url
         data_url = (
             f"{data_base_url}/hindcasts/ept-2/v2/global/2023-01-01-to-2024-12-28.zarr"
@@ -123,6 +193,7 @@ class Hindcast:
         )
 
     def _ept_15_early_adapter(self, print_progress: bool | None = None) -> JuaDataset:
+        """Load EPT1.5 Early hindcast dataset."""
         data_base_url = self._client.settings.data_base_url
         data_url = f"{data_base_url}/hindcasts/ept-1.5-early/europe/2024.zarr/"
 
@@ -137,6 +208,7 @@ class Hindcast:
         )
 
     def _ept15_adapter(self, print_progress: bool | None = None) -> JuaDataset:
+        """Load EPT1.5 hindcast dataset (multiple regions)."""
         data_base_url = self._client.settings.data_base_url
 
         zarr_urls = [
@@ -157,6 +229,7 @@ class Hindcast:
         )
 
     def _aifs025_adapter(self, print_progress: bool | None = None) -> JuaDataset:
+        """Load AIFS025 hindcast dataset."""
         data_base_url = self._client.settings.data_base_url
         zarr_url = (
             f"{data_base_url}/hindcasts/aifs/v1/global/2023-01-02-to-2024-12-27.zarr/"
