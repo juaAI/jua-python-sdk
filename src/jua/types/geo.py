@@ -1,3 +1,4 @@
+import numpy as np
 from pydantic import Field
 from pydantic.dataclasses import dataclass
 
@@ -13,3 +14,9 @@ class LatLon:
 
     lat: float = Field(..., ge=-90, le=90)
     lon: float = Field(..., ge=-180, le=180)
+
+
+PredictionTimeDelta = (
+    int | np.timedelta64 | slice | list[int] | list[np.timedelta64] | None
+)
+SpatialSelection = float | slice | list[float] | None

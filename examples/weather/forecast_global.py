@@ -1,7 +1,6 @@
 import logging
 
 import matplotlib.pyplot as plt
-from dask.diagnostics import ProgressBar
 
 from jua.client import JuaClient
 from jua.weather.models import Models
@@ -16,7 +15,14 @@ def main():
     model = client.weather.get_model(Models.EPT2)
 
     # Let' access the full, global dataset
-    dataset = model.forecast.get_latest_forecast_as_dataset()
+    lead_times_hours = [0, 12, 24]
+    dataset = model.forecast.get_latest_forecast_as_dataset(
+        prediction_timedelta=lead_times_hours,
+        variables=[
+            Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
+            Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+        ],
+    )
     print(dataset.to_xarray())
 
     # Fenerate a plot for air temperature and wind speed for 0, 12, and 24 hours
@@ -36,18 +42,12 @@ def main():
         Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
     ]
 
-    lead_times_hours = [0, 12, 24]
     colormaps = ["viridis", "plasma"]  # One cmap per variable/row
 
     # Loop through each variable (row)
     for r_idx, variable_key in enumerate(variables_to_plot):
         print(f"Loading data for {variable_key} at lead times {lead_times_hours}")
-        with ProgressBar():
-            data = (
-                dataset[variable_key]
-                .jua.sel(prediction_timedelta=lead_times_hours)
-                .compute()
-            )
+        data = dataset[variable_key]
 
         # Determine vmin and vmax for the current row using all its data
         # Using np.nanmin and np.nanmax to be robust to NaNs if any

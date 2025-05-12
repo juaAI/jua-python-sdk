@@ -8,10 +8,12 @@ from jua._utils.dataset import open_dataset
 from jua.client import JuaClient
 from jua.errors.model_errors import ModelHasNoHindcastData
 from jua.logging import get_logger
+from jua.types.geo import PredictionTimeDelta, SpatialSelection
 from jua.weather._api import WeatherAPI
-from jua.weather._jua_dataset import JuaDataset, rename_variables
+from jua.weather._jua_dataset import JuaDataset
 from jua.weather._model_meta import get_model_meta_info
 from jua.weather.models import Models
+from jua.weather.variables import Variables
 
 logger = get_logger(__name__)
 
@@ -130,10 +132,16 @@ class Hindcast:
         """
         return self._model in self._HINDCAST_ADAPTERS
 
-    @validate_call
-    def get_hindcast_as_dataset(
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_hindcast(
         self,
         print_progress: bool | None = None,
+        variables: list[Variables] | list[str] | None = None,
+        time: datetime | None = None,
+        prediction_timedelta: PredictionTimeDelta = None,
+        latitude: SpatialSelection | None = None,
+        longitude: SpatialSelection | None = None,
+        method: str | None = None,
     ) -> JuaDataset:
         """Retrieve the complete hindcast dataset for this model.
 
@@ -153,10 +161,21 @@ class Hindcast:
         """
         self._raise_if_no_file_access()
 
-        return self._HINDCAST_ADAPTERS[self._model](print_progress=print_progress)
+        return self._HINDCAST_ADAPTERS[self._model](
+            print_progress=print_progress,
+            variables=variables,
+            time=time,
+            prediction_timedelta=prediction_timedelta,
+            latitude=latitude,
+            longitude=longitude,
+            method=method,
+        )
 
     def _open_dataset(
-        self, url: str | list[str], print_progress: bool | None = None
+        self,
+        url: str | list[str],
+        print_progress: bool | None = None,
+        **kwargs,
     ) -> xr.Dataset:
         """Open a dataset from the given URL with appropriate chunking.
 
@@ -173,18 +192,17 @@ class Hindcast:
             url,
             should_print_progress=print_progress,
             chunks=chunks,
+            **kwargs,
         )
 
-    def _ept2_adapter(self, print_progress: bool | None = None) -> JuaDataset:
+    def _ept2_adapter(self, print_progress: bool | None = None, **kwargs) -> JuaDataset:
         """Load EPT2 hindcast dataset."""
         data_base_url = self._client.settings.data_base_url
         data_url = (
             f"{data_base_url}/hindcasts/ept-2/v2/global/2023-01-01-to-2024-12-28.zarr"
         )
 
-        raw_data = self._open_dataset(data_url, print_progress=print_progress)
-        # Rename coordinate prediction_timedelta to leadtime
-        raw_data = rename_variables(raw_data)
+        raw_data = self._open_dataset(data_url, print_progress=print_progress, **kwargs)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name="hindcast-2023-01-01-to-2024-12-28",
@@ -192,14 +210,14 @@ class Hindcast:
             model=self._model,
         )
 
-    def _ept_15_early_adapter(self, print_progress: bool | None = None) -> JuaDataset:
+    def _ept_15_early_adapter(
+        self, print_progress: bool | None = None, **kwargs
+    ) -> JuaDataset:
         """Load EPT1.5 Early hindcast dataset."""
         data_base_url = self._client.settings.data_base_url
         data_url = f"{data_base_url}/hindcasts/ept-1.5-early/europe/2024.zarr/"
 
-        raw_data = self._open_dataset(data_url, print_progress=print_progress)
-        # Rename coordinate prediction_timedelta to leadtime
-        raw_data = rename_variables(raw_data)
+        raw_data = self._open_dataset(data_url, print_progress=print_progress, **kwargs)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name="hindcast-2024-europe",
@@ -207,7 +225,9 @@ class Hindcast:
             model=self._model,
         )
 
-    def _ept15_adapter(self, print_progress: bool | None = None) -> JuaDataset:
+    def _ept15_adapter(
+        self, print_progress: bool | None = None, **kwargs
+    ) -> JuaDataset:
         """Load EPT1.5 hindcast dataset (multiple regions)."""
         data_base_url = self._client.settings.data_base_url
 
@@ -219,8 +239,9 @@ class Hindcast:
             f"{data_base_url}/hindcasts/ept-1.5/north-america/2024.zarr/",
         ]
 
-        raw_data = self._open_dataset(zarr_urls, print_progress=print_progress)
-        raw_data = rename_variables(raw_data)
+        raw_data = self._open_dataset(
+            zarr_urls, print_progress=print_progress, **kwargs
+        )
         return JuaDataset(
             settings=self._client.settings,
             dataset_name="hindcast-ept-1.5-europe-north-america",
@@ -228,15 +249,17 @@ class Hindcast:
             model=self._model,
         )
 
-    def _aifs025_adapter(self, print_progress: bool | None = None) -> JuaDataset:
+    def _aifs025_adapter(
+        self, print_progress: bool | None = None, **kwargs
+    ) -> JuaDataset:
         """Load AIFS025 hindcast dataset."""
         data_base_url = self._client.settings.data_base_url
         zarr_url = (
             f"{data_base_url}/hindcasts/aifs/v1/global/2023-01-02-to-2024-12-27.zarr/"
         )
 
-        raw_data = self._open_dataset(zarr_url, print_progress=print_progress)
-        # Should already have the correct variable names
+        raw_data = self._open_dataset(zarr_url, print_progress=print_progress, **kwargs)
+
         return JuaDataset(
             settings=self._client.settings,
             dataset_name="hindcast-aifs025-global",

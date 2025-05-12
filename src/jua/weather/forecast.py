@@ -7,14 +7,15 @@ from jua._utils.dataset import open_dataset
 from jua.client import JuaClient
 from jua.errors.model_errors import ModelDoesNotSupportForecastRawDataAccessError
 from jua.logging import get_logger
-from jua.types.geo import LatLon
+from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
 from jua.weather._api import WeatherAPI
-from jua.weather._jua_dataset import JuaDataset, rename_variables
+from jua.weather._jua_dataset import JuaDataset
 from jua.weather._model_meta import get_model_meta_info
 from jua.weather._types.api_payload_types import ForecastRequestPayload
 from jua.weather._types.api_response_types import ForecastMetadataResponse
 from jua.weather._types.forecast import ForecastData
 from jua.weather.models import Models
+from jua.weather.variables import Variables
 
 logger = get_logger(__name__)
 
@@ -114,14 +115,34 @@ class Forecast:
 
     # TODO: is_ready(init_time, forecast_horizon)
 
-    def get_latest_forecast_as_dataset(self) -> JuaDataset:
-        return self.get_forecast_as_dataset()
+    def get_latest_forecast_as_dataset(
+        self,
+        print_progress: bool | None = None,
+        variables: list[Variables] | list[str] | None = None,
+        prediction_timedelta: PredictionTimeDelta = None,
+        latitude: SpatialSelection | None = None,
+        longitude: SpatialSelection | None = None,
+        method: str | None = None,
+    ) -> JuaDataset:
+        return self.get_forecast_as_dataset(
+            variables=variables,
+            print_progress=print_progress,
+            prediction_timedelta=prediction_timedelta,
+            latitude=latitude,
+            longitude=longitude,
+            method=method,
+        )
 
-    @validate_call
+    @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_forecast_as_dataset(
         self,
+        variables: list[Variables] | list[str] | None = None,
         init_time: datetime | None = None,
         print_progress: bool | None = None,
+        prediction_timedelta: PredictionTimeDelta = None,
+        latitude: SpatialSelection | None = None,
+        longitude: SpatialSelection | None = None,
+        method: str | None = None,
     ) -> JuaDataset:
         if not self.is_file_access_available():
             raise ModelDoesNotSupportForecastRawDataAccessError(self._model_name)
@@ -130,11 +151,17 @@ class Forecast:
             init_time = self.get_latest_metadata().init_time
 
         return self._FORECAST_ADAPTERS[self._model](
-            init_time, print_progress=print_progress
+            init_time,
+            variables=variables,
+            print_progress=print_progress,
+            prediction_timedelta=prediction_timedelta,
+            latitude=latitude,
+            longitude=longitude,
+            method=method,
         )
 
     def _open_dataset(
-        self, url: str | list[str], print_progress: bool | None = None
+        self, url: str | list[str], print_progress: bool | None = None, **kwargs
     ) -> xr.Dataset:
         model_meta = get_model_meta_info(self._model)
 
@@ -143,10 +170,11 @@ class Forecast:
             url,
             should_print_progress=print_progress,
             chunks=model_meta.forecast_chunks,
+            **kwargs,
         )
 
     def _v3_data_adapter(
-        self, init_time: datetime, print_progress: bool | None = None
+        self, init_time: datetime, print_progress: bool | None = None, **kwargs
     ) -> JuaDataset:
         data_base_url = self._client.settings.data_base_url
         model_name = get_model_meta_info(self._model).forecast_name_mapping
@@ -154,9 +182,7 @@ class Forecast:
         dataset_name = f"{init_time_str}"
         data_url = f"{data_base_url}/forecasts/{model_name}/{dataset_name}.zarr"
 
-        raw_data = self._open_dataset(data_url, print_progress=print_progress)
-        # Rename coordinate prediction_timedelta to leadtime
-        raw_data = rename_variables(raw_data)
+        raw_data = self._open_dataset(data_url, print_progress=print_progress, **kwargs)
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,
@@ -165,7 +191,10 @@ class Forecast:
         )
 
     def _v2_data_adapter(
-        self, init_time: datetime, print_progress: bool | None = None
+        self,
+        init_time: datetime,
+        print_progress: bool | None = None,
+        **kwargs,
     ) -> JuaDataset:
         data_base_url = self._client.settings.data_base_url
         model_name = get_model_meta_info(self._model).forecast_name_mapping
@@ -187,8 +216,9 @@ class Forecast:
         ]
 
         dataset_name = f"{init_time_str}"
-        raw_data = self._open_dataset(zarr_urls, print_progress=print_progress)
-        raw_data = rename_variables(raw_data)
+        raw_data = self._open_dataset(
+            zarr_urls, print_progress=print_progress, **kwargs
+        )
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,

@@ -1,7 +1,16 @@
+from datetime import datetime
+
 import xarray as xr
 
 from jua._utils.optional_progress_bar import OptionalProgressBar
+from jua._utils.remove_none_from_dict import remove_none_from_dict
 from jua.client import JuaClient
+from jua.logging import get_logger
+from jua.types.geo import PredictionTimeDelta, SpatialSelection
+from jua.weather._jua_dataset import rename_variables
+from jua.weather.variables import Variables
+
+logger = get_logger(__name__)
 
 
 def open_dataset(
@@ -9,6 +18,12 @@ def open_dataset(
     urls: str | list[str],
     chunks: int | dict[str, int] | str = "auto",
     should_print_progress: bool | None = None,
+    variables: list[Variables] | list[str] | None = None,
+    time: datetime | None = None,
+    prediction_timedelta: PredictionTimeDelta = None,
+    latitude: SpatialSelection | None = None,
+    longitude: SpatialSelection | None = None,
+    method: str | None = None,
     **kwargs,
 ) -> xr.Dataset:
     """Create an xarray Dataset from one or more URLs.
@@ -27,6 +42,11 @@ def open_dataset(
             names to chunk sizes. Defaults to "auto".
         should_print_progress: Whether to display a progress bar during loading.
             If None, uses the client's default setting.
+        time: The initial time of the dataset.
+        prediction_timedelta: The prediction time delta of the dataset.
+        lat: The latitude of the dataset.
+        lon: The longitude of the dataset.
+        method: 'nearest' or None
         **kwargs: Additional keyword arguments passed to xr.open_dataset() or
             xr.open_mfdataset(). Common options include:
             - engine: The engine to use for opening the dataset. Defaults to "zarr".
@@ -65,10 +85,35 @@ def open_dataset(
 
     kwargs["chunks"] = chunks
 
+    logger.info("Opening dataset...")
     with OptionalProgressBar(client.settings, should_print_progress):
         if len(urls) == 1:
-            return xr.open_dataset(urls[0], **kwargs)
+            dataset = xr.open_dataset(urls[0], **kwargs)
         else:
             if "parallel" not in kwargs:
                 kwargs["parallel"] = True
-            return xr.open_mfdataset(urls, **kwargs)
+            dataset = xr.open_mfdataset(urls, **kwargs)
+
+        sel_kwargs = {
+            "time": time,
+            "prediction_timedelta": prediction_timedelta,
+            "latitude": latitude,
+            "longitude": longitude,
+        }
+
+        sel_kwargs = remove_none_from_dict(sel_kwargs)
+
+        non_slice_kwargs = {
+            k: v for k, v in sel_kwargs.items() if not isinstance(v, slice)
+        }
+
+        slice_kwargs = {k: v for k, v in sel_kwargs.items() if isinstance(v, slice)}
+
+        # We cannot call nearest on slices
+        dataset = dataset.sel(**non_slice_kwargs, method=method).sel(**slice_kwargs)
+        dataset = rename_variables(dataset)
+
+        if variables is not None:
+            dataset = dataset[[str(v) for v in variables]]
+
+        return dataset.compute()

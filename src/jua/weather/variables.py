@@ -74,6 +74,9 @@ class Variable:
             f"name_ept1_5={self.emcwf_code}, name_ept2={self.name_ept2})"
         )
 
+    def __hash__(self):
+        return hash(self.name)
+
 
 class Variables(Enum):
     """Standard weather variables available through the Jua API.

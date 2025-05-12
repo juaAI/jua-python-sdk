@@ -5,12 +5,14 @@ import xarray as xr
 
 from jua.logging import get_logger
 from jua.weather.conversions import to_timedelta
+from jua.weather.variables import Variables
 
 logger = get_logger(__name__)
 
 # Store original sel methods
 _original_dataset_sel = xr.Dataset.sel
 _original_dataarray_sel = xr.DataArray.sel
+_original_dataset_getitem = xr.Dataset.__getitem__
 
 
 def _check_prediction_timedelta(**kwargs):
@@ -67,10 +69,17 @@ def _patched_dataarray_sel(self, *args, **kwargs):
     return _original_dataarray_sel(self, *args, **kwargs)
 
 
+# Override Dataset.__getitem__ method
+def _patched_dataset_getitem(self, key: Any):
+    if isinstance(key, Variables):
+        key = str(key)
+    return _original_dataset_getitem(self, key)
+
+
 # Apply the patches
 xr.Dataset.sel = _patched_dataset_sel
 xr.DataArray.sel = _patched_dataarray_sel
-# TODO: Keeping the code below for reference, might want to remove
+xr.Dataset.__getitem__ = _patched_dataset_getitem
 
 
 # Define the actual implementation

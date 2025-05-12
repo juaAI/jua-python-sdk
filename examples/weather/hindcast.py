@@ -22,22 +22,18 @@ def main():
     regions = model.hindcast.metadata.available_regions
     print(f"Regions: {', '.join([r.region for r in regions])}")
 
-    hindcast = model.hindcast.get_hindcast_as_dataset()
     time = "2024-02-01T06:00:00.000000000"
+    hindcast = model.hindcast.get_hindcast(
+        variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
+        time=time,
+        prediction_timedelta=0,
+        # Select Europe
+        latitude=slice(71, 36),  # Note: slice is inverted
+        longitude=slice(-15, 50),
+        method="nearest",
+    )
 
-    print(hindcast.to_xarray())
-    # get the data for the time
-
-    print("Loading data...")
-    with ProgressBar():
-        data = (
-            hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-            .jua.sel(time=time, prediction_timedelta=0, method="nearest")
-            # Only plot a small part of the data for faster plotting
-            # Note that the latitude must be inverted
-            .sel(latitude=slice(71, 36), longitude=slice(-15, 50))
-            .compute()
-        )
+    data = hindcast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
     data.plot()
     plt.show()
 

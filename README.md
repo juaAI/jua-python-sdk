@@ -48,8 +48,13 @@ client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5)
 
 lead_time = 10 # hours
-dataset = model.forecast.get_latest_forecast_as_dataset()
-dataset[Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M].jua.sel(prediction_timedelta=lead_time).plot()
+dataset = model.forecast.get_latest_forecast_as_dataset(
+    prediction_timedelta=lead_time,
+    variables=[
+        Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+    ],
+)
+dataset[Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M].plot()
 plt.show()
 ```
 
@@ -65,15 +70,18 @@ from jua.weather.variables import Variables
 client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5_EARLY)
 
-hindcast = model.hindcast.get_hindcast_as_dataset()
 time = "2024-02-01T06:00:00.000000000"
-data = (
-    hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-    .jua.sel(time=time, prediction_timedelta=0, method="nearest")
-    # Selecting Europe
-    # Note that the latitude must be inverted
-    .sel(latitude=slice(71, 36), longitude=slice(0, 50))
+hindcast = model.hindcast.get_hindcast(
+    variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
+    time=time,
+    prediction_timedelta=0,
+    # Select Europe
+    latitude=slice(71, 36),  # Note: slice is inverted
+    longitude=slice(-15, 50),
+    method="nearest",
 )
+
+data = hindcast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
 data.plot()
 plt.show()
 ```
