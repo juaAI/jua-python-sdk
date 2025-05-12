@@ -228,6 +228,9 @@ class Forecast:
             else:
                 hours_to_load = [timedelta_to_hours(prediction_timedelta)]
 
+            # Already handled above, remove from kwargs
+            del kwargs["prediction_timedelta"]
+
         zarr_urls = [
             f"{data_base_url}/forecasts/{model_name}/{init_time_str}/{hour}.zarr"
             for hour in hours_to_load

@@ -78,12 +78,6 @@ def _open_mfdataset_custom(client: JuaClient, urls: list[str], **kwargs) -> xr.D
             time_to_select = kwargs["time"]
             del kwargs["time"]
 
-    prediction_timedelta = kwargs.get("prediction_timedelta", None)
-    if prediction_timedelta is not None and isinstance(prediction_timedelta, list):
-        del kwargs["prediction_timedelta"]
-    else:
-        prediction_timedelta = None
-
     datasets = [_open_dataset(client, url, **kwargs) for url in urls]
 
     # Filter empty datasets
@@ -92,9 +86,6 @@ def _open_mfdataset_custom(client: JuaClient, urls: list[str], **kwargs) -> xr.D
 
     if time_to_select is not None:
         combined = combined.sel(time=time_to_select, method="nearest")
-
-    if prediction_timedelta is not None:
-        combined = combined.sel(prediction_timedelta=prediction_timedelta)
 
     return combined
 
