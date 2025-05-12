@@ -43,7 +43,7 @@ class WeatherAPI:
         lat: float | None,
         lon: float | None,
         payload: ForecastRequestPayload | None,
-    ):
+    ) -> ForecastRequestPayload:
         if (lat is None and lon is None) and (
             payload is None or payload.points is None
         ):
@@ -57,6 +57,9 @@ class WeatherAPI:
                 payload = ForecastRequestPayload(points=[LatLon(lat=lat, lon=lon)])
             else:
                 payload.points = [LatLon(lat=lat, lon=lon)]
+        # Add this point, payload must be non-None
+        if payload is None:
+            raise ValueError("Payload must be non-None")
         return payload
 
     @validate_call
@@ -131,8 +134,8 @@ class WeatherAPI:
         payload = self._get_payload_raise_error(lat, lon, payload)
         init_time = validate_init_time(init_time)
         payload_points = payload.points
-        if len(payload_points) > 1:
-            raise JuaError("Only one point is supported for past forecasts")
+        if len(payload_points) != 1:
+            raise JuaError("Exactly one point is supported for past forecasts")
         lat = payload_points[0].lat
         lon = payload_points[0].lon
 

@@ -16,13 +16,25 @@ class AuthenticationSettings(BaseSettings):
     3. JSON file at secrets_path or ~/.jua/api-key.json
     """
 
-    api_key_id: str | None = Field(None, env="JUA_API_KEY_ID")
-    api_key_secret: str | None = Field(None, env="JUA_API_KEY_SECRET")
-    environment: str = Field("default", env="JUA_ENVIRONMENT")
-    secrets_path: str | None = Field(None, env="JUA_SECRETS_PATH")
+    api_key_id: str | None = Field(
+        default=None, description="API key identifier for authentication"
+    )
+    api_key_secret: str | None = Field(
+        default=None, description="Secret key for API authentication"
+    )
+    environment: str = Field(
+        default="default",
+        description="Environment name to determine configuration settings",
+    )
+    secrets_path: str | None = Field(
+        default=None, description="Custom path to load API credentials from a JSON file"
+    )
 
     model_config = SettingsConfigDict(
-        env_file=".env", env_file_encoding="utf-8", extra="ignore"
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+        env_prefix="JUA_",
     )
 
     def __init__(

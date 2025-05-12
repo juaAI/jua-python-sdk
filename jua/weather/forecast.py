@@ -33,7 +33,7 @@ class Forecast:
         }
 
     @property
-    def zarr_version(self) -> int:
+    def zarr_version(self) -> int | None:
         return get_model_meta_info(self._model).forecast_zarr_version
 
     def is_file_access_available(self) -> bool:

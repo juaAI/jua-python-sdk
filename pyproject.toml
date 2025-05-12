@@ -11,9 +11,11 @@ dependencies = [
     "pydantic-settings>=2.8.1",
     "requests>=2.32.3",
     "s3fs>=2025.3.2",
+    "types-requests>=2.32.0.20250328",
     "xarray>=2025.4.0",
     "zarr>=3.0.0",
 ]
+
 
 [project.scripts]
 jua = "jua.scripts.jua:main"
@@ -23,8 +25,12 @@ plotting = [
     "matplotlib>=3.8.0",
 ]
 
+[tool.uv]
+package = true
+
 [dependency-groups]
 dev = [
+    "pre-commit>=4.2.0",
     "ruff>=0.11.8",
 ]
 
@@ -39,3 +45,6 @@ select = ["E", "F", "I", "W"]
 quote-style = "double"
 indent-style = "space"
 line-ending = "auto"
+
+[tool.mypy]
+plugins = ["pydantic.mypy"]

@@ -1,7 +1,7 @@
 import argparse
 
 
-def get_auth_parser(subparsers: argparse.ArgumentParser):
+def get_auth_parser(subparsers: argparse._SubParsersAction):
     """Set up the auth command parser"""
     parser = subparsers.add_parser("auth", help="Authentication commands")
     return parser

@@ -93,6 +93,8 @@ class Variables(Enum):
         if isinstance(other, str):
             return self.value.name == other
         if isinstance(other, Variable):
+            return self.value.name == other.name
+        if isinstance(other, Variables):
             return self.value.name == other.value.name
         return NotImplemented
 

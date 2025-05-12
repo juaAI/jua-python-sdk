@@ -12,7 +12,7 @@ def remove_none_from_dict(d: dict, max_recursion: int = 10) -> dict:
                     cleaned_list.append(remove_none_from_dict(item, max_recursion - 1))
                 else:
                     cleaned_list.append(item)
-            cleaned_dict[k] = cleaned_list
+            cleaned_dict[k] = cleaned_list  # type: ignore[assignment]
         elif v is None:
             continue
         else:

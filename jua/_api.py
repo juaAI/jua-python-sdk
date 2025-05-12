@@ -1,4 +1,4 @@
-import requests
+import requests  # type: ignore[import-untyped]
 
 from jua.client import JuaClient
 from jua.errors.api_errors import (
@@ -51,7 +51,7 @@ class API:
         )
 
     def get(
-        self, url: str, params: dict = None, requires_auth: bool = True
+        self, url: str, params: dict | None = None, requires_auth: bool = True
     ) -> requests.Response:
         headers = self._get_headers(requires_auth)
         response = requests.get(self._get_url(url), headers=headers, params=params)
@@ -61,8 +61,8 @@ class API:
     def post(
         self,
         url: str,
-        data: dict = None,
-        query_params: dict = None,
+        data: dict | None = None,
+        query_params: dict | None = None,
         requires_auth: bool = True,
     ) -> requests.Response:
         headers = self._get_headers(requires_auth)
@@ -76,7 +76,7 @@ class API:
         return response
 
     def put(
-        self, url: str, data: dict = None, requires_auth: bool = True
+        self, url: str, data: dict | None = None, requires_auth: bool = True
     ) -> requests.Response:
         headers = self._get_headers(requires_auth)
         response = requests.put(self._get_url(url), headers=headers, json=data)
@@ -90,7 +90,7 @@ class API:
         return response
 
     def patch(
-        self, url: str, data: dict = None, requires_auth: bool = True
+        self, url: str, data: dict | None = None, requires_auth: bool = True
     ) -> requests.Response:
         headers = self._get_headers(requires_auth)
         response = requests.patch(self._get_url(url), headers=headers, json=data)

@@ -120,7 +120,7 @@ TypedDataset = Any  # type: ignore
 
 # For type checking only
 if TYPE_CHECKING:
-    T = TypeVar("T", bound=xr.DataArray | xr.Dataset)
+    T = TypeVar("T", bound=xr.DataArray | xr.Dataset, covariant=True)
 
     class JuaAccessorProtocol(Protocol[T]):
         def __init__(self, xarray_obj: T) -> None: ...
@@ -137,18 +137,18 @@ if TYPE_CHECKING:
         def to_celcius(self) -> TypedDataArray: ...
 
     # Define enhanced types
-    class TypedDataArray(xr.DataArray):
+    class TypedDataArray(xr.DataArray):  # type: ignore
         jua: JuaAccessorProtocol["TypedDataArray"]
 
         def sel(self, *args, **kwargs) -> "TypedDataArray": ...
 
         def isel(self, *args, **kwargs) -> "TypedDataArray": ...
 
-    class TypedDataset(xr.Dataset):
+    class TypedDataset(xr.Dataset):  # type: ignore
         jua: JuaAccessorProtocol["TypedDataset"]
 
         # This is the key addition - make __getitem__ return the TypedDataArray
-        def __getitem__(self, key: any) -> "TypedDataArray": ...
+        def __getitem__(self, key: Any) -> "TypedDataArray": ...
 
         def sel(self, *args, **kwargs) -> "TypedDataset": ...
 

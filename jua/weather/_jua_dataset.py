@@ -1,5 +1,6 @@
 from datetime import datetime
 from pathlib import Path
+from typing import Any
 
 import xarray as xr
 from pydantic import validate_call
@@ -51,7 +52,7 @@ class JuaDataset:
         return bytes_to_gb(self.nbytes)
 
     @property
-    def zarr_version(self) -> int:
+    def zarr_version(self) -> int | None:
         return get_model_meta_info(self._model).forecast_zarr_version
 
     def _get_default_output_path(self) -> Path:
@@ -60,7 +61,7 @@ class JuaDataset:
     def to_xarray(self) -> TypedDataset:
         return as_typed_dataset(self._raw_data)
 
-    def __getitem__(self, key: any) -> TypedDataArray:
+    def __getitem__(self, key: Any) -> TypedDataArray:
         return as_typed_dataarray(self._raw_data[str(key)])
 
     @validate_call(config={"arbitrary_types_allowed": True})
