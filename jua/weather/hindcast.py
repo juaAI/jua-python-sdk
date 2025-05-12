@@ -6,6 +6,7 @@ from pydantic import validate_call
 
 from jua._utils.optional_progress_bar import OptionalProgressBar
 from jua.client import JuaClient
+from jua.errors.model_errors import ModelHasNoHindcastData
 from jua.logging import get_logger
 from jua.weather._api import WeatherAPI
 from jua.weather._jua_dataset import JuaDataset, rename_variables
@@ -72,8 +73,13 @@ class Hindcast:
             Models.ECMWF_AIFS025_SINGLE: self._aifs025_adapter,
         }
 
+    def _raise_if_no_file_access(self):
+        if not self.is_file_access_available():
+            raise ModelHasNoHindcastData(self._model_name)
+
     @property
     def metadata(self) -> HindcastMetadata:
+        self._raise_if_no_file_access()
         return self._MODEL_METADATA[self._model]
 
     def is_file_access_available(self) -> bool:
@@ -84,11 +90,7 @@ class Hindcast:
         self,
         print_progress: bool | None = None,
     ) -> JuaDataset:
-        if not self.is_file_access_available():
-            raise ValueError(
-                "This model does not have hindcast file access. "
-                "Please check the model documentation."
-            )
+        self._raise_if_no_file_access()
 
         return self._HINDCAST_ADAPTERS[self._model](print_progress=print_progress)
 

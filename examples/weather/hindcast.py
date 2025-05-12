@@ -31,7 +31,7 @@ def main():
         .jua.sel(time=time, prediction_timedelta=0, method="nearest")
         # Only plot a small part of the data for faster plotting
         # Note that the latitude must be inverted
-        .sel(latitude=slice(71, 36), longitude=slice(0, 50))
+        .sel(latitude=slice(71, 36), longitude=slice(-15, 50))
     )
     data.plot()
     plt.show()

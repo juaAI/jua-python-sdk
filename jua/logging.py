@@ -6,8 +6,7 @@ def get_logger(name: str) -> logging.Logger:
 
     # Set logger string format
     formatter = logging.Formatter(
-        fmt="%(asctime)s [%(levelname)-8s] [%(name)s] "
-        "[%(module)s.%(funcName)s:%(lineno)d] - %(message)s",
+        fmt="%(asctime)s [%(levelname)-8s] [%(name)s] - %(message)s",
         datefmt="%Y-%m-%dT%H:%M:%S%z",  # Example ISO 8601 like format
     )
 

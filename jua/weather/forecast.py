@@ -6,6 +6,7 @@ from pydantic import validate_call
 from jua._utils.optional_progress_bar import OptionalProgressBar
 from jua._utils.spinner import Spinner
 from jua.client import JuaClient
+from jua.errors.model_errors import ModelDoesNotSupportForecastRawDataAccessError
 from jua.logging import get_logger
 from jua.types.geo import LatLon
 from jua.weather._api import WeatherAPI
@@ -122,10 +123,7 @@ class Forecast:
         print_progress: bool | None = None,
     ) -> JuaDataset:
         if not self.is_file_access_available():
-            raise ValueError(
-                "This model does not have forecast file access. "
-                "Please check the model documentation."
-            )
+            raise ModelDoesNotSupportForecastRawDataAccessError(self._model_name)
 
         if init_time is None:
             init_time = self.get_latest_metadata().init_time

@@ -133,7 +133,7 @@ class WeatherAPI:
 
         payload = self._get_payload_raise_error(lat, lon, payload)
         init_time = validate_init_time(init_time)
-        payload_points = payload.points
+        payload_points = payload.points or []
         if len(payload_points) != 1:
             raise JuaError("Exactly one point is supported for past forecasts")
         lat = payload_points[0].lat
