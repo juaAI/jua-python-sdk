@@ -5,6 +5,7 @@ description = "Access Jua's API with ease"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
+    "aiohttp>=3.11.18",
     "dask>=2025.4.1",
     "pandas>=2.2.3",
     "pydantic>=2.10.6",

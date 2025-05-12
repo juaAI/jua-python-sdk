@@ -6,7 +6,7 @@ from jua.weather.models import Models as ModelEnum
 logger = get_logger(__name__)
 
 
-class _LayzModelWrapper:
+class _LazyModelWrapper:
     def __init__(self, **kwargs):
         self._kwargs = kwargs
         self._instance = None
@@ -21,7 +21,7 @@ class Weather:
     def __init__(self, client: JuaClient) -> None:
         self._client = client
         self._lazy_models = {
-            model: _LayzModelWrapper(client=client, model=model) for model in ModelEnum
+            model: _LazyModelWrapper(client=client, model=model) for model in ModelEnum
         }
 
     def __getitem__(self, model: ModelEnum) -> Model:
