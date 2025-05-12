@@ -112,6 +112,8 @@ class Forecast:
     def get_available_init_times(self) -> list[datetime]:
         return self._api.get_available_init_times(model_name=self._model_name)
 
+    # TODO: is_ready(init_time, forecast_horizon)
+
     def get_latest_forecast_as_dataset(self) -> JuaDataset:
         return self.get_forecast_as_dataset()
 

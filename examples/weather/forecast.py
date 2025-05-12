@@ -45,6 +45,7 @@ def main():
         max_lead_time=480,
     )
     # plot the temperature of the two points
+    print(forecast.to_xarray())
     temp_data = forecast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
     temp_data_celsius = temp_data.jua.to_celcius()
 
