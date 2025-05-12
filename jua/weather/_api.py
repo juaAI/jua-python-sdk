@@ -6,16 +6,16 @@ from jua._api import API
 from jua._utils.remove_none_from_dict import remove_none_from_dict
 from jua.client import JuaClient
 from jua.errors.jua_error import JuaError
-from jua.types.weather._api_payload_types import ForecastRequestPayload
-from jua.types.weather._api_response_types import (
+from jua.types.geo import LatLon
+from jua.weather._types.api_payload_types import ForecastRequestPayload
+from jua.weather._types.api_response_types import (
     AvailableInitTimesResponse,
     AvailableModelsResponse,
     ForecastMetadataResponse,
     ForecastResponse,
 )
-from jua.types.weather.forecast import ForecastData
-from jua.types.weather.raw_file_access import DirectoryResponse, FileResponse
-from jua.types.weather.weather import Coordinate
+from jua.weather._types.forecast import ForecastData
+from jua.weather._types.raw_file_access import DirectoryResponse, FileResponse
 from jua.weather.conversions import validate_init_time
 
 
@@ -54,9 +54,9 @@ class WeatherAPI:
             raise ValueError("Only one of lat and lon or payload must be provided")
         if lat is not None and lon is not None:
             if payload is None:
-                payload = ForecastRequestPayload(points=[Coordinate(lat=lat, lon=lon)])
+                payload = ForecastRequestPayload(points=[LatLon(lat=lat, lon=lon)])
             else:
-                payload.points = [Coordinate(lat=lat, lon=lon)]
+                payload.points = [LatLon(lat=lat, lon=lon)]
         return payload
 
     @validate_call

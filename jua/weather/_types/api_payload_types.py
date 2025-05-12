@@ -1,10 +1,10 @@
 from pydantic import BaseModel
 
-from jua.types.weather.weather import Coordinate
+from jua.types.geo import LatLon
 
 
 class ForecastRequestPayload(BaseModel):
-    points: list[Coordinate] | None = None
+    points: list[LatLon] | None = None
     min_lead_time: int = 0
     max_lead_time: int = 0
     variables: list[str] | None = None

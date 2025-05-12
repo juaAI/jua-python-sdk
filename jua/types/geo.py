@@ -2,6 +2,6 @@ from pydantic.dataclasses import dataclass
 
 
 @dataclass
-class Coordinate:
+class LatLon:
     lat: float
     lon: float

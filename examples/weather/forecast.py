@@ -3,7 +3,7 @@ import logging
 import matplotlib.pyplot as plt
 
 from jua.client import JuaClient
-from jua.types.weather.weather import Coordinate
+from jua.types.geo import LatLon
 from jua.weather.models import Models
 from jua.weather.variables import Variables
 
@@ -38,8 +38,8 @@ def main():
 
     # For the latest forecast, we can also query multiple locations
     # Let's compare Zurichs temperature to that of Cape Town
-    zurich = Coordinate(lat=47.3769, lon=8.5417)
-    cape_town = Coordinate(lat=-33.9249, lon=18.4241)
+    zurich = LatLon(lat=47.3769, lon=8.5417)
+    cape_town = LatLon(lat=-33.9249, lon=18.4241)
     forecast = model.forecast.get_latest(
         points=[zurich, cape_town],
         max_lead_time=480,

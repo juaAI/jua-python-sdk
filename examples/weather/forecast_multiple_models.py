@@ -3,7 +3,7 @@ import logging
 import matplotlib.pyplot as plt
 
 from jua.client import JuaClient
-from jua.types.weather.weather import Coordinate
+from jua.types.geo import LatLon
 from jua.weather.models import Models
 from jua.weather.variables import Variables
 
@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    zurich = Coordinate(lat=47.3769, lon=8.5417)
+    zurich = LatLon(lat=47.3769, lon=8.5417)
 
     client = JuaClient()
     models_to_use = [Models.EPT1_5, Models.EPT1_5_EARLY, Models.ECMWF_AIFS025_SINGLE]

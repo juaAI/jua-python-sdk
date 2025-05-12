@@ -2,8 +2,8 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
-from jua.types.weather.forecast import ForecastData
-from jua.types.weather.raw_file_access import DirectoryResponse, FileResponse
+from jua.weather._types.forecast import ForecastData
+from jua.weather._types.raw_file_access import DirectoryResponse, FileResponse
 
 
 class AvailableModelsResponse(BaseModel):

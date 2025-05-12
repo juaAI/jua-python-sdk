@@ -7,13 +7,13 @@ from jua._utils.optional_progress_bar import OptionalProgressBar
 from jua._utils.spinner import Spinner
 from jua.client import JuaClient
 from jua.logging import get_logger
-from jua.types.weather._api_payload_types import ForecastRequestPayload
-from jua.types.weather._api_response_types import ForecastMetadataResponse
-from jua.types.weather.forecast import ForecastData
-from jua.types.weather.weather import Coordinate
+from jua.types.geo import LatLon
 from jua.weather._api import WeatherAPI
 from jua.weather._jua_dataset import JuaDataset, rename_variables
 from jua.weather._model_meta import get_model_meta_info
+from jua.weather._types.api_payload_types import ForecastRequestPayload
+from jua.weather._types.api_response_types import ForecastMetadataResponse
+from jua.weather._types.forecast import ForecastData
 from jua.weather.models import Models
 
 logger = get_logger(__name__)
@@ -43,7 +43,7 @@ class Forecast:
         self,
         lat: float | None = None,
         lon: float | None = None,
-        points: list[Coordinate] | None = None,
+        points: list[LatLon] | None = None,
         min_lead_time: int = 0,
         max_lead_time: int = 0,
         variables: list[str] | None = None,
@@ -67,7 +67,7 @@ class Forecast:
         init_time: datetime | str | None = None,
         lat: float | None = None,
         lon: float | None = None,
-        points: list[Coordinate] | None = None,
+        points: list[LatLon] | None = None,
         min_lead_time: int = 0,
         max_lead_time: int = 0,
         variables: list[str] | None = None,

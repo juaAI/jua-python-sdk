@@ -23,12 +23,6 @@ def main():
 
     hindcast = model.hindcast.get_hindcast_as_dataset()
     time = "2024-02-01T06:00:00.000000000"
-    hindcast.download(
-        start_date=time,
-        end_date=time,
-        always_download=True,
-        overwrite=True,
-    )
 
     print(hindcast.to_xarray())
     # get the data for the time

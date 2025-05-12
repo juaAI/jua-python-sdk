@@ -15,6 +15,9 @@ dependencies = [
     "zarr>=3.0.0",
 ]
 
+[project.scripts]
+jua = "jua.scripts.jua:main"
+
 [project.optional-dependencies]
 plotting = [
     "matplotlib>=3.8.0",
