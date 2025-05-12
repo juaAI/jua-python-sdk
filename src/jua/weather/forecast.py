@@ -14,6 +14,7 @@ from jua.weather._model_meta import get_model_meta_info
 from jua.weather._types.api_payload_types import ForecastRequestPayload
 from jua.weather._types.api_response_types import ForecastMetadataResponse
 from jua.weather._types.forecast import ForecastData
+from jua.weather.conversions import timedelta_to_hours
 from jua.weather.models import Models
 from jua.weather.variables import Variables
 
@@ -210,11 +211,27 @@ class Forecast:
         except Exception:
             max_available_hours = 480
 
+        hours_to_load = list(range(max_available_hours + 1))
+        prediction_timedelta = kwargs.get("prediction_timedelta", None)
+        if prediction_timedelta is not None:
+            if isinstance(prediction_timedelta, list):
+                hours_to_load = [timedelta_to_hours(td) for td in prediction_timedelta]
+
+            elif isinstance(prediction_timedelta, slice):
+                hours_to_load = list(
+                    range(
+                        timedelta_to_hours(prediction_timedelta.start),
+                        timedelta_to_hours(prediction_timedelta.stop),
+                        timedelta_to_hours(prediction_timedelta.step),
+                    )
+                )
+            else:
+                hours_to_load = [timedelta_to_hours(prediction_timedelta)]
+
         zarr_urls = [
             f"{data_base_url}/forecasts/{model_name}/{init_time_str}/{hour}.zarr"
-            for hour in range(max_available_hours + 1)
+            for hour in hours_to_load
         ]
-
         dataset_name = f"{init_time_str}"
         raw_data = self._open_dataset(
             zarr_urls, print_progress=print_progress, **kwargs

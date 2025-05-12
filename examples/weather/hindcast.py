@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     client = JuaClient()
-    model = client.weather.get_model(Models.EPT1_5_EARLY)
+    model = client.weather.get_model(Models.EPT1_5)
 
     start_date = model.hindcast.metadata.start_date
     end_date = model.hindcast.metadata.end_date

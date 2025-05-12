@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 def main():
     client = JuaClient()
-    model = client.weather.get_model(Models.EPT2)
+    model = client.weather.get_model(Models.EPT1_5)
 
     # Let' access the full, global dataset
     lead_times_hours = [0, 12, 24]

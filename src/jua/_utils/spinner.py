@@ -84,14 +84,3 @@ class Spinner:
     def __exit__(self, exc_type, exc_val, exc_tb):
         """Context manager exit - stops the spinner."""
         self.stop()
-
-
-# Example usage:
-if __name__ == "__main__":
-    print("Testing different spinner styles:")
-
-    # Use as a centered large spinner
-    with Spinner("Downloading files") as spinner:
-        time.sleep(5)
-
-    print("\nAll tasks completed!")

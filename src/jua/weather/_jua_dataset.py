@@ -124,7 +124,10 @@ class JuaDataset:
             f"{self._dataset_name} to {output_path}..."
         )
 
-        with Spinner("Preparing download. This might take a while..."):
+        with Spinner(
+            "Preparing download. This might take a while...",
+            disable=not show_progress,
+        ):
             zarr_version = get_model_meta_info(self._model).forecast_zarr_version
             logger.info(f"Initializing dataset (zarr_format={zarr_version})...")
             delayed = data_to_download.to_zarr(

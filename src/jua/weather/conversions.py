@@ -41,3 +41,11 @@ def to_timedelta(hours: int | np.timedelta64 | None) -> np.timedelta64 | None:
     if hours is None:
         return None
     raise ValueError(f"unexpected timedelta type: {hours}")
+
+
+def timedelta_to_hours(td: np.timedelta64 | int) -> int:
+    if isinstance(td, np.timedelta64):
+        return int(td.astype("timedelta64[ns]") / np.timedelta64(1, "h"))
+    if isinstance(td, int):
+        return td
+    raise ValueError(f"unexpected timedelta type: {td}")
