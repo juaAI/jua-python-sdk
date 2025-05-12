@@ -4,12 +4,13 @@ from datetime import datetime
 import xarray as xr
 from pydantic import validate_call
 
-from jua._utils.optional_progress_bar import OptionalProgressBar
+from jua._utils.dataset import open_dataset
 from jua.client import JuaClient
 from jua.errors.model_errors import ModelHasNoHindcastData
 from jua.logging import get_logger
 from jua.weather._api import WeatherAPI
 from jua.weather._jua_dataset import JuaDataset, rename_variables
+from jua.weather._model_meta import get_model_meta_info
 from jua.weather.models import Models
 
 logger = get_logger(__name__)
@@ -94,28 +95,16 @@ class Hindcast:
 
         return self._HINDCAST_ADAPTERS[self._model](print_progress=print_progress)
 
-    def _open_dataset(self, url: str, print_progress: bool | None = None) -> xr.Dataset:
-        logger.info(f"Opening dataset from {url}")
-        with OptionalProgressBar(self._client.settings, print_progress):
-            return xr.open_dataset(
-                url,
-                engine="zarr",
-                decode_timedelta=True,
-                storage_options={"auth": self._client.settings.auth.get_basic_auth()},
-            )
-
-    def _open_dataset_multiple(
-        self, urls: list[str], print_progress: bool | None = None
+    def _open_dataset(
+        self, url: str | list[str], print_progress: bool | None = None
     ) -> xr.Dataset:
-        logger.info("Opening dataset.")
-        with OptionalProgressBar(self._client.settings, print_progress):
-            return xr.open_mfdataset(
-                urls,
-                engine="zarr",
-                decode_timedelta=True,
-                storage_options={"auth": self._client.settings.auth.get_basic_auth()},
-                parallel=True,
-            )
+        chunks = get_model_meta_info(self._model).hindcast_chunks
+        return open_dataset(
+            self._client,
+            url,
+            should_print_progress=print_progress,
+            chunks=chunks,
+        )
 
     def _ept2_adapter(self, print_progress: bool | None = None) -> JuaDataset:
         data_base_url = self._client.settings.data_base_url
@@ -158,7 +147,7 @@ class Hindcast:
             f"{data_base_url}/hindcasts/ept-1.5/north-america/2024.zarr/",
         ]
 
-        raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
+        raw_data = self._open_dataset(zarr_urls, print_progress=print_progress)
         raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,

@@ -13,18 +13,19 @@ _original_dataset_sel = xr.Dataset.sel
 _original_dataarray_sel = xr.DataArray.sel
 
 
-# Override Dataset.sel method
-def _patched_dataset_sel(self, *args, **kwargs):
-    """
-    This is a patch to the xarray.Dataset.sel method to convert the prediction_timedelta
-    argument to a timedelta.
-    """
-    # Check if prediction_timedelta is in kwargs
+def _check_prediction_timedelta(**kwargs):
     if "prediction_timedelta" in kwargs and not isinstance(
         kwargs["prediction_timedelta"], slice
     ):
         # Convert to timedelta
-        kwargs["prediction_timedelta"] = to_timedelta(kwargs["prediction_timedelta"])
+        if isinstance(kwargs["prediction_timedelta"], list):
+            kwargs["prediction_timedelta"] = [
+                to_timedelta(t) for t in kwargs["prediction_timedelta"]
+            ]
+        else:
+            kwargs["prediction_timedelta"] = to_timedelta(
+                kwargs["prediction_timedelta"]
+            )
     elif "prediction_timedelta" in kwargs and isinstance(
         kwargs["prediction_timedelta"], slice
     ):
@@ -41,6 +42,17 @@ def _patched_dataset_sel(self, *args, **kwargs):
             step = to_timedelta(step)
 
         kwargs["prediction_timedelta"] = slice(start, stop, step)
+    return kwargs
+
+
+# Override Dataset.sel method
+def _patched_dataset_sel(self, *args, **kwargs):
+    """
+    This is a patch to the xarray.Dataset.sel method to convert the prediction_timedelta
+    argument to a timedelta.
+    """
+    # Check if prediction_timedelta is in kwargs
+    kwargs = _check_prediction_timedelta(**kwargs)
 
     # Call the original method
     return _original_dataset_sel(self, *args, **kwargs)
@@ -49,27 +61,7 @@ def _patched_dataset_sel(self, *args, **kwargs):
 # Override DataArray.sel method
 def _patched_dataarray_sel(self, *args, **kwargs):
     # Check if prediction_timedelta is in kwargs
-    if "prediction_timedelta" in kwargs and not isinstance(
-        kwargs["prediction_timedelta"], slice
-    ):
-        # Convert to timedelta
-        kwargs["prediction_timedelta"] = to_timedelta(kwargs["prediction_timedelta"])
-    elif "prediction_timedelta" in kwargs and isinstance(
-        kwargs["prediction_timedelta"], slice
-    ):
-        # Handle slice case
-        start = kwargs["prediction_timedelta"].start
-        stop = kwargs["prediction_timedelta"].stop
-        step = kwargs["prediction_timedelta"].step
-
-        if start is not None:
-            start = to_timedelta(start)
-        if stop is not None:
-            stop = to_timedelta(stop)
-        if step is not None:
-            step = to_timedelta(step)
-
-        kwargs["prediction_timedelta"] = slice(start, stop, step)
+    kwargs = _check_prediction_timedelta(**kwargs)
 
     # Call the original method
     return _original_dataarray_sel(self, *args, **kwargs)

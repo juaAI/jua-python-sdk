@@ -3,8 +3,7 @@ from datetime import datetime
 import xarray as xr
 from pydantic import validate_call
 
-from jua._utils.optional_progress_bar import OptionalProgressBar
-from jua._utils.spinner import Spinner
+from jua._utils.dataset import open_dataset
 from jua.client import JuaClient
 from jua.errors.model_errors import ModelDoesNotSupportForecastRawDataAccessError
 from jua.logging import get_logger
@@ -132,31 +131,17 @@ class Forecast:
             init_time, print_progress=print_progress
         )
 
-    def _open_dataset(self, url: str, print_progress: bool | None = None) -> xr.Dataset:
-        logger.info(f"Opening dataset from {url}")
-        with Spinner(
-            "Opening dataset...",
-            disable=not self._client.settings.should_print_progress(),
-        ):
-            return xr.open_dataset(
-                url,
-                engine="zarr",
-                decode_timedelta=True,
-                storage_options={"auth": self._client.settings.auth.get_basic_auth()},
-            )
-
-    def _open_dataset_multiple(
-        self, urls: list[str], print_progress: bool | None = None
+    def _open_dataset(
+        self, url: str | list[str], print_progress: bool | None = None
     ) -> xr.Dataset:
-        logger.info("Opening dataset.")
-        with OptionalProgressBar(self._client.settings, print_progress):
-            return xr.open_mfdataset(
-                urls,
-                engine="zarr",
-                decode_timedelta=True,
-                storage_options={"auth": self._client.settings.auth.get_basic_auth()},
-                parallel=True,
-            )
+        model_meta = get_model_meta_info(self._model)
+
+        return open_dataset(
+            self._client,
+            url,
+            should_print_progress=print_progress,
+            chunks=model_meta.forecast_chunks,
+        )
 
     def _v3_data_adapter(
         self, init_time: datetime, print_progress: bool | None = None
@@ -200,7 +185,7 @@ class Forecast:
         ]
 
         dataset_name = f"{init_time_str}"
-        raw_data = self._open_dataset_multiple(zarr_urls, print_progress=print_progress)
+        raw_data = self._open_dataset(zarr_urls, print_progress=print_progress)
         raw_data = rename_variables(raw_data)
         return JuaDataset(
             settings=self._client.settings,

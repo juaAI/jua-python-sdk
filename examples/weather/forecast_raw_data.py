@@ -1,7 +1,7 @@
 import logging
 
 import matplotlib.pyplot as plt
-import numpy as np
+from dask.diagnostics import ProgressBar
 
 from jua.client import JuaClient
 from jua.weather.models import Models
@@ -41,17 +41,18 @@ def main():
 
     # Loop through each variable (row)
     for r_idx, variable_key in enumerate(variables_to_plot):
-        data_for_row = []
-        # First, collect all data arrays for the current variable to find global
-        # min/max for the row
-        for lead_time_h in lead_times_hours:
-            data_array = dataset[variable_key].jua.sel(prediction_timedelta=lead_time_h)
-            data_for_row.append(data_array.data)  # Append numpy array
+        print(f"Loading data for {variable_key} at lead times {lead_times_hours}")
+        with ProgressBar():
+            data = (
+                dataset[variable_key]
+                .jua.sel(prediction_timedelta=lead_times_hours)
+                .compute()
+            )
 
         # Determine vmin and vmax for the current row using all its data
         # Using np.nanmin and np.nanmax to be robust to NaNs if any
-        current_vmin = np.nanmin([arr.min() for arr in data_for_row if arr.size > 0])
-        current_vmax = np.nanmax([arr.max() for arr in data_for_row if arr.size > 0])
+        current_vmin = data.min()
+        current_vmax = data.max()
 
         print(
             f"Variable: {variable_display_names[variable_key]}, "
@@ -63,9 +64,7 @@ def main():
         # Second, plot each heatmap in the row using the determined vmin/vmax
         for c_idx, lead_time_h in enumerate(lead_times_hours):
             ax = axs[r_idx, c_idx]
-            data_array_to_plot = dataset[variable_key].jua.sel(
-                prediction_timedelta=lead_time_h
-            )
+            data_array_to_plot = data.jua.sel(prediction_timedelta=lead_time_h)
 
             im = data_array_to_plot.plot(
                 ax=ax,

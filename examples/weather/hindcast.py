@@ -2,6 +2,7 @@ import logging
 from pathlib import Path
 
 import matplotlib.pyplot as plt
+from dask.diagnostics import ProgressBar
 
 from jua.client import JuaClient
 from jua.weather.models import Models
@@ -26,13 +27,17 @@ def main():
 
     print(hindcast.to_xarray())
     # get the data for the time
-    data = (
-        hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-        .jua.sel(time=time, prediction_timedelta=0, method="nearest")
-        # Only plot a small part of the data for faster plotting
-        # Note that the latitude must be inverted
-        .sel(latitude=slice(71, 36), longitude=slice(-15, 50))
-    )
+
+    print("Loading data...")
+    with ProgressBar():
+        data = (
+            hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+            .jua.sel(time=time, prediction_timedelta=0, method="nearest")
+            # Only plot a small part of the data for faster plotting
+            # Note that the latitude must be inverted
+            .sel(latitude=slice(71, 36), longitude=slice(-15, 50))
+            .compute()
+        )
     data.plot()
     plt.show()
 
@@ -40,7 +45,10 @@ def main():
     output_path = Path(
         "~/data/ept15_early_air_temperature_2024-02-01.zarr"
     ).expanduser()
-    data.to_zarr(output_path, mode="w", zarr_format=hindcast.zarr_version)
+    with ProgressBar():
+        data.to_zarr(
+            output_path, mode="w", zarr_format=hindcast.zarr_version, compute=True
+        )
 
 
 if __name__ == "__main__":
