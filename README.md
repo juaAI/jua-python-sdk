@@ -79,3 +79,15 @@ plt.show()
 ```
 
 ## Development
+
+To install all dependencies run
+
+```
+uv sync --all-extras
+```
+
+Enable pre-commit for linting and formatting:
+
+```
+uv run pre-commit install && uv run pre-commit install-hooks
+```
