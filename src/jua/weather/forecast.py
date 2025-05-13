@@ -26,6 +26,7 @@ class Forecast:
         self._client = client
         self._model = model
         self._model_name = model.value
+        self._model_meta = get_model_meta_info(model)
         self._api = WeatherAPI(client)
 
         self._FORECAST_ADAPTERS = {
@@ -36,9 +37,9 @@ class Forecast:
 
     @property
     def zarr_version(self) -> int | None:
-        return get_model_meta_info(self._model).forecast_zarr_version
+        return self._model_meta.forecast_zarr_version
 
-    def is_file_access_available(self) -> bool:
+    def is_global_data_available(self) -> bool:
         return self._model in self._FORECAST_ADAPTERS
 
     def get_latest(
@@ -103,18 +104,45 @@ class Forecast:
     def get_latest_metadata(self) -> ForecastMetadataResponse:
         return self._api.get_latest_forecast_metadata(model_name=self._model_name)
 
-    def get_metadata(self, init_time: datetime | str | None = None):
+    def get_metadata(
+        self, init_time: datetime | str | None = None
+    ) -> ForecastMetadataResponse | None:
         if init_time is None:
             return self.get_latest_metadata()
+
+        if not self._model_meta.is_jua_model:
+            logger.warning(
+                f"Model {self._model_name} only supports loading the latest metadata"
+            )
+            return None
 
         return self._api.get_forecast_metadata(
             model_name=self._model_name, init_time=init_time
         )
 
     def get_available_init_times(self) -> list[datetime]:
+        if not self._model_meta.is_jua_model:
+            logger.warning(
+                f"Model {self._model_name} only supports loading the latest forecast"
+            )
+            return []
+
         return self._api.get_available_init_times(model_name=self._model_name)
 
-    # TODO: is_ready(init_time, forecast_horizon)
+    def is_ready(
+        self, forecast_horizon: int, init_time: datetime | None = None
+    ) -> bool:
+        if init_time is None:
+            return (
+                self.get_latest_metadata().available_forecasted_hours
+                >= forecast_horizon
+            )
+
+        maybe_metadata = self.get_metadata(init_time)
+        if maybe_metadata is None:
+            return False
+
+        return maybe_metadata.available_forecasted_hours >= forecast_horizon
 
     def get_latest_forecast_as_dataset(
         self,
@@ -145,7 +173,7 @@ class Forecast:
         longitude: SpatialSelection | None = None,
         method: str | None = None,
     ) -> JuaDataset:
-        if not self.is_file_access_available():
+        if not self.is_global_data_available():
             raise ModelDoesNotSupportForecastRawDataAccessError(self._model_name)
 
         if init_time is None:
@@ -205,9 +233,11 @@ class Forecast:
         # if the forecast is no longer in cache.
         # For now, we try and if it fails default to 480 hours
         try:
-            max_available_hours = self.get_metadata(
-                init_time=init_time
-            ).available_forecasted_hours
+            maybe_metadata = self.get_metadata(init_time=init_time)
+            if maybe_metadata is None:
+                max_available_hours = 480
+            else:
+                max_available_hours = maybe_metadata.available_forecasted_hours
         except Exception:
             max_available_hours = 480
 

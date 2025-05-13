@@ -37,11 +37,14 @@ def get_logger(name: str) -> logging.Logger:
     """
     logger = logging.getLogger(name)
 
-    # Set logger string format
-    formatter = CustomFormatter()
+    # Only add handler if the logger doesn't already have handlers
+    if not logger.handlers:
+        # Set logger string format
+        formatter = CustomFormatter()
 
-    handler = logging.StreamHandler()
-    handler.setFormatter(formatter)
-    logger.addHandler(handler)
+        handler = logging.StreamHandler()
+        handler.setFormatter(formatter)
+        logger.addHandler(handler)
+        logger.propagate = False
 
     return logger

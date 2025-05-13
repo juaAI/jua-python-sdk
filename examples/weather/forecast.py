@@ -16,9 +16,9 @@ def main():
     model = client.weather.get_model(Models.EPT1_5)
 
     print(model.forecast.get_latest_metadata())
-    print(model.forecast.get_available_init_times()[-1])
 
     # Query the second-to-last forecast for Zurich, Switzerland
+    # Note that only JUA's models support querying specific init times
     second_to_last_init_time = model.forecast.get_available_init_times()[1]
     print(f"Querying forecast for {second_to_last_init_time.isoformat()}")
     forecast = model.forecast.get(
