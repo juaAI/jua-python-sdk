@@ -187,7 +187,7 @@ class LeadTimeSelector:
             raise ValueError("This method only works on DataArrays")
         return self._xarray_obj - 273.15
 
-    def to_total_time(self) -> xr.DataArray | xr.Dataset:
+    def to_absolute_time(self) -> xr.DataArray | xr.Dataset:
         if "time" not in self._xarray_obj.dims:
             raise ValueError("time must be a dimension")
         if self._xarray_obj.time.shape != (1,):
@@ -195,12 +195,12 @@ class LeadTimeSelector:
         if "prediction_timedelta" not in self._xarray_obj.dims:
             raise ValueError("prediction_timedelta must be a dimension")
 
-        total_time = (
+        absolute_time = (
             self._xarray_obj.time[0].values + self._xarray_obj.prediction_timedelta
         )
         ds = self._xarray_obj.copy(deep=True)
-        ds = ds.assign_coords({"total_time": total_time})
-        ds = ds.swap_dims({"prediction_timedelta": "total_time"})
+        ds = ds.assign_coords({"absolute_time": absolute_time})
+        ds = ds.swap_dims({"prediction_timedelta": "absolute_time"})
         return ds
 
 
@@ -226,7 +226,7 @@ if TYPE_CHECKING:
 
         """Convert the dataarray to celcius"""
 
-        def to_total_time(self) -> TypedDataArray: ...
+        def to_absolute_time(self) -> TypedDataArray: ...
 
         """Add a new dimension to the dataarray with the total time
 

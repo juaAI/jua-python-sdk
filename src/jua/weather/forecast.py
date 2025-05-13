@@ -164,10 +164,6 @@ class Forecast:
         if (
             now - init_time_dt
         ).total_seconds() > self._MAX_INIT_TIME_PAST_FOR_API_H * 3600:
-            logger.warning(
-                "Init times that are more than 36 hours in the past "
-                "will be slower to load."
-            )
             return False
 
         if points is None and (latitude is None or longitude is None):
@@ -184,25 +180,14 @@ class Forecast:
         )
 
         if not self._is_latest_init_time(init_time) and len(points) > 1:
-            logger.warning(
-                "Loading more than one point for a non-latest forecast."
-                "Falling back to slower backend."
-            )
             return False
 
         if len(points) > self._MAX_POINTS_FOR_API:
-            logger.warning(
-                f"Loading more than {self._MAX_POINTS_FOR_API} points might be slow."
-            )
             return False
 
         if prediction_timedelta is not None:
             if isinstance(prediction_timedelta, slice):
                 if prediction_timedelta.step is not None:
-                    logger.warning(
-                        "Step in prediction_timedelta slices will result in "
-                        "slower loading."
-                    )
                     return False
 
         return True
@@ -318,7 +303,7 @@ class Forecast:
                 model=self._model,
             )
 
-        logger.warning("Falling back to slower backend")
+        logger.warning("Large query, this might take some time.")
         latitude, longitude = self._get_spatial_selection_for_adapter(
             latitude=latitude, longitude=longitude, points=points
         )
