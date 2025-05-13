@@ -7,7 +7,7 @@ from jua._utils.remove_none_from_dict import remove_none_from_dict
 from jua._utils.spinner import Spinner
 from jua.client import JuaClient
 from jua.logging import get_logger
-from jua.types.geo import PredictionTimeDelta, SpatialSelection
+from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
 from jua.weather._jua_dataset import rename_variables
 from jua.weather.conversions import bytes_to_gb
 from jua.weather.variables import Variables
@@ -24,9 +24,16 @@ def _open_dataset(
     prediction_timedelta: PredictionTimeDelta = None,
     latitude: SpatialSelection | None = None,
     longitude: SpatialSelection | None = None,
+    points: list[LatLon] | LatLon | None = None,
     method: str | None = None,
     **kwargs,
 ) -> xr.Dataset:
+    if points is not None and (latitude is not None or longitude is not None):
+        raise ValueError(
+            "Cannot provide both points and latitude/longitude. "
+            "Please provide either points or latitude/longitude."
+        )
+
     if "engine" not in kwargs:
         kwargs["engine"] = "zarr"
 
@@ -45,6 +52,7 @@ def _open_dataset(
         "prediction_timedelta": prediction_timedelta,
         "latitude": latitude,
         "longitude": longitude,
+        "points": points,
     }
 
     sel_kwargs = remove_none_from_dict(sel_kwargs)
@@ -100,51 +108,12 @@ def open_dataset(
     prediction_timedelta: PredictionTimeDelta = None,
     latitude: SpatialSelection | None = None,
     longitude: SpatialSelection | None = None,
+    points: list[LatLon] | LatLon | None = None,
     method: str | None = None,
     size_warning_threshold_gb: float = 1,
     compute: bool = True,
     **kwargs,
 ) -> xr.Dataset:
-    """Create an xarray Dataset from one or more URLs.
-
-    Opens datasets stored at the provided URLs using xarray's open_dataset or
-    open_mfdataset functions, handling authentication and progress tracking.
-    This is a utility function that configures common settings like authentication,
-    chunking, and time decoding.
-
-    Args:
-        client: A JuaClient instance used for authentication and settings.
-        urls: A single URL string or a list of URL strings pointing to dataset
-            locations.
-        chunks: Chunk sizes for dask array. Can be "auto" for automatic chunking,
-            an integer for uniform chunk size, or a dictionary mapping dimension
-            names to chunk sizes. Defaults to "auto".
-        should_print_progress: Whether to display a progress bar during loading.
-            If None, uses the client's default setting.
-        time: The initial time of the dataset.
-        prediction_timedelta: The prediction time delta of the dataset.
-        lat: The latitude of the dataset.
-        lon: The longitude of the dataset.
-        method: 'nearest' or None
-        **kwargs: Additional keyword arguments passed to xr.open_dataset() or
-            xr.open_mfdataset(). Common options include:
-            - engine: The engine to use for opening the dataset. Defaults to "zarr".
-            - decode_timedelta: Whether to decode time delta data. Defaults to True.
-            - storage_options: Dict of parameters for the storage backend.
-
-    Returns:
-        An xarray Dataset containing the loaded data.
-
-    Raises:
-        ValueError: If no URLs are provided.
-
-    Examples:
-        >>> ds = open_dataset(client, "https://data.jua.sh/forecasts/ept-2/2025042406.zarr/")
-        >>> ds = open_dataset(client, [
-            "https://data.jua.sh/forecasts/ept-2/2025042406.zarr/",
-            "https://data.jua.sh/forecasts/ept-2/2025042407.zarr/",
-        ])
-    """
     if isinstance(urls, str):
         urls = [urls]
 
@@ -172,6 +141,7 @@ def open_dataset(
             "prediction_timedelta": prediction_timedelta,
             "latitude": latitude,
             "longitude": longitude,
+            "points": points,
             "method": method,
         },
     }

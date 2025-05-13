@@ -1,6 +1,7 @@
 from datetime import datetime
 
 import numpy as np
+import pandas as pd
 
 
 def validate_init_time(init_time: datetime | str) -> datetime:
@@ -41,6 +42,14 @@ def to_timedelta(hours: int | np.timedelta64 | None) -> np.timedelta64 | None:
     if hours is None:
         return None
     raise ValueError(f"unexpected timedelta type: {hours}")
+
+
+def to_datetime(dt: datetime | str) -> datetime:
+    if isinstance(dt, datetime):
+        return dt
+    if isinstance(dt, str):
+        return pd.to_datetime(dt).to_pydatetime()
+    raise ValueError(f"unexpected datetime type: {dt}")
 
 
 def timedelta_to_hours(td: np.timedelta64 | int) -> int:

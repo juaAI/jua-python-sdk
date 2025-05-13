@@ -2,8 +2,10 @@ from typing import TYPE_CHECKING, Any, Protocol, TypeVar
 
 import numpy as np
 import xarray as xr
+from pydantic import validate_call
 
 from jua.logging import get_logger
+from jua.types.geo import LatLon, SpatialSelection
 from jua.weather.conversions import to_timedelta
 from jua.weather.variables import Variables
 
@@ -15,26 +17,17 @@ _original_dataarray_sel = xr.DataArray.sel
 _original_dataset_getitem = xr.Dataset.__getitem__
 
 
-def _check_prediction_timedelta(**kwargs):
-    if "prediction_timedelta" in kwargs and not isinstance(
-        kwargs["prediction_timedelta"], slice
-    ):
-        # Convert to timedelta
-        if isinstance(kwargs["prediction_timedelta"], list):
-            kwargs["prediction_timedelta"] = [
-                to_timedelta(t) for t in kwargs["prediction_timedelta"]
-            ]
-        else:
-            kwargs["prediction_timedelta"] = to_timedelta(
-                kwargs["prediction_timedelta"]
-            )
-    elif "prediction_timedelta" in kwargs and isinstance(
-        kwargs["prediction_timedelta"], slice
-    ):
+def _check_prediction_timedelta(
+    prediction_timedelta: int | np.timedelta64 | slice | None,
+):
+    if prediction_timedelta is None:
+        return None
+
+    if isinstance(prediction_timedelta, slice):
         # Handle slice case
-        start = kwargs["prediction_timedelta"].start
-        stop = kwargs["prediction_timedelta"].stop
-        step = kwargs["prediction_timedelta"].step or 1
+        start = prediction_timedelta.start
+        stop = prediction_timedelta.stop
+        step = prediction_timedelta.step or 1
 
         if start is not None:
             start = to_timedelta(start)
@@ -43,28 +36,109 @@ def _check_prediction_timedelta(**kwargs):
         if step is not None:
             step = to_timedelta(step)
 
-        kwargs["prediction_timedelta"] = slice(start, stop, step)
-    return kwargs
+        return slice(start, stop, step)
+
+    if isinstance(prediction_timedelta, list):
+        return [to_timedelta(t) for t in prediction_timedelta]
+    return to_timedelta(prediction_timedelta)
+
+
+def _check_points(
+    points: LatLon | list[LatLon] | None,
+    latitude: SpatialSelection | None,
+    longitude: SpatialSelection | None,
+):
+    if points is not None and (latitude is not None or longitude is not None):
+        raise ValueError(
+            "Cannot provide both points and latitude/longitude. "
+            "Please provide either points or latitude/longitude."
+        )
+
+    if points is not None:
+        if not isinstance(points, list):
+            points = [points]
+        latitude = [p.lat for p in points]
+        longitude = [p.lon for p in points]
+
+    return latitude, longitude
+
+
+def _patch_args(
+    prediction_timedelta: int | np.timedelta64 | slice | None,
+    time: np.datetime64 | slice | None,
+    latitude: float | slice | None,
+    longitude: float | slice | None,
+    points: LatLon | list[LatLon] | None,
+    **kwargs,
+):
+    prediction_timedelta = _check_prediction_timedelta(prediction_timedelta)
+    latitude, longitude = _check_points(points, latitude, longitude)
+
+    if isinstance(latitude, slice):
+        if latitude.start < latitude.stop:
+            latitude = slice(latitude.stop, latitude.start, latitude.step)
+
+    jua_args = {}
+    if prediction_timedelta is not None:
+        jua_args["prediction_timedelta"] = prediction_timedelta
+    if time is not None:
+        jua_args["time"] = time
+    if latitude is not None:
+        jua_args["latitude"] = latitude
+    if longitude is not None:
+        jua_args["longitude"] = longitude
+
+    return {**jua_args, **kwargs}
 
 
 # Override Dataset.sel method
-def _patched_dataset_sel(self, *args, **kwargs):
+def _patched_dataset_sel(
+    self,
+    *args,
+    time: np.datetime64 | slice | None = None,
+    prediction_timedelta: int | np.timedelta64 | slice | None = None,
+    latitude: float | slice | None = None,
+    longitude: float | slice | None = None,
+    points: LatLon | list[LatLon] | None = None,
+    **kwargs,
+):
     """
     This is a patch to the xarray.Dataset.sel method to convert the prediction_timedelta
     argument to a timedelta.
     """
     # Check if prediction_timedelta is in kwargs
-    kwargs = _check_prediction_timedelta(**kwargs)
-
+    kwargs = _patch_args(
+        time=time,
+        prediction_timedelta=prediction_timedelta,
+        latitude=latitude,
+        longitude=longitude,
+        points=points,
+        **kwargs,
+    )
     # Call the original method
     return _original_dataset_sel(self, *args, **kwargs)
 
 
 # Override DataArray.sel method
-def _patched_dataarray_sel(self, *args, **kwargs):
+def _patched_dataarray_sel(
+    self,
+    *args,
+    time: np.datetime64 | slice | None = None,
+    prediction_timedelta: int | np.timedelta64 | slice | None = None,
+    latitude: float | slice | None = None,
+    longitude: float | slice | None = None,
+    points: LatLon | list[LatLon] | None = None,
+    **kwargs,
+):
     # Check if prediction_timedelta is in kwargs
-    kwargs = _check_prediction_timedelta(**kwargs)
-
+    kwargs = _patch_args(
+        time=time,
+        prediction_timedelta=prediction_timedelta,
+        latitude=latitude,
+        longitude=longitude,
+        points=points,
+        **kwargs,
+    )
     # Call the original method
     return _original_dataarray_sel(self, *args, **kwargs)
 
@@ -89,25 +163,24 @@ class LeadTimeSelector:
     def __init__(self, xarray_obj: xr.DataArray | xr.Dataset):
         self._xarray_obj = xarray_obj
 
-    # Lead time can be int, timedelta or slice
-    def sel(
+    @validate_call
+    def select_points(
         self,
-        prediction_timedelta: int | np.timedelta64 | slice | None = None,
-        time: np.datetime64 | slice | None = None,
-        latitude: float | slice | None = None,
-        longitude: float | slice | None = None,
+        points: LatLon | list[LatLon],
+        method: str | None = "nearest",
         **kwargs,
     ) -> xr.DataArray | xr.Dataset:
-        jua_args = {}
-        if prediction_timedelta is not None:
-            jua_args["prediction_timedelta"] = prediction_timedelta
-        if time is not None:
-            jua_args["time"] = time
-        if latitude is not None:
-            jua_args["latitude"] = latitude
-        if longitude is not None:
-            jua_args["longitude"] = longitude
-        return self._xarray_obj.sel(**jua_args, **kwargs)
+        if not isinstance(points, list):
+            points = [points]
+
+        point_data = []
+        for point in points:
+            point_data.append(
+                self._xarray_obj.sel(
+                    latitude=point.lat, longitude=point.lon, method=method, **kwargs
+                )
+            )
+        return xr.concat(point_data, dim="point")
 
     def to_celcius(self) -> xr.DataArray:
         if not isinstance(self._xarray_obj, xr.DataArray):
@@ -142,14 +215,12 @@ if TYPE_CHECKING:
     class JuaAccessorProtocol(Protocol[T]):
         def __init__(self, xarray_obj: T) -> None: ...
 
-        def sel(
+        def select_points(
             self,
-            prediction_timedelta: int | np.timedelta64 | slice | None = None,
-            time: np.datetime64 | slice | None = None,
-            latitude: float | slice | None = None,
-            longitude: float | slice | None = None,
+            points: LatLon | list[LatLon],
+            method: str | None = "nearest",
             **kwargs,
-        ) -> T: ...
+        ) -> TypedDataArray | TypedDataset: ...
 
         def to_celcius(self) -> TypedDataArray: ...
 
@@ -171,9 +242,27 @@ if TYPE_CHECKING:
         latitude: xr.DataArray
         longitude: xr.DataArray
 
-        def sel(self, *args, **kwargs) -> "TypedDataArray": ...
+        def sel(
+            self,
+            *args,
+            prediction_timedelta: int | np.timedelta64 | slice | None = None,
+            time: np.datetime64 | slice | None = None,
+            latitude: float | slice | None = None,
+            longitude: float | slice | None = None,
+            points: LatLon | list[LatLon] | None = None,
+            **kwargs,
+        ) -> "TypedDataArray": ...
 
-        def isel(self, *args, **kwargs) -> "TypedDataArray": ...
+        def isel(
+            self,
+            *args,
+            prediction_timedelta: int | np.timedelta64 | slice | None = None,
+            time: np.datetime64 | slice | None = None,
+            latitude: float | slice | None = None,
+            longitude: float | slice | None = None,
+            points: LatLon | list[LatLon] | None = None,
+            **kwargs,
+        ) -> "TypedDataArray": ...
 
     class TypedDataset(xr.Dataset):  # type: ignore
         jua: JuaAccessorProtocol["TypedDataset"]

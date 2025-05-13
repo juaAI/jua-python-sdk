@@ -27,9 +27,9 @@ from jua.weather.variables import Variables
 client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5)
 zurich = LatLon(lat=47.3769, lon=8.5417)
-forecast = model.forecast.get_latest(
-    points=[zurich],
-    max_lead_time=480, # Hours
+# Get latest forecast
+forecast = model.forecast.get_forecast(
+    points=[zurich]
 )
 temp_data = forecast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
 temp_data.jua.to_celcius().plot()
@@ -48,7 +48,7 @@ client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5)
 
 lead_time = 10 # hours
-dataset = model.forecast.get_latest_forecast_as_dataset(
+dataset = model.forecast.get_forecast(
     prediction_timedelta=lead_time,
     variables=[
         Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,

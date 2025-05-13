@@ -16,7 +16,5 @@ class LatLon:
     lon: float = Field(..., ge=-180, le=180)
 
 
-PredictionTimeDelta = (
-    int | np.timedelta64 | slice | list[int] | list[np.timedelta64] | None
-)
-SpatialSelection = float | slice | list[float] | None
+PredictionTimeDelta = int | np.timedelta64 | slice | list[int] | list[np.timedelta64]
+SpatialSelection = float | slice | list[float]

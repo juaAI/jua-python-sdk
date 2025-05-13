@@ -14,7 +14,7 @@ from jua.weather._model_meta import get_model_meta_info
 from jua.weather._types.api_payload_types import ForecastRequestPayload
 from jua.weather._types.api_response_types import ForecastMetadataResponse
 from jua.weather._types.forecast import ForecastData
-from jua.weather.conversions import timedelta_to_hours
+from jua.weather.conversions import timedelta_to_hours, to_datetime
 from jua.weather.models import Models
 from jua.weather.variables import Variables
 
@@ -22,6 +22,9 @@ logger = get_logger(__name__)
 
 
 class Forecast:
+    _MAX_INIT_TIME_PAST_FOR_API_H = 36
+    _MAX_POINTS_FOR_API = 25
+
     def __init__(self, client: JuaClient, model: Models):
         self._client = client
         self._model = model
@@ -41,65 +44,6 @@ class Forecast:
 
     def is_global_data_available(self) -> bool:
         return self._model in self._FORECAST_ADAPTERS
-
-    def get_latest(
-        self,
-        lat: float | None = None,
-        lon: float | None = None,
-        points: list[LatLon] | None = None,
-        min_lead_time: int = 0,
-        max_lead_time: int = 0,
-        variables: list[str] | None = None,
-        full: bool = False,
-    ) -> ForecastData:
-        return self._api.get_latest_forecast(
-            model_name=self._model_name,
-            lat=lat,
-            lon=lon,
-            payload=ForecastRequestPayload(
-                points=points,
-                min_lead_time=min_lead_time,
-                max_lead_time=max_lead_time,
-                variables=variables,
-                full=full,
-            ),
-        )
-
-    def get(
-        self,
-        init_time: datetime | str | None = None,
-        lat: float | None = None,
-        lon: float | None = None,
-        points: list[LatLon] | None = None,
-        min_lead_time: int = 0,
-        max_lead_time: int = 0,
-        variables: list[str] | None = None,
-        full: bool = False,
-    ) -> ForecastData:
-        if not init_time:
-            return self.get_latest(
-                lat=lat,
-                lon=lon,
-                points=points,
-                min_lead_time=min_lead_time,
-                max_lead_time=max_lead_time,
-                variables=variables,
-                full=full,
-            )
-
-        return self._api.get_forecast(
-            init_time=init_time,
-            model_name=self._model_name,
-            lat=lat,
-            lon=lon,
-            payload=ForecastRequestPayload(
-                points=points,
-                min_lead_time=min_lead_time,
-                max_lead_time=max_lead_time,
-                variables=variables,
-                full=full,
-            ),
-        )
 
     def get_latest_metadata(self) -> ForecastMetadataResponse:
         return self._api.get_latest_forecast_metadata(model_name=self._model_name)
@@ -144,17 +88,54 @@ class Forecast:
 
         return maybe_metadata.available_forecasted_hours >= forecast_horizon
 
-    @validate_call(config=dict(arbitrary_types_allowed=True))
-    def get_latest_forecast_as_dataset(
+    def _dispatch_to_api(
         self,
-        print_progress: bool | None = None,
+        init_time: datetime | str = "latest",
+        points: list[LatLon] | None = None,
+        min_lead_time: int = 0,
+        max_lead_time: int = 0,
+        variables: list[str] | list[Variables] | None = None,
+    ) -> ForecastData:
+        if init_time == "latest":
+            return self._api.get_latest_forecast(
+                model_name=self._model_name,
+                payload=ForecastRequestPayload(
+                    points=points,
+                    min_lead_time=min_lead_time,
+                    max_lead_time=max_lead_time,
+                    variables=variables,
+                ),
+            )
+
+        return self._api.get_forecast(
+            init_time=init_time,
+            model_name=self._model_name,
+            payload=ForecastRequestPayload(
+                points=points,
+                min_lead_time=min_lead_time,
+                max_lead_time=max_lead_time,
+                variables=variables,
+            ),
+        )
+
+    def _dispatch_to_data_adapter(
+        self,
+        init_time: datetime | str = "latest",
         variables: list[Variables] | list[str] | None = None,
+        print_progress: bool | None = None,
         prediction_timedelta: PredictionTimeDelta = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
         method: str | None = None,
-    ) -> JuaDataset:
-        return self.get_forecast_as_dataset(
+    ):
+        if not self.is_global_data_available():
+            raise ModelDoesNotSupportForecastRawDataAccessError(self._model_name)
+
+        if init_time == "latest":
+            init_time = self.get_latest_metadata().init_time
+
+        return self._FORECAST_ADAPTERS[self._model](
+            to_datetime(init_time),
             variables=variables,
             print_progress=print_progress,
             prediction_timedelta=prediction_timedelta,
@@ -163,25 +144,192 @@ class Forecast:
             method=method,
         )
 
-    @validate_call(config=dict(arbitrary_types_allowed=True))
-    def get_forecast_as_dataset(
+    def _can_be_dispatched_to_api(
         self,
+        init_time: datetime | str,
+        prediction_timedelta: PredictionTimeDelta | None = None,
+        latitude: SpatialSelection | None = None,
+        longitude: SpatialSelection | None = None,
+        points: list[LatLon] | None = None,
+    ) -> bool:
+        if init_time == "latest":
+            init_time = self.get_latest_metadata().init_time
+
+        init_time_dt = to_datetime(init_time)
+        # Make now timezone-aware if init_time is timezone-aware
+        now = (
+            datetime.now(init_time_dt.tzinfo) if init_time_dt.tzinfo else datetime.now()
+        )
+
+        if (
+            now - init_time_dt
+        ).total_seconds() > self._MAX_INIT_TIME_PAST_FOR_API_H * 3600:
+            logger.warning(
+                "Init times that are more than 36 hours in the past "
+                "will be slower to load."
+            )
+            return False
+
+        if points is None and (latitude is None or longitude is None):
+            return False
+
+        if isinstance(latitude, slice) or isinstance(longitude, slice):
+            return False
+
+        if latitude is not None and longitude is not None:
+            points = self._convert_lat_lon_to_points(latitude, longitude)
+
+        assert points is not None, (
+            "Points are either provided or determined from latitude and longitude"
+        )
+
+        if not self._is_latest_init_time(init_time) and len(points) > 1:
+            logger.warning(
+                "Loading more than one point for a non-latest forecast."
+                "Falling back to slower backend."
+            )
+            return False
+
+        if len(points) > self._MAX_POINTS_FOR_API:
+            logger.warning(
+                f"Loading more than {self._MAX_POINTS_FOR_API} points might be slow."
+            )
+            return False
+
+        if prediction_timedelta is not None:
+            if isinstance(prediction_timedelta, slice):
+                if prediction_timedelta.step is not None:
+                    logger.warning(
+                        "Step in prediction_timedelta slices will result in "
+                        "slower loading."
+                    )
+                    return False
+
+        return True
+
+    def _convert_lat_lon_to_points(
+        self,
+        latitude: list[float] | float,
+        longitude: list[float] | float,
+    ) -> list[LatLon]:
+        if isinstance(latitude, float):
+            latitude = [latitude]
+        if isinstance(longitude, float):
+            longitude = [longitude]
+        return [LatLon(lat, lon) for lat in latitude for lon in longitude]
+
+    def _convert_prediction_timedelta_to_api_call(
+        self,
+        min_lead_time: int | None,
+        max_lead_time: int | None,
+        prediction_timedelta: PredictionTimeDelta | None,
+    ) -> tuple[int, int]:
+        # Default to 480 hours
+        min_lead_time = min_lead_time or 0
+        max_lead_time = max_lead_time or 480
+
+        if isinstance(prediction_timedelta, slice):
+            return prediction_timedelta.start, prediction_timedelta.stop
+
+        if prediction_timedelta is not None:
+            # Assume it is a scalar value
+            return 0, timedelta_to_hours(prediction_timedelta)
+        return min_lead_time, max_lead_time
+
+    def _is_latest_init_time(self, init_time: datetime | str) -> bool:
+        if init_time == "latest":
+            return True
+        if isinstance(init_time, datetime):
+            return init_time == self.get_latest_metadata().init_time
+        return False
+
+    def _get_prediction_timedelta_for_adapter(
+        self,
+        min_lead_time: int | None,
+        max_lead_time: int | None,
+        prediction_timedelta: PredictionTimeDelta | None,
+    ) -> PredictionTimeDelta:
+        if prediction_timedelta is not None:
+            return prediction_timedelta
+        min_lead_time = min_lead_time or 0
+        max_lead_time = max_lead_time or 480
+        return slice(min_lead_time, max_lead_time)
+
+    def _get_spatial_selection_for_adapter(
+        self,
+        latitude: SpatialSelection | None,
+        longitude: SpatialSelection | None,
+        points: list[LatLon] | None,
+    ) -> tuple[SpatialSelection | None, SpatialSelection | None]:
+        if points is None:
+            return latitude, longitude
+        lats, lons = zip(*[(p.lat, p.lon) for p in points])
+        return list(lats), list(lons)
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_forecast(
+        self,
+        init_time: datetime | str = "latest",
         variables: list[Variables] | list[str] | None = None,
-        init_time: datetime | None = None,
         print_progress: bool | None = None,
         prediction_timedelta: PredictionTimeDelta = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
-        method: str | None = None,
+        points: list[LatLon] | LatLon | None = None,
+        min_lead_time: int | None = None,
+        max_lead_time: int | None = None,
+        method: str | None = "nearest",
     ) -> JuaDataset:
-        if not self.is_global_data_available():
-            raise ModelDoesNotSupportForecastRawDataAccessError(self._model_name)
+        if points is not None and (latitude is not None or longitude is not None):
+            raise ValueError(
+                "Cannot provide both points and latitude/longitude. "
+                "Please provide either points or latitude/longitude."
+            )
+        if points is not None and not isinstance(points, list):
+            points = [points]
 
-        if init_time is None:
-            init_time = self.get_latest_metadata().init_time
+        if self._can_be_dispatched_to_api(
+            init_time=init_time,
+            latitude=latitude,
+            longitude=longitude,
+            points=points,
+        ):
+            # As _can_be_dispatched_to_api has passed, either points are not none
+            # or we can convert the latitude and longitude to points
+            points = points or self._convert_lat_lon_to_points(latitude, longitude)  # type: ignore
+            min_lead_time, max_lead_time = (
+                self._convert_prediction_timedelta_to_api_call(
+                    min_lead_time, max_lead_time, prediction_timedelta
+                )
+            )
 
-        return self._FORECAST_ADAPTERS[self._model](
-            init_time,
+            data = self._dispatch_to_api(
+                init_time=init_time,
+                points=points,
+                variables=variables,
+                min_lead_time=min_lead_time,
+                max_lead_time=max_lead_time,
+            )
+            dataset_name = f"{self._model_name}_{data.init_time.strftime('%Y%m%d%H')}"
+            return JuaDataset(
+                settings=self._client.settings,
+                dataset_name=dataset_name,
+                raw_data=data.to_xarray(),
+                model=self._model,
+            )
+
+        logger.warning("Falling back to slower backend")
+        latitude, longitude = self._get_spatial_selection_for_adapter(
+            latitude=latitude, longitude=longitude, points=points
+        )
+        prediction_timedelta = self._get_prediction_timedelta_for_adapter(
+            min_lead_time=min_lead_time,
+            max_lead_time=max_lead_time,
+            prediction_timedelta=prediction_timedelta,
+        )
+
+        return self._dispatch_to_data_adapter(
+            init_time=init_time,
             variables=variables,
             print_progress=print_progress,
             prediction_timedelta=prediction_timedelta,

@@ -7,7 +7,7 @@ import xarray as xr
 from pydantic import BaseModel
 from pydantic.dataclasses import dataclass
 
-from jua.weather._xarray_patches import TypedDataset, as_typed_dataset
+from jua.weather._xarray_patches import TypedDataset
 from jua.weather.variables import rename_variable
 
 
@@ -67,54 +67,55 @@ class ForecastData:
         variable_keys = list(self.points[0].variables.keys())
 
         # Extract coordinate information
-        requested_lats = [p.requested_latlon.lat for p in self.points]
-        requested_lons = [p.requested_latlon.lon for p in self.points]
         returned_lats = [p.returned_latlon.lat for p in self.points]
         returned_lons = [p.returned_latlon.lon for p in self.points]
 
-        # Create data variables
-        data_vars = {}
-        for var in variable_keys:
-            # For each point, get values across all times
-            values = []
-            for point in self.points:
-                if var in point.variables:
-                    # Ensure the length matches self.times, pad with np.nan if necessary
-                    point_data = point[var]
-                    if point_data is not None and len(point_data) == len(self.times):
-                        values.append(point_data)
-                    else:
-                        values.append([np.nan] * len(self.times))
-                else:
-                    values.append([np.nan] * len(self.times))
+        lats = np.unique(returned_lats)
+        lons = np.unique(returned_lons)
 
-            # Create a variable with dimensions (point, time)
-            data_vars[var] = (("point", "time"), np.array(values))
+        prediction_timedeltas = [t - self.init_time for t in self.times]
 
-        # Create the dataset with point as primary dimension
-        ds = (
-            xr.Dataset(
-                data_vars=data_vars,
-                coords={
-                    "time": self.times,
-                    "point": np.arange(len(self.points)),
-                    "requested_lat": ("point", requested_lats),
-                    "requested_lon": ("point", requested_lons),
-                    "returned_lat": ("point", returned_lats),
-                    "returned_lon": ("point", returned_lons),
-                },
-                attrs={
-                    "model": self.model,
-                    "forecast_id": self.id,
-                    "name": self.name,
-                    "init_time": self.init_time.isoformat(),
-                },
-            )
-            .set_index(point=["requested_lat", "requested_lon"])
-            .set_index(point=["returned_lat", "returned_lon"])
+        ds = xr.Dataset(
+            coords={
+                "time": [self.init_time],
+                "prediction_timedelta": prediction_timedeltas,
+                "latitude": lats,
+                "longitude": lons,
+            },
         )
 
-        return as_typed_dataset(ds)
+        point_mapping: dict[tuple[float, float], PointResponse] = {}
+        for point in self.points:
+            point_mapping[(point.returned_latlon.lat, point.returned_latlon.lon)] = (
+                point
+            )
+
+        # Create data variables for the dataset
+        for var_key in variable_keys:
+            # Initialize array with explicit missing values (using numpy.nan)
+            data_shape = (1, len(prediction_timedeltas), len(lats), len(lons))
+            data_array = np.full(data_shape, np.nan)
+
+            # Fill only the coordinates where we actually have data
+            for lat_idx, lat in enumerate(lats):
+                for lon_idx, lon in enumerate(lons):
+                    if (lat, lon) not in point_mapping:
+                        continue
+                    point = point_mapping[(lat, lon)]
+                    var_values = point[var_key]
+                    data_array[0, :, lat_idx, lon_idx] = var_values
+
+            # Add the variable to the dataset
+            ds[var_key] = (
+                ("time", "prediction_timedelta", "latitude", "longitude"),
+                data_array,
+            )
+        ds.attrs["model"] = self.model
+        ds.attrs["id"] = self.id
+        ds.attrs["name"] = self.name
+        ds.attrs["init_time"] = str(self.init_time)
+        ds.attrs["max_available_lead_time"] = self.max_available_lead_time
+        return ds
 
     def to_pandas(self) -> pd.DataFrame | None:
         ds = self.to_xarray()

@@ -19,9 +19,8 @@ def main():
     models = [client.weather.get_model(model) for model in models_to_use]
 
     for model in models:
-        forecast = model.forecast.get_latest(
+        forecast = model.forecast.get_forecast(
             points=[zurich],
-            max_lead_time=480,
         )
         # plot the temperature of the two points
         temp_data = forecast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]

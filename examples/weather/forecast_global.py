@@ -16,19 +16,16 @@ def main():
 
     # Let' access the full, global dataset
     lead_times_hours = [0, 12, 24]
-    dataset = model.forecast.get_latest_forecast_as_dataset(
+    init_time = model.forecast.get_available_init_times()[1]
+    dataset = model.forecast.get_forecast(
+        init_time=init_time,
         prediction_timedelta=lead_times_hours,
         variables=[
             Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
             Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
         ],
-        latitude=[10, 20, 30],
-        longitude=[10, 20, 30],
         method="nearest",
     )
-    print(dataset.to_xarray())
-
-    return
 
     # Fenerate a plot for air temperature and wind speed for 0, 12, and 24 hours
     rows = 2
@@ -51,7 +48,7 @@ def main():
 
     # Loop through each variable (row)
     for r_idx, variable_key in enumerate(variables_to_plot):
-        print(f"Loading data for {variable_key} at lead times {lead_times_hours}")
+        print(f"Plotting data for {variable_key} at lead times {lead_times_hours}")
         data = dataset[variable_key]
 
         # Determine vmin and vmax for the current row using all its data
@@ -69,7 +66,7 @@ def main():
         # Second, plot each heatmap in the row using the determined vmin/vmax
         for c_idx, lead_time_h in enumerate(lead_times_hours):
             ax = axs[r_idx, c_idx]
-            data_array_to_plot = data.jua.sel(prediction_timedelta=lead_time_h)
+            data_array_to_plot = data.sel(prediction_timedelta=lead_time_h)
 
             im = data_array_to_plot.plot(
                 ax=ax,

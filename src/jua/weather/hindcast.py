@@ -8,7 +8,7 @@ from jua._utils.dataset import open_dataset
 from jua.client import JuaClient
 from jua.errors.model_errors import ModelHasNoHindcastData
 from jua.logging import get_logger
-from jua.types.geo import PredictionTimeDelta, SpatialSelection
+from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
 from jua.weather._api import WeatherAPI
 from jua.weather._jua_dataset import JuaDataset
 from jua.weather._model_meta import get_model_meta_info
@@ -141,6 +141,7 @@ class Hindcast:
         prediction_timedelta: PredictionTimeDelta = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
+        points: list[LatLon] | LatLon | None = None,
         method: str | None = None,
     ) -> JuaDataset:
         """Retrieve the complete hindcast dataset for this model.
@@ -168,6 +169,7 @@ class Hindcast:
             prediction_timedelta=prediction_timedelta,
             latitude=latitude,
             longitude=longitude,
+            points=points,
             method=method,
         )
 
