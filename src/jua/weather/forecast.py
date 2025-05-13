@@ -16,7 +16,7 @@ from jua.weather._types.api_response_types import ForecastMetadataResponse
 from jua.weather._types.forecast import ForecastData
 from jua.weather.conversions import timedelta_to_hours, to_datetime
 from jua.weather.models import Models
-from jua.weather.variables import Variables
+from jua.weather.variables import Variables, rename_to_ept2
 
 logger = get_logger(__name__)
 
@@ -88,6 +88,11 @@ class Forecast:
 
         return maybe_metadata.available_forecasted_hours >= forecast_horizon
 
+    def _rename_variables_for_api(
+        self, variables: list[str] | list[Variables]
+    ) -> list[str]:
+        return [rename_to_ept2(v) for v in variables]
+
     def _dispatch_to_api(
         self,
         init_time: datetime | str = "latest",
@@ -96,6 +101,9 @@ class Forecast:
         max_lead_time: int = 0,
         variables: list[str] | list[Variables] | None = None,
     ) -> ForecastData:
+        if variables is not None:
+            variables = self._rename_variables_for_api(variables)
+
         if init_time == "latest":
             return self._api.get_latest_forecast(
                 model_name=self._model_name,
