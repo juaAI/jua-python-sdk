@@ -34,7 +34,7 @@ def _check_prediction_timedelta(**kwargs):
         # Handle slice case
         start = kwargs["prediction_timedelta"].start
         stop = kwargs["prediction_timedelta"].stop
-        step = kwargs["prediction_timedelta"].step
+        step = kwargs["prediction_timedelta"].step or 1
 
         if start is not None:
             start = to_timedelta(start)
@@ -114,6 +114,22 @@ class LeadTimeSelector:
             raise ValueError("This method only works on DataArrays")
         return self._xarray_obj - 273.15
 
+    def to_total_time(self) -> xr.DataArray | xr.Dataset:
+        if "time" not in self._xarray_obj.dims:
+            raise ValueError("time must be a dimension")
+        if self._xarray_obj.time.shape != (1,):
+            raise ValueError("time must be a single value")
+        if "prediction_timedelta" not in self._xarray_obj.dims:
+            raise ValueError("prediction_timedelta must be a dimension")
+
+        total_time = (
+            self._xarray_obj.time[0].values + self._xarray_obj.prediction_timedelta
+        )
+        ds = self._xarray_obj.copy(deep=True)
+        ds = ds.assign_coords({"total_time": total_time})
+        ds = ds.swap_dims({"prediction_timedelta": "total_time"})
+        return ds
+
 
 # Tricking python to enable type hints in the IDE
 TypedDataArray = Any  # type: ignore
@@ -137,9 +153,23 @@ if TYPE_CHECKING:
 
         def to_celcius(self) -> TypedDataArray: ...
 
+        """Convert the dataarray to celcius"""
+
+        def to_total_time(self) -> TypedDataArray: ...
+
+        """Add a new dimension to the dataarray with the total time
+
+        The total time is computed as the sum of the time and the prediction_timedelta.
+        """
+
     # Define enhanced types
     class TypedDataArray(xr.DataArray):  # type: ignore
         jua: JuaAccessorProtocol["TypedDataArray"]
+
+        time: xr.DataArray
+        prediction_timedelta: xr.DataArray
+        latitude: xr.DataArray
+        longitude: xr.DataArray
 
         def sel(self, *args, **kwargs) -> "TypedDataArray": ...
 
@@ -147,6 +177,11 @@ if TYPE_CHECKING:
 
     class TypedDataset(xr.Dataset):  # type: ignore
         jua: JuaAccessorProtocol["TypedDataset"]
+
+        time: xr.DataArray
+        prediction_timedelta: xr.DataArray
+        latitude: xr.DataArray
+        longitude: xr.DataArray
 
         # This is the key addition - make __getitem__ return the TypedDataArray
         def __getitem__(self, key: Any) -> "TypedDataArray": ...

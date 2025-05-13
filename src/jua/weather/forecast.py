@@ -144,6 +144,7 @@ class Forecast:
 
         return maybe_metadata.available_forecasted_hours >= forecast_horizon
 
+    @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_latest_forecast_as_dataset(
         self,
         print_progress: bool | None = None,
@@ -252,7 +253,7 @@ class Forecast:
                     range(
                         timedelta_to_hours(prediction_timedelta.start),
                         timedelta_to_hours(prediction_timedelta.stop),
-                        timedelta_to_hours(prediction_timedelta.step),
+                        timedelta_to_hours(prediction_timedelta.step or 1),
                     )
                 )
             else:

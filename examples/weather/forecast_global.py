@@ -22,8 +22,13 @@ def main():
             Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
             Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
         ],
+        latitude=[10, 20, 30],
+        longitude=[10, 20, 30],
+        method="nearest",
     )
     print(dataset.to_xarray())
+
+    return
 
     # Fenerate a plot for air temperature and wind speed for 0, 12, and 24 hours
     rows = 2

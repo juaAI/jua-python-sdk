@@ -25,6 +25,9 @@ jua = "jua.scripts.jua:main"
 plotting = [
     "matplotlib>=3.8.0",
 ]
+examples = [
+    "ipykernel>=6.29.5",
+]
 
 [tool.uv]
 package = true
