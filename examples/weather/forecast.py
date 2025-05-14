@@ -22,14 +22,12 @@ def main():
         init_time=second_to_last_init_time,
         latitude=47.3769,
         longitude=8.5417,
-    )
-    as_xarray = forecast.to_xarray()
+    ).to_xarray()
 
     # Plot the first point's air temperature at height level 2m in Celsius
-    as_xarray[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M][0].jua.to_celcius().plot()
+    forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M].to_celcius().plot()
     plt.show()
 
-    # For the latest forecast, we can also query multiple locations
     # Let's compare Zurichs temperature to that of Cape Town
     zurich = LatLon(lat=47.3769, lon=8.5417)
     cape_town = LatLon(lat=-33.9249, lon=18.4241)
@@ -40,10 +38,8 @@ def main():
     # plot the temperature of the two points
     print(forecast)
     # jua.select_points allows us to use isel(point=0,1,2,...)
-    temp_data = forecast.jua.select_points(points=[zurich, cape_town])[
-        Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M
-    ]
-    temp_data_celsius = temp_data.jua.to_celcius()
+    temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+    temp_data_celsius = temp_data.to_celcius()
 
     # Plot each point separately
     temp_data_celsius.isel(point=0).plot(label="Zurich")

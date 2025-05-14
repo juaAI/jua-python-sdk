@@ -22,8 +22,8 @@ def main():
             points=[zurich],
         )
         # plot the temperature of the two points
-        temp_data = forecast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-        temp_data_celsius = temp_data.jua.to_celcius()
+        temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+        temp_data_celsius = temp_data.to_celcius()
         temp_data_celsius.plot(label=model.model_name)
 
     plt.title("Temperature Forecast Comparison")

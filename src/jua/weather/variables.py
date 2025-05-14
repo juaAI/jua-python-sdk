@@ -35,6 +35,24 @@ class Variable:
         self.emcwf_code = emcwf_code
         self.name_ept2 = name_ept2
 
+    @property
+    def display_name(self) -> str:
+        """Return the display name of the variable.
+
+        Returns:
+            The display name of the variable.
+        """
+        return " ".join(word.capitalize() for word in self.name.split("_"))
+
+    @property
+    def display_name_with_unit(self) -> str:
+        """Return the display name of the variable with its unit.
+
+        Returns:
+            The display name of the variable with its unit.
+        """
+        return f"{self.display_name} ({self.unit})"
+
     def __eq__(self, other):
         """Check if two Variable objects are equal.
 
@@ -132,6 +150,51 @@ class Variables(Enum):
     NORTHWARD_WIND_AT_HEIGHT_LEVEL_100M = Variable(
         "northward_wind_at_height_level_100m", "m s⁻¹", None, "northward_wind_100m"
     )
+
+    @property
+    def display_name(self) -> str:
+        """Return the display name of the variable.
+
+        Returns:
+            The display name of the variable.
+        """
+        return self.value.display_name
+
+    @property
+    def name(self) -> str:
+        """Return the name of the variable.
+
+        Returns:
+            The name of the variable.
+        """
+        return self.value.name
+
+    @property
+    def emcwf_code(self) -> str | None:
+        """Return the EMCWF code of the variable.
+
+        Returns:
+            The EMCWF code of the variable.
+        """
+        return self.value.emcwf_code
+
+    @property
+    def unit(self) -> str:
+        """Return the unit of the variable.
+
+        Returns:
+            The unit of the variable.
+        """
+        return self.value.unit
+
+    @property
+    def display_name_with_unit(self) -> str:
+        """Return the display name of the variable with its unit.
+
+        Returns:
+            The display name of the variable with its unit.
+        """
+        return self.value.display_name_with_unit
 
     def __str__(self) -> str:
         """Return the variable's standard name as a string.

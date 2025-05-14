@@ -303,11 +303,14 @@ class Forecast:
                 min_lead_time=min_lead_time,
                 max_lead_time=max_lead_time,
             )
+            raw_data = data.to_xarray()
+            if points is not None and raw_data is not None:
+                raw_data = raw_data.select_points(points=points)
             dataset_name = f"{self._model_name}_{data.init_time.strftime('%Y%m%d%H')}"
             return JuaDataset(
                 settings=self._client.settings,
                 dataset_name=dataset_name,
-                raw_data=data.to_xarray(),
+                raw_data=raw_data,
                 model=self._model,
             )
 

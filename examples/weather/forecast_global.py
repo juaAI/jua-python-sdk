@@ -15,15 +15,15 @@ def main():
 
     # Let' access the full, global dataset
     lead_times_hours = [0, 12, 24]
+    variables = [
+        Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
+        Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+    ]
     init_time = model.forecast.get_available_init_times()[1]
     dataset = model.forecast.get_forecast(
         init_time=init_time,
         prediction_timedelta=lead_times_hours,
-        variables=[
-            Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
-            Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
-        ],
-        method="nearest",
+        variables=variables,
     )
 
     # Fenerate a plot for air temperature and wind speed for 0, 12, and 24 hours
@@ -33,22 +33,10 @@ def main():
         rows, cols, figsize=(18, 10), sharex=True, sharey=True
     )  # Share axes for maps
 
-    variable_display_names = {
-        Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M: "Temperature (K)",
-        Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M: "Wind Speed (m/s)",
-    }
-
-    variables_to_plot = [
-        Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
-        Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
-    ]
-
-    colormaps = ["viridis", "plasma"]  # One cmap per variable/row
-
     # Loop through each variable (row)
-    for r_idx, variable_key in enumerate(variables_to_plot):
-        print(f"Plotting data for {variable_key} at lead times {lead_times_hours}")
-        data = dataset[variable_key]
+    for r_idx, variable in enumerate(variables):
+        print(f"Plotting data for {variable} at lead times {lead_times_hours}")
+        data = dataset[variable]
 
         # Determine vmin and vmax for the current row using all its data
         # Using np.nanmin and np.nanmax to be robust to NaNs if any
@@ -56,7 +44,7 @@ def main():
         current_vmax = data.max()
 
         print(
-            f"Variable: {variable_display_names[variable_key]}, "
+            f"Variable: {variable.display_name}, "
             f"vmin: {current_vmin:.2f}, vmax: {current_vmax:.2f}"
         )
 
@@ -70,7 +58,6 @@ def main():
             im = data_array_to_plot.plot(
                 ax=ax,
                 add_colorbar=False,  # We add a shared colorbar manually
-                cmap=colormaps[r_idx],
                 vmin=current_vmin,
                 vmax=current_vmax,
             )
@@ -106,16 +93,14 @@ def main():
 
             cbar_ax = fig.add_axes([cbar_left, cbar_bottom, cbar_width, cbar_height])
             cb = fig.colorbar(last_plot_in_row, cax=cbar_ax)
-            cb.set_label(variable_display_names[variable_key])
+            cb.set_label(variable.display_name_with_unit)
 
     # Add prominent row labels on the far left using fig.text (optional, if desired)
     # These are in addition to axis labels or colorbar labels
     y_positions_row_labels = [0.75, 0.28]  # Adjusted based on typical subplot heights
-    for r_idx, variable_key in enumerate(variables_to_plot):
+    for r_idx, variable in enumerate(variables):
         # Using the actual variable names from the dictionary for these labels
-        label_text = variable_display_names[variable_key].split(" (")[
-            0
-        ]  # e.g., "Temperature"
+        label_text = variable.display_name  # e.g., "Temperature"
         fig.text(
             0.01,  # x-position (very left)
             y_positions_row_labels[r_idx],  # y-position (centered for each row)

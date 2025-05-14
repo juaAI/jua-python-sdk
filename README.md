@@ -31,7 +31,7 @@ forecast = model.forecast.get_forecast(
     points=[zurich]
 )
 temp_data = forecast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-temp_data.jua.to_celcius().plot()
+temp_data.to_celcius().plot()
 ```
 
 ### Plot the global forecast with 10h lead time

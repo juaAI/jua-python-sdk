@@ -56,11 +56,11 @@ def test_flip_lat(mock_dataset: xr.Dataset):
 
 def test_to_celcius(mock_dataset: xr.Dataset):
     data = mock_dataset[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-    assert data.jua.to_celcius().equals(data - 273.15)
+    assert data.to_celcius().equals(data - 273.15)
 
 
 def test_to_absolute_time(mock_dataset: xr.Dataset):
-    with_absolute_time = mock_dataset.jua.to_absolute_time()
+    with_absolute_time = mock_dataset.to_absolute_time()
 
     assert hasattr(with_absolute_time, "absolute_time")
     assert "prediction_timedelta" not in with_absolute_time.dims

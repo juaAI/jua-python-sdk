@@ -116,7 +116,10 @@ def _patched_dataset_sel(
         **kwargs,
     )
     # Call the original method
-    return _original_dataset_sel(self, *args, **kwargs)
+    data = _original_dataset_sel(self, *args, **kwargs)
+    if points is not None:
+        return data.sel(points=points)
+    return data
 
 
 # Override DataArray.sel method
@@ -140,7 +143,10 @@ def _patched_dataarray_sel(
         **kwargs,
     )
     # Call the original method
-    return _original_dataarray_sel(self, *args, **kwargs)
+    data = _original_dataarray_sel(self, *args, **kwargs)
+    if points is not None:
+        return data.sel(points=points)
+    return data
 
 
 # Override Dataset.__getitem__ method
@@ -170,17 +176,7 @@ class LeadTimeSelector:
         method: str | None = "nearest",
         **kwargs,
     ) -> xr.DataArray | xr.Dataset:
-        if not isinstance(points, list):
-            points = [points]
-
-        point_data = []
-        for point in points:
-            point_data.append(
-                self._xarray_obj.sel(
-                    latitude=point.lat, longitude=point.lon, method=method, **kwargs
-                )
-            )
-        return xr.concat(point_data, dim="point")
+        return self._xarray_obj.select_points(points, method, **kwargs)
 
     def to_celcius(self) -> xr.DataArray:
         if not isinstance(self._xarray_obj, xr.DataArray):
@@ -221,6 +217,31 @@ class ToCelciusAccessor:
 
     def __call__(self) -> xr.DataArray:
         return self._xarray_obj - 273.15
+
+
+@xr.register_dataarray_accessor("select_points")
+@xr.register_dataset_accessor("select_points")
+class SelectPointsAccessor:
+    def __init__(self, xarray_obj: xr.DataArray | xr.Dataset):
+        self._xarray_obj = xarray_obj
+
+    def __call__(
+        self,
+        points: LatLon | list[LatLon],
+        method: str | None = "nearest",
+        **kwargs,
+    ) -> xr.DataArray | xr.Dataset:
+        if not isinstance(points, list):
+            points = [points]
+
+        point_data = []
+        for point in points:
+            point_data.append(
+                self._xarray_obj.sel(
+                    latitude=point.lat, longitude=point.lon, method=method, **kwargs
+                )
+            )
+        return xr.concat(point_data, dim="point")
 
 
 # Tricking python to enable type hints in the IDE
@@ -287,6 +308,13 @@ if TYPE_CHECKING:
 
         def to_celcius(self) -> "TypedDataArray": ...
 
+        def select_points(
+            self,
+            points: LatLon | list[LatLon],
+            method: str | None = "nearest",
+            **kwargs,
+        ) -> "TypedDataArray": ...
+
     class TypedDataset(xr.Dataset):  # type: ignore
         jua: JuaAccessorProtocol["TypedDataset"]
 
@@ -303,6 +331,13 @@ if TYPE_CHECKING:
         def isel(self, *args, **kwargs) -> "TypedDataset": ...
 
         def to_absolute_time(self) -> "TypedDataset": ...
+
+        def select_points(
+            self,
+            points: LatLon | list[LatLon],
+            method: str | None = "nearest",
+            **kwargs,
+        ) -> "TypedDataset": ...
 
     # Monkey patch the xarray types
     xr.DataArray = TypedDataArray  # type: ignore
