@@ -6,8 +6,8 @@ import jua.weather._xarray_patches  # # noqa: F401
 
 # Make sure the xarray patches are loaded
 from jua.types.geo import LatLon
+from jua.weather import Variables
 from jua.weather.conversions import to_datetime, to_timedelta
-from jua.weather.variables import Variables
 
 _TIME = to_datetime("2025-05-02")
 _TIMEDELTAS = np.array(to_timedelta(list(range(12))))

@@ -1,3 +1,4 @@
+import warnings
 from datetime import datetime
 
 import xarray as xr
@@ -61,7 +62,12 @@ def _open_dataset(
 
     slice_kwargs = {k: v for k, v in sel_kwargs.items() if isinstance(v, slice)}
 
-    dataset = xr.open_dataset(url, **kwargs)
+    # Suppress UserWarning about chunks
+    with warnings.catch_warnings():
+        warnings.filterwarnings(
+            "ignore", message=".*chunks separate the stored chunks.*"
+        )
+        dataset = xr.open_dataset(url, **kwargs)
     # We cannot call nearest on slices
     dataset = dataset.sel(**non_slice_kwargs, method=method).sel(**slice_kwargs)
     dataset = rename_variables(dataset)

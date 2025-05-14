@@ -19,10 +19,9 @@ Alternatively, generate an API Key [here](https://app.jua.sh/api-keys) and copy 
 
 ```python
 import matplotlib.pyplot as plt
-from jua.client import JuaClient
+from jua import JuaClient
 from jua.types.geo import LatLon
-from jua.weather.models import Models
-from jua.weather.variables import Variables
+from jua.weather import Models, Variables
 
 client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5)
@@ -39,10 +38,9 @@ temp_data.jua.to_celcius().plot()
 
 ```python
 import matplotlib.pyplot as plt
-from jua.client import JuaClient
+from jua import JuaClient
 from jua.types.geo import LatLon
-from jua.weather.models import Models
-from jua.weather.variables import Variables
+from jua.weather import Models, Variables
 
 client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5)
@@ -62,10 +60,9 @@ plt.show()
 
 ```python
 import matplotlib.pyplot as plt
-from jua.client import JuaClient
+from jua import JuaClient
 from jua.types.geo import LatLon
-from jua.weather.models import Models
-from jua.weather.variables import Variables
+from jua.weather import Models, Variables
 
 client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5_EARLY)

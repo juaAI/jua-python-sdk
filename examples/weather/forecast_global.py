@@ -2,9 +2,8 @@ import logging
 
 import matplotlib.pyplot as plt
 
-from jua.client import JuaClient
-from jua.weather.models import Models
-from jua.weather.variables import Variables
+from jua import JuaClient
+from jua.weather import Models, Variables
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
