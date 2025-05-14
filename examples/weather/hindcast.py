@@ -28,7 +28,7 @@ def main():
         time=time,
         prediction_timedelta=0,
         # Select Europe
-        latitude=slice(71, 36),  # Note: slice is inverted
+        latitude=slice(71, 36),
         longitude=slice(-15, 50),
         method="nearest",
     )

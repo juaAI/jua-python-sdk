@@ -185,9 +185,19 @@ class LeadTimeSelector:
     def to_celcius(self) -> xr.DataArray:
         if not isinstance(self._xarray_obj, xr.DataArray):
             raise ValueError("This method only works on DataArrays")
-        return self._xarray_obj - 273.15
+        return self._xarray_obj.to_celcius()
 
     def to_absolute_time(self) -> xr.DataArray | xr.Dataset:
+        return self._xarray_obj.to_absolute_time()
+
+
+@xr.register_dataarray_accessor("to_absolute_time")
+@xr.register_dataset_accessor("to_absolute_time")
+class ToAbsoluteTimeAccessor:
+    def __init__(self, xarray_obj: xr.DataArray | xr.Dataset):
+        self._xarray_obj = xarray_obj
+
+    def __call__(self) -> xr.DataArray | xr.Dataset:
         if "time" not in self._xarray_obj.dims:
             raise ValueError("time must be a dimension")
         if self._xarray_obj.time.shape != (1,):
@@ -202,6 +212,15 @@ class LeadTimeSelector:
         ds = ds.assign_coords({"absolute_time": absolute_time})
         ds = ds.swap_dims({"prediction_timedelta": "absolute_time"})
         return ds
+
+
+@xr.register_dataarray_accessor("to_celcius")
+class ToCelciusAccessor:
+    def __init__(self, xarray_obj: xr.DataArray):
+        self._xarray_obj = xarray_obj
+
+    def __call__(self) -> xr.DataArray:
+        return self._xarray_obj - 273.15
 
 
 # Tricking python to enable type hints in the IDE
@@ -264,6 +283,10 @@ if TYPE_CHECKING:
             **kwargs,
         ) -> "TypedDataArray": ...
 
+        def to_absolute_time(self) -> "TypedDataArray": ...
+
+        def to_celcius(self) -> "TypedDataArray": ...
+
     class TypedDataset(xr.Dataset):  # type: ignore
         jua: JuaAccessorProtocol["TypedDataset"]
 
@@ -278,6 +301,8 @@ if TYPE_CHECKING:
         def sel(self, *args, **kwargs) -> "TypedDataset": ...
 
         def isel(self, *args, **kwargs) -> "TypedDataset": ...
+
+        def to_absolute_time(self) -> "TypedDataset": ...
 
     # Monkey patch the xarray types
     xr.DataArray = TypedDataArray  # type: ignore
