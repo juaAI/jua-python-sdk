@@ -1,5 +1,5 @@
 [project]
-name = "jua-python-sdk"
+name = "jua"
 version = "0.1.0"
 description = "Access Jua's API with ease"
 readme = "README.md"
