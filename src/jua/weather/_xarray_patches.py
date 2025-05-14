@@ -68,12 +68,9 @@ def _patch_args(
     time: np.datetime64 | slice | None,
     latitude: float | slice | None,
     longitude: float | slice | None,
-    points: LatLon | list[LatLon] | None,
     **kwargs,
 ):
     prediction_timedelta = _check_prediction_timedelta(prediction_timedelta)
-    latitude, longitude = _check_points(points, latitude, longitude)
-
     if isinstance(latitude, slice):
         if latitude.start < latitude.stop:
             latitude = slice(latitude.stop, latitude.start, latitude.step)
@@ -107,19 +104,17 @@ def _patched_dataset_sel(
     argument to a timedelta.
     """
     # Check if prediction_timedelta is in kwargs
-    kwargs = _patch_args(
+    full_kwargs = _patch_args(
         time=time,
         prediction_timedelta=prediction_timedelta,
         latitude=latitude,
         longitude=longitude,
-        points=points,
         **kwargs,
     )
-    # Call the original method
-    data = _original_dataset_sel(self, *args, **kwargs)
     if points is not None:
-        return data.sel(points=points)
-    return data
+        return self.jua.select_points(*args, points=points, **full_kwargs)
+    # Call the original method
+    return _original_dataset_sel(self, *args, **full_kwargs)
 
 
 # Override DataArray.sel method
@@ -134,19 +129,19 @@ def _patched_dataarray_sel(
     **kwargs,
 ):
     # Check if prediction_timedelta is in kwargs
-    kwargs = _patch_args(
+    full_kwargs = _patch_args(
         time=time,
         prediction_timedelta=prediction_timedelta,
         latitude=latitude,
         longitude=longitude,
-        points=points,
         **kwargs,
     )
-    # Call the original method
-    data = _original_dataarray_sel(self, *args, **kwargs)
+
     if points is not None:
-        return data.sel(points=points)
-    return data
+        return self.jua.select_points(*args, points=points, **full_kwargs)
+
+    # Call the original method
+    return _original_dataarray_sel(self, *args, **full_kwargs)
 
 
 # Override Dataset.__getitem__ method

@@ -713,7 +713,7 @@ wheels = [
 ]
 
 [[package]]
-name = "jua-python-sdk"
+name = "jua"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

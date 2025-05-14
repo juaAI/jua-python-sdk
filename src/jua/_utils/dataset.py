@@ -152,7 +152,10 @@ def open_dataset(
         },
     }
 
-    with Spinner("Preparing dataset...", disable=not should_print_progress):
+    with Spinner(
+        "Preparing dataset...",
+        disable=not client.settings.should_print_progress(should_print_progress),
+    ):
         if len(urls) == 1:
             dataset = _open_dataset(client, urls[0], **kwargs)
         else:

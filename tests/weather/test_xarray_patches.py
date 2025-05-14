@@ -84,7 +84,7 @@ def test_select_multiple_points(mock_dataset: xr.Dataset):
         LatLon(lat=np.random.uniform(-10, 10), lon=np.random.uniform(-10, 10))
         for _ in range(10)
     ]
-    selected = mock_dataset.jua.select_points(points=points, method="nearest")
+    selected = mock_dataset.sel(points=points, method="nearest")
     data = selected[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
     for i, p in enumerate(points):
         reference = mock_dataset[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M].sel(
