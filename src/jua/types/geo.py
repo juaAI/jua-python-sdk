@@ -14,6 +14,7 @@ class LatLon:
 
     lat: float = Field(..., ge=-90, le=90)
     lon: float = Field(..., ge=-180, le=180)
+    label: str | None = None
 
 
 PredictionTimeDelta = int | np.timedelta64 | slice | list[int] | list[np.timedelta64]
