@@ -45,14 +45,15 @@ class Forecast:
     def is_global_data_available(self) -> bool:
         return self._model in self._FORECAST_ADAPTERS
 
-    def get_latest_metadata(self) -> ForecastMetadataResponse:
+    def _get_latest_metadata(self) -> ForecastMetadataResponse:
         return self._api.get_latest_forecast_metadata(model_name=self._model_name)
 
+    @validate_call
     def get_metadata(
-        self, init_time: datetime | str | None = None
+        self, init_time: datetime | str = "latest"
     ) -> ForecastMetadataResponse | None:
-        if init_time is None:
-            return self.get_latest_metadata()
+        if init_time == "latest":
+            return self._get_latest_metadata()
 
         if not self._model_meta.is_jua_model:
             logger.warning(
@@ -73,20 +74,15 @@ class Forecast:
 
         return self._api.get_available_init_times(model_name=self._model_name)
 
+    @validate_call
     def is_ready(
-        self, forecast_horizon: int, init_time: datetime | None = None
+        self, forecasted_hours: int, init_time: datetime | str = "latest"
     ) -> bool:
-        if init_time is None:
-            return (
-                self.get_latest_metadata().available_forecasted_hours
-                >= forecast_horizon
-            )
-
         maybe_metadata = self.get_metadata(init_time)
         if maybe_metadata is None:
             return False
 
-        return maybe_metadata.available_forecasted_hours >= forecast_horizon
+        return maybe_metadata.available_forecasted_hours >= forecasted_hours
 
     def _rename_variables_for_api(
         self, variables: list[str] | list[Variables]
@@ -140,7 +136,10 @@ class Forecast:
             raise ModelDoesNotSupportForecastRawDataAccessError(self._model_name)
 
         if init_time == "latest":
-            init_time = self.get_latest_metadata().init_time
+            metadata = self.get_metadata()
+            if metadata is None:
+                raise ValueError("No metadata found for model")
+            init_time = metadata.init_time
 
         return self._FORECAST_ADAPTERS[self._model](
             to_datetime(init_time),
@@ -161,7 +160,10 @@ class Forecast:
         points: list[LatLon] | None = None,
     ) -> bool:
         if init_time == "latest":
-            init_time = self.get_latest_metadata().init_time
+            metadata = self.get_metadata()
+            if metadata is None:
+                raise ValueError("No metadata found for model")
+            init_time = metadata.init_time
 
         init_time_dt = to_datetime(init_time)
         # Make now timezone-aware if init_time is timezone-aware
@@ -232,9 +234,11 @@ class Forecast:
     def _is_latest_init_time(self, init_time: datetime | str) -> bool:
         if init_time == "latest":
             return True
-        if isinstance(init_time, datetime):
-            return init_time == self.get_latest_metadata().init_time
-        return False
+        init_time_dt = to_datetime(init_time)
+        metadata = self.get_metadata()
+        if metadata is None:
+            return False
+        return init_time_dt == metadata.init_time
 
     def _get_prediction_timedelta_for_adapter(
         self,

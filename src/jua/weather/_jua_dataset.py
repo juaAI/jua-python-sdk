@@ -1,4 +1,3 @@
-from datetime import datetime
 from pathlib import Path
 from typing import Any
 
@@ -65,27 +64,17 @@ class JuaDataset:
         return as_typed_dataarray(self._raw_data[str(key)])
 
     @validate_call(config={"arbitrary_types_allowed": True})
-    def download(
+    def save(
         self,
-        start_date: datetime | None = None,
-        end_date: datetime | None = None,
         output_path: Path | None = None,
         show_progress: bool | None = None,
         overwrite: bool = False,
-        always_download: bool = False,
+        ignore_size_warning: bool = False,
     ) -> None:
         if output_path is None:
             output_path = self._get_default_output_path()
 
         output_name = self._dataset_name
-
-        if start_date is not None and end_date is not None:
-            output_name += f"-from-{start_date.isoformat()}-to-{end_date.isoformat()}"
-        elif start_date is not None:
-            output_name += f"-since-{start_date.isoformat()}"
-        elif end_date is not None:
-            output_name += f"-before-{end_date.isoformat()}"
-
         if output_path.suffix != ".zarr":
             output_path = output_path / f"{output_name}.zarr"
 
@@ -96,45 +85,37 @@ class JuaDataset:
             )
             return
 
-        if start_date is not None and end_date is not None:
-            data_to_download = self._raw_data.sel(time=slice(start_date, end_date))
-        elif start_date is not None:
-            data_to_download = self._raw_data.sel(time=slice(start_date, None))
-        elif end_date is not None:
-            data_to_download = self._raw_data.sel(time=slice(None, end_date))
-        else:
-            data_to_download = self._raw_data
-
-        download_size_gb = bytes_to_gb(data_to_download.nbytes)
+        data_to_save = self._raw_data
+        data_size = bytes_to_gb(data_to_save.nbytes)
         if (
-            not always_download
-            and download_size_gb > self._DOWLOAD_SIZE_WARNING_THRESHOLD_GB
+            not ignore_size_warning
+            and data_size > self._DOWLOAD_SIZE_WARNING_THRESHOLD_GB
         ):
             logger.warning(
-                f"Dataset {self._dataset_name} is large ({download_size_gb:.2f}GB). "
-                "This may take a while to download."
+                f"Dataset {self._dataset_name} is large ({data_size:.2f}GB). "
+                "This may take a while to save."
             )
             yn = input("Do you want to continue? (y/N) ")
             if yn.lower() != "y":
-                logger.info("Skipping download.")
+                logger.info("Skipping save.")
                 return
 
         logger.info(
-            f"Downloading {download_size_gb:.2f}GB dataset "
+            f"Saving a {data_size:.2f}GB dataset "
             f"{self._dataset_name} to {output_path}..."
         )
 
         with Spinner(
-            "Preparing download. This might take a while...",
+            "Preparing save. This might take a while...",
             disable=not show_progress,
         ):
             zarr_version = get_model_meta_info(self._model).forecast_zarr_version
             logger.info(f"Initializing dataset (zarr_format={zarr_version})...")
-            delayed = data_to_download.to_zarr(
+            delayed = data_to_save.to_zarr(
                 output_path, mode="w", zarr_format=zarr_version, compute=False
             )
 
         with OptionalProgressBar(self._settings, show_progress):
-            logger.info("Downloading dataset...")
+            logger.info("Saving dataset...")
             delayed.compute()
-        logger.info(f"Dataset {self._dataset_name} downloaded to {output_path}.")
+        logger.info(f"Dataset {self._dataset_name} saved to {output_path}.")

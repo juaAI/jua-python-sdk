@@ -24,7 +24,7 @@ class Model:
         )
 
     @property
-    def model_name(self) -> str:
+    def name(self) -> str:
         return self._model.value
 
     @property
@@ -36,7 +36,7 @@ class Model:
         return self._hindcast
 
     def __repr__(self) -> str:
-        return f"<Model name='{self.model_name}'>"
+        return f"<Model name='{self.name}'>"
 
     def __str__(self) -> str:
-        return self.model_name
+        return self.name
