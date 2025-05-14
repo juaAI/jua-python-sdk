@@ -62,7 +62,7 @@ class TestAuthenticationSettings:
 
         with patch("builtins.open", mock_open(read_data=json_content)):
             with patch("pathlib.Path.exists", return_value=True):
-                auth = AuthenticationSettings(secrets_path="/path/to/secrets.json")
+                auth = AuthenticationSettings(api_key_path="/path/to/secrets.json")
 
                 assert auth.api_key_id == "file_id"
                 assert auth.api_key_secret == "file_secret"
@@ -180,7 +180,7 @@ class TestAuthenticationSettings:
         custom_creds_file.write_text('{"id": "custom_id", "secret": "custom_secret"}')
 
         # When using secrets_path, it should override the default path
-        auth = AuthenticationSettings(secrets_path=str(custom_creds_file))
+        auth = AuthenticationSettings(api_key_path=str(custom_creds_file))
 
         assert auth.api_key_id == "custom_id"
         assert auth.api_key_secret == "custom_secret"

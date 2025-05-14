@@ -1,3 +1,5 @@
+from pydantic import validate_call
+
 from jua.settings.jua_settings import JuaSettings
 
 
@@ -17,6 +19,7 @@ class JuaClient:
         >>> forecast_model = client.weather.get_model(...)
     """
 
+    @validate_call
     def __init__(self, settings: JuaSettings = JuaSettings()):
         """Initialize a new Jua client.
 

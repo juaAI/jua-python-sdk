@@ -50,7 +50,7 @@ class AuthenticationSettings(BaseSettings):
         default="default",
         description="Environment name to determine configuration settings",
     )
-    secrets_path: str | None = Field(
+    api_key_path: str | None = Field(
         default=None, description="Custom path to load API credentials from a JSON file"
     )
 
@@ -66,7 +66,7 @@ class AuthenticationSettings(BaseSettings):
         api_key_id: str | None = None,
         api_key_secret: str | None = None,
         environment: str = "default",
-        secrets_path: str | None = None,
+        api_key_path: str | None = None,
         **kwargs,
     ):
         super().__init__(**kwargs)
@@ -77,8 +77,8 @@ class AuthenticationSettings(BaseSettings):
             self.api_key_secret = api_key_secret
         if environment is not None:
             self.environment = environment
-        if secrets_path is not None:
-            self.secrets_path = secrets_path
+        if api_key_path is not None:
+            self.api_key_path = api_key_path
 
         # If credentials are not set via env vars or .env, try loading from JSON file
         if not self.api_key_id or not self.api_key_secret:
@@ -92,8 +92,8 @@ class AuthenticationSettings(BaseSettings):
         fails if the file doesn't exist or contains invalid JSON.
         """
         # Determine the secrets file path
-        if self.secrets_path:
-            file_path = Path(self.secrets_path)
+        if self.api_key_path:
+            file_path = Path(self.api_key_path)
         else:
             file_path = Path.home() / ".jua" / self.environment / "api-key.json"
 
