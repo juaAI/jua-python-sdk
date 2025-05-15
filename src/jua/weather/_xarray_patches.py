@@ -1,4 +1,4 @@
-from typing import TYPE_CHECKING, Any, Protocol, TypeVar
+from typing import TYPE_CHECKING, Any, Callable, Protocol, TypeVar
 
 import numpy as np
 import xarray as xr
@@ -40,7 +40,35 @@ def _check_prediction_timedelta(
 
     if isinstance(prediction_timedelta, list):
         return [to_timedelta(t) for t in prediction_timedelta]
+
     return to_timedelta(prediction_timedelta)
+
+
+def _patch_timedelta_slicing(
+    available_timedeltas: np.ndarray,
+    prediction_timedelta: slice,
+    method: str | None = None,
+) -> list[int] | slice:
+    if prediction_timedelta.step is None:
+        return prediction_timedelta
+    if prediction_timedelta.start is None or prediction_timedelta.stop is None:
+        raise ValueError("start and stop must be provided")
+    requested = [prediction_timedelta.start]
+    current = requested[0]
+    while True:
+        current += prediction_timedelta.step
+        if current >= prediction_timedelta.stop:
+            break
+        requested.append(current)
+
+    # convert to indices
+    if method is None:
+        return [np.where(available_timedeltas == t)[0][0] for t in requested]
+    elif method == "nearest":
+        indices = [np.argmin(np.abs(available_timedeltas - t)) for t in requested]
+        return np.sort(np.unique(indices))
+    else:
+        raise ValueError(f"Invalid method: {method}")
 
 
 def _patch_args(
@@ -68,8 +96,16 @@ def _patch_args(
     return {**jua_args, **kwargs}
 
 
-# Override Dataset.sel method
-def _patched_dataset_sel(
+def _must_use_patch_timedelta_slicing(
+    prediction_timedelta: PredictionTimeDelta | None,
+) -> bool:
+    if not isinstance(prediction_timedelta, slice):
+        return False
+    return prediction_timedelta.step is not None
+
+
+def _patched_sel(
+    original_sel: Callable,
     self,
     *args,
     time: np.datetime64 | slice | None = None,
@@ -79,10 +115,6 @@ def _patched_dataset_sel(
     points: LatLon | list[LatLon] | None = None,
     **kwargs,
 ):
-    """
-    This is a patch to the xarray.Dataset.sel method to convert the prediction_timedelta
-    argument to a timedelta.
-    """
     # Check if prediction_timedelta is in kwargs
     full_kwargs = _patch_args(
         time=time,
@@ -95,35 +127,42 @@ def _patched_dataset_sel(
     if points is not None:
         return self.jua.select_point(*args, points=points, **full_kwargs)
 
-    # Call the original method
-    return _original_dataset_sel(self, *args, **full_kwargs)
+    prediction_timedelta = full_kwargs.get("prediction_timedelta")
+    must_use_patch_timedelta_slicing = _must_use_patch_timedelta_slicing(
+        prediction_timedelta
+    )
+    if must_use_patch_timedelta_slicing:
+        prediction_timedelta = _patch_timedelta_slicing(
+            self.prediction_timedelta.values.flatten(),
+            prediction_timedelta,
+        )
+        del full_kwargs["prediction_timedelta"]
+    data = original_sel(self, *args, **full_kwargs)
+    if must_use_patch_timedelta_slicing:
+        data = data.isel(prediction_timedelta=prediction_timedelta)
+    return data
+
+
+# Override Dataset.sel method
+def _patched_dataset_sel(
+    self,
+    *args,
+    **kwargs,
+):
+    """
+    This is a patch to the xarray.Dataset.sel method to convert the prediction_timedelta
+    argument to a timedelta.
+    """
+    return _patched_sel(_original_dataset_sel, self, *args, **kwargs)
 
 
 # Override DataArray.sel method
 def _patched_dataarray_sel(
     self,
     *args,
-    time: np.datetime64 | slice | None = None,
-    prediction_timedelta: int | np.timedelta64 | slice | None = None,
-    latitude: float | slice | None = None,
-    longitude: float | slice | None = None,
-    points: LatLon | list[LatLon] | None = None,
     **kwargs,
 ):
-    # Check if prediction_timedelta is in kwargs
-    full_kwargs = _patch_args(
-        time=time,
-        prediction_timedelta=prediction_timedelta,
-        latitude=latitude,
-        longitude=longitude,
-        **kwargs,
-    )
-
-    if points is not None:
-        return self.jua.select_point(*args, points=points, **full_kwargs)
-
-    # Call the original method
-    return _original_dataarray_sel(self, *args, **full_kwargs)
+    return _patched_sel(_original_dataarray_sel, self, *args, **kwargs)
 
 
 # Override Dataset.__getitem__ method

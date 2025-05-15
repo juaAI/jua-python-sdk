@@ -7,6 +7,7 @@ import jua.weather._xarray_patches  # # noqa: F401
 # Make sure the xarray patches are loaded
 from jua.types.geo import LatLon
 from jua.weather import Variables
+from jua.weather._xarray_patches import _patch_timedelta_slicing
 from jua.weather.conversions import to_datetime, to_timedelta
 
 _TIME = to_datetime("2025-05-02")
@@ -91,3 +92,22 @@ def test_select_multiple_point(mock_dataset: xr.Dataset):
             latitude=p.lat, longitude=p.lon, method="nearest"
         )
         assert np.allclose(data.isel(points=i).values, reference.values)
+
+
+def test_patch_timedelta_slicing(mock_dataset: xr.Dataset):
+    available_timedeltas = np.array(to_timedelta(list(range(12))))
+    prediction_timedelta = slice(to_timedelta(0), to_timedelta(10), to_timedelta(1))
+    method = "nearest"
+    indices = _patch_timedelta_slicing(
+        available_timedeltas, prediction_timedelta, method
+    )
+    assert np.array_equal(indices, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+    method = None
+    indices = _patch_timedelta_slicing(
+        available_timedeltas, prediction_timedelta, method
+    )
+    assert np.array_equal(indices, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9])
+
+    selected = mock_dataset.sel(prediction_timedelta=slice(0, 5, 1))
+    assert selected.equals(mock_dataset.isel(prediction_timedelta=slice(0, 5, 1)))

@@ -135,14 +135,14 @@ class Hindcast:
     @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_hindcast(
         self,
-        print_progress: bool | None = None,
-        variables: list[Variables] | list[str] | None = None,
         time: datetime | list[datetime] | slice | None = None,
+        variables: list[Variables] | list[str] | None = None,
         prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
         points: list[LatLon] | LatLon | None = None,
         method: str | None = None,
+        print_progress: bool | None = None,
     ) -> JuaDataset:
         """Retrieve the complete hindcast dataset for this model.
 
