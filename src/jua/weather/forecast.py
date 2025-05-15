@@ -23,7 +23,7 @@ logger = get_logger(__name__)
 
 class Forecast:
     _MAX_INIT_TIME_PAST_FOR_API_H = 36
-    _MAX_POINTS_FOR_API = 25
+    _MAX_point_FOR_API = 25
 
     def __init__(self, client: JuaClient, model: Models):
         self._client = client
@@ -92,7 +92,7 @@ class Forecast:
     def _dispatch_to_api(
         self,
         init_time: datetime | str = "latest",
-        points: list[LatLon] | None = None,
+        point: list[LatLon] | None = None,
         min_lead_time: int = 0,
         max_lead_time: int = 0,
         variables: list[str] | list[Variables] | None = None,
@@ -104,7 +104,7 @@ class Forecast:
             return self._api.get_latest_forecast(
                 model_name=self._model_name,
                 payload=ForecastRequestPayload(
-                    points=points,
+                    points=point,
                     min_lead_time=min_lead_time,
                     max_lead_time=max_lead_time,
                     variables=variables,
@@ -115,7 +115,7 @@ class Forecast:
             init_time=init_time,
             model_name=self._model_name,
             payload=ForecastRequestPayload(
-                points=points,
+                points=point,
                 min_lead_time=min_lead_time,
                 max_lead_time=max_lead_time,
                 variables=variables,
@@ -157,7 +157,7 @@ class Forecast:
         prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
-        points: list[LatLon] | None = None,
+        point: list[LatLon] | None = None,
     ) -> bool:
         if init_time == "latest":
             metadata = self.get_metadata()
@@ -176,23 +176,23 @@ class Forecast:
         ).total_seconds() > self._MAX_INIT_TIME_PAST_FOR_API_H * 3600:
             return False
 
-        if points is None and (latitude is None or longitude is None):
+        if point is None and (latitude is None or longitude is None):
             return False
 
         if isinstance(latitude, slice) or isinstance(longitude, slice):
             return False
 
         if latitude is not None and longitude is not None:
-            points = self._convert_lat_lon_to_points(latitude, longitude)
+            point = self._convert_lat_lon_to_point(latitude, longitude)
 
-        assert points is not None, (
-            "Points are either provided or determined from latitude and longitude"
+        assert point is not None, (
+            "point are either provided or determined from latitude and longitude"
         )
 
-        if not self._is_latest_init_time(init_time) and len(points) > 1:
+        if not self._is_latest_init_time(init_time) and len(point) > 1:
             return False
 
-        if len(points) > self._MAX_POINTS_FOR_API:
+        if len(point) > self._MAX_point_FOR_API:
             return False
 
         if prediction_timedelta is not None:
@@ -202,7 +202,7 @@ class Forecast:
 
         return True
 
-    def _convert_lat_lon_to_points(
+    def _convert_lat_lon_to_point(
         self,
         latitude: list[float] | float,
         longitude: list[float] | float,
@@ -256,11 +256,11 @@ class Forecast:
         self,
         latitude: SpatialSelection | None,
         longitude: SpatialSelection | None,
-        points: list[LatLon] | None,
+        point: list[LatLon] | None,
     ) -> tuple[SpatialSelection | None, SpatialSelection | None]:
-        if points is None:
+        if point is None:
             return latitude, longitude
-        lats, lons = zip(*[(p.lat, p.lon) for p in points])
+        lats, lons = zip(*[(p.lat, p.lon) for p in point])
         return list(lats), list(lons)
 
     @validate_call(config=dict(arbitrary_types_allowed=True))
@@ -272,28 +272,28 @@ class Forecast:
         prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
-        points: list[LatLon] | LatLon | None = None,
+        point: list[LatLon] | LatLon | None = None,
         min_lead_time: int | None = None,
         max_lead_time: int | None = None,
         method: str | None = "nearest",
     ) -> JuaDataset:
-        if points is not None and (latitude is not None or longitude is not None):
+        if point is not None and (latitude is not None or longitude is not None):
             raise ValueError(
-                "Cannot provide both points and latitude/longitude. "
-                "Please provide either points or latitude/longitude."
+                "Cannot provide both point and latitude/longitude. "
+                "Please provide either point or latitude/longitude."
             )
-        if points is not None and not isinstance(points, list):
-            points = [points]
+        if point is not None and not isinstance(point, list):
+            point = [point]
 
         if self._can_be_dispatched_to_api(
             init_time=init_time,
             latitude=latitude,
             longitude=longitude,
-            points=points,
+            point=point,
         ):
-            # As _can_be_dispatched_to_api has passed, either points are not none
-            # or we can convert the latitude and longitude to points
-            points = points or self._convert_lat_lon_to_points(latitude, longitude)  # type: ignore
+            # As _can_be_dispatched_to_api has passed, either point are not none
+            # or we can convert the latitude and longitude to point
+            point = point or self._convert_lat_lon_to_point(latitude, longitude)  # type: ignore
             min_lead_time, max_lead_time = (
                 self._convert_prediction_timedelta_to_api_call(
                     min_lead_time, max_lead_time, prediction_timedelta
@@ -302,14 +302,14 @@ class Forecast:
 
             data = self._dispatch_to_api(
                 init_time=init_time,
-                points=points,
+                point=point,
                 variables=variables,
                 min_lead_time=min_lead_time,
                 max_lead_time=max_lead_time,
             )
             raw_data = data.to_xarray()
-            if points is not None and raw_data is not None:
-                raw_data = raw_data.select_points(points=points)
+            if point is not None and raw_data is not None:
+                raw_data = raw_data.select_point(point=point)
             dataset_name = f"{self._model_name}_{data.init_time.strftime('%Y%m%d%H')}"
             return JuaDataset(
                 settings=self._client.settings,
@@ -320,7 +320,7 @@ class Forecast:
 
         logger.warning("Large query, this might take some time.")
         latitude, longitude = self._get_spatial_selection_for_adapter(
-            latitude=latitude, longitude=longitude, points=points
+            latitude=latitude, longitude=longitude, point=point
         )
         prediction_timedelta = self._get_prediction_timedelta_for_adapter(
             min_lead_time=min_lead_time,

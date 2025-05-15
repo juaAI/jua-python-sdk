@@ -76,7 +76,7 @@ def _patched_dataset_sel(
     prediction_timedelta: int | np.timedelta64 | slice | None = None,
     latitude: float | slice | None = None,
     longitude: float | slice | None = None,
-    points: LatLon | list[LatLon] | None = None,
+    point: LatLon | list[LatLon] | None = None,
     **kwargs,
 ):
     """
@@ -91,8 +91,8 @@ def _patched_dataset_sel(
         longitude=longitude,
         **kwargs,
     )
-    if points is not None:
-        return self.jua.select_points(*args, points=points, **full_kwargs)
+    if point is not None:
+        return self.jua.select_point(*args, point=point, **full_kwargs)
     # Call the original method
     return _original_dataset_sel(self, *args, **full_kwargs)
 
@@ -105,7 +105,7 @@ def _patched_dataarray_sel(
     prediction_timedelta: int | np.timedelta64 | slice | None = None,
     latitude: float | slice | None = None,
     longitude: float | slice | None = None,
-    points: LatLon | list[LatLon] | None = None,
+    point: LatLon | list[LatLon] | None = None,
     **kwargs,
 ):
     # Check if prediction_timedelta is in kwargs
@@ -117,8 +117,8 @@ def _patched_dataarray_sel(
         **kwargs,
     )
 
-    if points is not None:
-        return self.jua.select_points(*args, points=points, **full_kwargs)
+    if point is not None:
+        return self.jua.select_point(*args, point=point, **full_kwargs)
 
     # Call the original method
     return _original_dataarray_sel(self, *args, **full_kwargs)
@@ -145,13 +145,13 @@ class LeadTimeSelector:
         self._xarray_obj = xarray_obj
 
     @validate_call
-    def select_points(
+    def select_point(
         self,
-        points: LatLon | list[LatLon],
+        point: LatLon | list[LatLon] | str | list[str],
         method: str | None = "nearest",
         **kwargs,
     ) -> xr.DataArray | xr.Dataset:
-        return self._xarray_obj.select_points(points, method, **kwargs)
+        return self._xarray_obj.select_point(point, method, **kwargs)
 
     def to_celcius(self) -> xr.DataArray:
         if not isinstance(self._xarray_obj, xr.DataArray):
@@ -194,36 +194,62 @@ class ToCelciusAccessor:
         return self._xarray_obj - 273.15
 
 
-@xr.register_dataarray_accessor("select_points")
-@xr.register_dataset_accessor("select_points")
-class SelectPointsAccessor:
+@xr.register_dataarray_accessor("select_point")
+@xr.register_dataset_accessor("select_point")
+class SelectpointAccessor:
     def __init__(self, xarray_obj: xr.DataArray | xr.Dataset):
         self._xarray_obj = xarray_obj
 
     def __call__(
         self,
-        points: LatLon | list[LatLon],
+        point: LatLon | list[LatLon] | str | list[str],
         method: str | None = "nearest",
         **kwargs,
     ) -> xr.DataArray | xr.Dataset:
-        if not isinstance(points, list):
-            points = [points]
+        is_single_point = not isinstance(point, list)
+        if is_single_point:
+            point = [point]  # type: ignore
+
+        if len(point) == 0:  # type: ignore
+            raise ValueError("At least one point must be provided")
+
+        if "point" in self._xarray_obj.dims:
+            point = [str(p) for p in point]  # type: ignore
+            sel_fn = (
+                _original_dataset_sel
+                if isinstance(self._xarray_obj, xr.Dataset)
+                else _original_dataarray_sel
+            )
+            data = sel_fn(self._xarray_obj, point=point, **kwargs)
+            if is_single_point:
+                return data.isel(point=0)
+            return data
+
+        # If point is not a dimension, we need to select the points meaning
+        # we cannot support strings
+        if any(isinstance(p, str) for p in point):  # type: ignore
+            raise ValueError("Point must be a LatLon or a list of LatLon")
 
         point_data = []
         point_keys = []
-        for point in points:
+        for point in point:  # type: ignore
             point_data.append(
                 self._xarray_obj.sel(
-                    latitude=point.lat, longitude=point.lon, method=method, **kwargs
+                    latitude=point.lat,  # type: ignore
+                    longitude=point.lon,  # type: ignore
+                    method=method,
+                    **kwargs,
                 )
             )
-            point_keys.append(point.key)
+            point_keys.append(point.key)  # type: ignore
 
         result = xr.concat(point_data, dim="point")
         # Add the point_keys as coordinates
         result = result.assign_coords(point_key=(["point"], point_keys))
         # create index for key-based selection
         result = result.set_index(point=["point_key"])
+        if is_single_point:
+            return result.isel(point=0)
         return result
 
 
@@ -238,9 +264,9 @@ if TYPE_CHECKING:
     class JuaAccessorProtocol(Protocol[T]):
         def __init__(self, xarray_obj: T) -> None: ...
 
-        def select_points(
+        def select_point(
             self,
-            points: LatLon | list[LatLon],
+            point: LatLon | list[LatLon],
             method: str | None = "nearest",
             **kwargs,
         ) -> TypedDataArray | TypedDataset: ...
@@ -272,7 +298,7 @@ if TYPE_CHECKING:
             time: np.datetime64 | slice | None = None,
             latitude: float | slice | None = None,
             longitude: float | slice | None = None,
-            points: LatLon | list[LatLon] | None = None,
+            point: LatLon | list[LatLon] | None = None,
             **kwargs,
         ) -> "TypedDataArray": ...
 
@@ -283,7 +309,7 @@ if TYPE_CHECKING:
             time: np.datetime64 | slice | None = None,
             latitude: float | slice | None = None,
             longitude: float | slice | None = None,
-            points: LatLon | list[LatLon] | None = None,
+            point: LatLon | list[LatLon] | None = None,
             **kwargs,
         ) -> "TypedDataArray": ...
 
@@ -291,9 +317,9 @@ if TYPE_CHECKING:
 
         def to_celcius(self) -> "TypedDataArray": ...
 
-        def select_points(
+        def select_point(
             self,
-            points: LatLon | list[LatLon],
+            point: LatLon | list[LatLon],
             method: str | None = "nearest",
             **kwargs,
         ) -> "TypedDataArray": ...
@@ -315,9 +341,9 @@ if TYPE_CHECKING:
 
         def to_absolute_time(self) -> "TypedDataset": ...
 
-        def select_points(
+        def select_point(
             self,
-            points: LatLon | list[LatLon],
+            point: LatLon | list[LatLon],
             method: str | None = "nearest",
             **kwargs,
         ) -> "TypedDataset": ...

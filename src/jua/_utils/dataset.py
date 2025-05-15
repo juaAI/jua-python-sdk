@@ -25,14 +25,14 @@ def _open_dataset(
     prediction_timedelta: PredictionTimeDelta = None,
     latitude: SpatialSelection | None = None,
     longitude: SpatialSelection | None = None,
-    points: list[LatLon] | LatLon | None = None,
+    point: list[LatLon] | LatLon | None = None,
     method: str | None = None,
     **kwargs,
 ) -> xr.Dataset:
-    if points is not None and (latitude is not None or longitude is not None):
+    if point is not None and (latitude is not None or longitude is not None):
         raise ValueError(
-            "Cannot provide both points and latitude/longitude. "
-            "Please provide either points or latitude/longitude."
+            "Cannot provide both point and latitude/longitude. "
+            "Please provide either point or latitude/longitude."
         )
 
     if "engine" not in kwargs:
@@ -53,7 +53,7 @@ def _open_dataset(
         "prediction_timedelta": prediction_timedelta,
         "latitude": latitude,
         "longitude": longitude,
-        "points": points,
+        "point": point,
     }
 
     sel_kwargs = remove_none_from_dict(sel_kwargs)
@@ -114,7 +114,7 @@ def open_dataset(
     prediction_timedelta: PredictionTimeDelta = None,
     latitude: SpatialSelection | None = None,
     longitude: SpatialSelection | None = None,
-    points: list[LatLon] | LatLon | None = None,
+    point: list[LatLon] | LatLon | None = None,
     method: str | None = None,
     size_warning_threshold_gb: float = 1,
     compute: bool = True,
@@ -147,7 +147,7 @@ def open_dataset(
             "prediction_timedelta": prediction_timedelta,
             "latitude": latitude,
             "longitude": longitude,
-            "points": points,
+            "point": point,
             "method": method,
         },
     }

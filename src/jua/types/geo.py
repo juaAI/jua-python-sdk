@@ -26,7 +26,8 @@ class LatLon:
             return
         if self.label is not None:
             self.key = _label_to_key(self.label)
-        self.key = f"point_{self.lat}_{self.lon}"
+        else:
+            self.key = f"point_{self.lat}_{self.lon}"
 
     def __str__(self):
         return self.key

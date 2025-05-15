@@ -28,7 +28,7 @@ model = client.weather.get_model(Models.EPT1_5)
 zurich = LatLon(lat=47.3769, lon=8.5417)
 # Get latest forecast
 forecast = model.forecast.get_forecast(
-    points=[zurich]
+    point=[zurich]
 )
 temp_data = forecast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
 temp_data.to_celcius().plot()

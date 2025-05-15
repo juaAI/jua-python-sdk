@@ -19,9 +19,8 @@ def main():
 
     for model in models:
         forecast = model.forecast.get_forecast(
-            points=[zurich],
+            point=zurich,
         )
-        # plot the temperature of the two points
         temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
         temp_data_celsius = temp_data.to_celcius()
         temp_data_celsius.plot(label=model.name)

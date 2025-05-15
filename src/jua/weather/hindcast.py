@@ -141,7 +141,7 @@ class Hindcast:
         prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
-        points: list[LatLon] | LatLon | None = None,
+        point: list[LatLon] | LatLon | None = None,
         method: str | None = None,
     ) -> JuaDataset:
         """Retrieve the complete hindcast dataset for this model.
@@ -169,7 +169,7 @@ class Hindcast:
             prediction_timedelta=prediction_timedelta,
             latitude=latitude,
             longitude=longitude,
-            points=points,
+            point=point,
             method=method,
         )
 

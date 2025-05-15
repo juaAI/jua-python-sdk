@@ -8,12 +8,12 @@ class JuaSettings(BaseSettings):
     """Settings for configuring the Jua SDK client.
 
     This class contains all configuration options for the Jua API client,
-    including API endpoints, authentication, and behavior preferences.
+    including API endpoint, authentication, and behavior preferences.
     Settings can be provided via environment variables prefixed with 'JUA_',
     a .env file, or directly in code.
 
     Attributes:
-        api_url: Base URL for the JUA API endpoints.
+        api_url: Base URL for the JUA API endpoint.
         api_version: Version of the API to use (e.g., "v1").
         data_base_url: Base URL for data access services.
         auth: Authentication configuration including API keys.
