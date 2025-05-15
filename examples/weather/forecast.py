@@ -29,8 +29,8 @@ def main():
     plt.show()
 
     # Let's compare Zurichs temperature to that of Cape Town
-    zurich = LatLon(lat=47.3769, lon=8.5417)
-    cape_town = LatLon(lat=-33.9249, lon=18.4241)
+    zurich = LatLon(lat=47.3769, lon=8.5417, label="Zurich")
+    cape_town = LatLon(lat=-33.9249, lon=18.4241, label="Cape Town")
     forecast = model.forecast.get_forecast(
         points=[zurich, cape_town],
     ).to_xarray()
@@ -41,11 +41,28 @@ def main():
     temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
     temp_data_celsius = temp_data.to_celcius()
 
-    # Plot each point separately
+    # Plot each point separately using numerical indexes
     temp_data_celsius.isel(point=0).plot(label="Zurich")
     temp_data_celsius.isel(point=1).plot(label="Cape Town")
 
     plt.title("Temperature Forecast Comparison")
+    plt.ylabel("Temperature (°C)")
+    plt.legend()
+    plt.show()
+
+    # Display the available point keys
+    print("Available point keys:", temp_data_celsius.point_key.values)
+
+    # Now access points by their key
+    # We can use .sel() directly since we indexed the dataset with point_key
+    zurich_temp = temp_data_celsius.sel(point="zurich")
+    cape_town_temp = temp_data_celsius.sel(point="cape_town")
+
+    # Plot using the key-selected data
+    plt.figure()
+    zurich_temp.plot(label="Zurich (by key)")
+    cape_town_temp.plot(label="Cape Town (by key)")
+    plt.title("Temperature Forecast Comparison (accessed by keys)")
     plt.ylabel("Temperature (°C)")
     plt.legend()
     plt.show()

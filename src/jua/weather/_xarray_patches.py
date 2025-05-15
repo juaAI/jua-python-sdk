@@ -5,7 +5,7 @@ import xarray as xr
 from pydantic import validate_call
 
 from jua.logging import get_logger
-from jua.types.geo import LatLon, SpatialSelection
+from jua.types.geo import LatLon
 from jua.weather.conversions import to_timedelta
 from jua.weather.variables import Variables
 
@@ -41,26 +41,6 @@ def _check_prediction_timedelta(
     if isinstance(prediction_timedelta, list):
         return [to_timedelta(t) for t in prediction_timedelta]
     return to_timedelta(prediction_timedelta)
-
-
-def _check_points(
-    points: LatLon | list[LatLon] | None,
-    latitude: SpatialSelection | None,
-    longitude: SpatialSelection | None,
-):
-    if points is not None and (latitude is not None or longitude is not None):
-        raise ValueError(
-            "Cannot provide both points and latitude/longitude. "
-            "Please provide either points or latitude/longitude."
-        )
-
-    if points is not None:
-        if not isinstance(points, list):
-            points = [points]
-        latitude = [p.lat for p in points]
-        longitude = [p.lon for p in points]
-
-    return latitude, longitude
 
 
 def _patch_args(
@@ -230,13 +210,21 @@ class SelectPointsAccessor:
             points = [points]
 
         point_data = []
+        point_keys = []
         for point in points:
             point_data.append(
                 self._xarray_obj.sel(
                     latitude=point.lat, longitude=point.lon, method=method, **kwargs
                 )
             )
-        return xr.concat(point_data, dim="point")
+            point_keys.append(point.key)
+
+        result = xr.concat(point_data, dim="point")
+        # Add the point_keys as coordinates
+        result = result.assign_coords(point_key=(["point"], point_keys))
+        # create index for key-based selection
+        result = result.set_index(point=["point_key"])
+        return result
 
 
 # Tricking python to enable type hints in the IDE

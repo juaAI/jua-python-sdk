@@ -269,7 +269,7 @@ class Forecast:
         init_time: datetime | str = "latest",
         variables: list[Variables] | list[str] | None = None,
         print_progress: bool | None = None,
-        prediction_timedelta: PredictionTimeDelta = None,
+        prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
         points: list[LatLon] | LatLon | None = None,
