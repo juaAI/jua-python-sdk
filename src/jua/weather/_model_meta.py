@@ -43,8 +43,6 @@ _MODEL_META_INFO[Models.EPT1_5] = ModelMetaInfo(
     forecast_name_mapping="ept-1.5",
     forecast_zarr_version=2,
     hindcast_zarr_version=2,
-    # Specified manually since "auto" throws error when calling .to_zarr()
-    hindcast_chunks=Chunks(1, 1, 444, 741).to_dict(),
     full_forecasted_hours=480,
     is_jua_model=True,
 )
@@ -52,8 +50,6 @@ _MODEL_META_INFO[Models.EPT1_5_EARLY] = ModelMetaInfo(
     forecast_name_mapping="ept-1.5-early",
     forecast_zarr_version=2,
     hindcast_zarr_version=2,
-    # Specified manually since "auto" throws error when calling .to_zarr()
-    hindcast_chunks=Chunks(1, 1, 444, 741).to_dict(),
     full_forecasted_hours=480,
     is_jua_model=True,
 )
