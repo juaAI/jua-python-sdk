@@ -94,7 +94,7 @@ def _patched_dataset_sel(
 
     if points is not None:
         return self.jua.select_point(*args, points=points, **full_kwargs)
-    print("patching sel", full_kwargs)
+
     # Call the original method
     return _original_dataset_sel(self, *args, **full_kwargs)
 
