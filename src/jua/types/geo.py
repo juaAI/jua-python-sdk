@@ -9,7 +9,7 @@ def _label_to_key(label: str) -> str:
 
 @dataclass
 class LatLon:
-    """Geographic coordinate representing a point on Earth's surface.
+    """Geographic coordinate representing a points on Earth's surface.
 
     Attributes:
         lat: Latitude in decimal degrees (range: -90 to 90).

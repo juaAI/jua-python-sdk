@@ -57,7 +57,7 @@ class WeatherAPI:
                 payload = ForecastRequestPayload(points=[LatLon(lat=lat, lon=lon)])
             else:
                 payload.points = [LatLon(lat=lat, lon=lon)]
-        # Add this point, payload must be non-None
+        # Add this points, payload must be non-None
         if payload is None:
             raise ValueError("Payload must be non-None")
         return payload
@@ -135,7 +135,7 @@ class WeatherAPI:
         init_time = validate_init_time(init_time)
         payload_points = payload.points or []
         if len(payload_points) != 1:
-            raise JuaError("Exactly one point is supported for past forecasts")
+            raise JuaError("Exactly one points is supported for past forecasts")
         lat = payload_points[0].lat
         lon = payload_points[0].lon
 

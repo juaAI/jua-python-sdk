@@ -4,7 +4,7 @@ from jua.settings.jua_settings import JuaSettings
 
 
 class JuaClient:
-    """Main entry point for the Jua SDK.
+    """Main entry points for the Jua SDK.
 
     JuaClient provides access to all Jua services through a unified interface.
 

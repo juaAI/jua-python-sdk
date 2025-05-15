@@ -15,7 +15,7 @@ TODO: After installing run `jua auth`. This will open your webbrowser for authen
 
 Alternatively, generate an API Key [here](https://app.jua.sh/api-keys) and copy the file to `~/.jua/default/api-key.json`.
 
-### Access the latest 20-day forecast for a specific point
+### Access the latest 20-day forecast for a specific points
 
 ```python
 import matplotlib.pyplot as plt
@@ -28,7 +28,7 @@ model = client.weather.get_model(Models.EPT1_5)
 zurich = LatLon(lat=47.3769, lon=8.5417)
 # Get latest forecast
 forecast = model.forecast.get_forecast(
-    point=[zurich]
+    points=[zurich]
 )
 temp_data = forecast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
 temp_data.to_celcius().plot()

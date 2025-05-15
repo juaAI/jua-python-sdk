@@ -70,8 +70,8 @@ def test_to_absolute_time(mock_dataset: xr.Dataset):
 
 
 def test_select_single_point(mock_dataset: xr.Dataset):
-    point = LatLon(lat=0, lon=0)
-    selected = mock_dataset.jua.select_point(point=point, method="nearest")
+    points = LatLon(lat=0, lon=0)
+    selected = mock_dataset.jua.select_point(points=points, method="nearest")
     reference = mock_dataset.sel(latitude=0, longitude=0, method="nearest")
     air_temp_selected = selected[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
     air_temp_reference = reference[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
@@ -79,15 +79,15 @@ def test_select_single_point(mock_dataset: xr.Dataset):
 
 
 def test_select_multiple_point(mock_dataset: xr.Dataset):
-    """Testing that the order of the point is preserved"""
-    point = [
+    """Testing that the order of the points is preserved"""
+    points = [
         LatLon(lat=np.random.uniform(-10, 10), lon=np.random.uniform(-10, 10))
         for _ in range(10)
     ]
-    selected = mock_dataset.sel(point=point, method="nearest")
+    selected = mock_dataset.sel(points=points, method="nearest")
     data = selected[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-    for i, p in enumerate(point):
+    for i, p in enumerate(points):
         reference = mock_dataset[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M].sel(
             latitude=p.lat, longitude=p.lon, method="nearest"
         )
-        assert np.allclose(data.isel(point=i).values, reference.values)
+        assert np.allclose(data.isel(points=i).values, reference.values)

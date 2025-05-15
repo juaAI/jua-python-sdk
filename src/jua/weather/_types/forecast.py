@@ -85,9 +85,9 @@ class ForecastData:
         )
 
         point_mapping: dict[tuple[float, float], PointResponse] = {}
-        for point in self.points:
-            point_mapping[(point.returned_latlon.lat, point.returned_latlon.lon)] = (
-                point
+        for points in self.points:
+            point_mapping[(points.returned_latlon.lat, points.returned_latlon.lon)] = (
+                points
             )
 
         # Create data variables for the dataset
@@ -101,8 +101,8 @@ class ForecastData:
                 for lon_idx, lon in enumerate(lons):
                     if (lat, lon) not in point_mapping:
                         continue
-                    point = point_mapping[(lat, lon)]
-                    var_values = point[var_key]
+                    points = point_mapping[(lat, lon)]
+                    var_values = points[var_key]
                     data_array[0, :, lat_idx, lon_idx] = var_values
 
             # Add the variable to the dataset

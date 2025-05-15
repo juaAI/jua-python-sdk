@@ -23,8 +23,8 @@ def main():
 
     time = "2024-02-01T06:00:00.000000000"
     hindcast = model.hindcast.get_hindcast(
-        variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
         time=time,
+        variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
         prediction_timedelta=0,
         # Select Europe
         latitude=slice(71, 36),
