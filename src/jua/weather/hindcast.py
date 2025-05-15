@@ -135,13 +135,15 @@ class Hindcast:
     @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_hindcast(
         self,
-        time: datetime | list[datetime] | slice | None = None,
+        init_time: datetime | list[datetime] | slice | None = None,
         variables: list[Variables] | list[str] | None = None,
         prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
         points: list[LatLon] | LatLon | None = None,
-        method: str | None = None,
+        min_lead_time: int | None = None,
+        max_lead_time: int | None = None,
+        method: str | None = "nearest",
         print_progress: bool | None = None,
     ) -> JuaDataset:
         """Retrieve the complete hindcast dataset for this model.
@@ -161,11 +163,21 @@ class Hindcast:
             ModelHasNoHindcastData: If the model doesn't support hindcasts.
         """
         self._raise_if_no_file_access()
+        if prediction_timedelta is not None and (
+            min_lead_time is not None or max_lead_time is not None
+        ):
+            raise ValueError(
+                "Cannot provide both prediction_timedelta and "
+                "min_lead_time/max_lead_time.\nPlease provide "
+                "either prediction_timedelta or min_lead_time/max_lead_time."
+            )
+        if min_lead_time is not None or max_lead_time is not None:
+            prediction_timedelta = slice(min_lead_time, max_lead_time)
 
         return self._HINDCAST_ADAPTERS[self._model](
             print_progress=print_progress,
             variables=variables,
-            time=time,
+            time=init_time,
             prediction_timedelta=prediction_timedelta,
             latitude=latitude,
             longitude=longitude,

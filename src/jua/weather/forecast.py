@@ -268,7 +268,6 @@ class Forecast:
         self,
         init_time: datetime | str = "latest",
         variables: list[Variables] | list[str] | None = None,
-        print_progress: bool | None = None,
         prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
@@ -276,6 +275,7 @@ class Forecast:
         min_lead_time: int | None = None,
         max_lead_time: int | None = None,
         method: str | None = "nearest",
+        print_progress: bool | None = None,
     ) -> JuaDataset:
         if points is not None and (latitude is not None or longitude is not None):
             raise ValueError(

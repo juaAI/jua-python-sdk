@@ -67,10 +67,10 @@ from jua.weather import Models, Variables
 client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5_EARLY)
 
-time = "2024-02-01T06:00:00.000000000"
+init_time = "2024-02-01T06:00:00.000000000"
 hindcast = model.hindcast.get_hindcast(
     variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
-    time=time,
+    init_time=init_time,
     prediction_timedelta=0,
     # Select Europe
     latitude=slice(71, 36),  # Note: slice is inverted
