@@ -5,7 +5,7 @@ import xarray as xr
 from pydantic import validate_call
 
 from jua.logging import get_logger
-from jua.types.geo import LatLon
+from jua.types.geo import LatLon, PredictionTimeDelta
 from jua.weather.conversions import to_timedelta
 from jua.weather.variables import Variables
 
@@ -27,7 +27,7 @@ def _check_prediction_timedelta(
         # Handle slice case
         start = prediction_timedelta.start
         stop = prediction_timedelta.stop
-        step = prediction_timedelta.step or 1
+        step = prediction_timedelta.step
 
         if start is not None:
             start = to_timedelta(start)
@@ -73,7 +73,7 @@ def _patched_dataset_sel(
     self,
     *args,
     time: np.datetime64 | slice | None = None,
-    prediction_timedelta: int | np.timedelta64 | slice | None = None,
+    prediction_timedelta: PredictionTimeDelta | None = None,
     latitude: float | slice | None = None,
     longitude: float | slice | None = None,
     points: LatLon | list[LatLon] | None = None,
@@ -91,8 +91,10 @@ def _patched_dataset_sel(
         longitude=longitude,
         **kwargs,
     )
+
     if points is not None:
         return self.jua.select_point(*args, points=points, **full_kwargs)
+    print("patching sel", full_kwargs)
     # Call the original method
     return _original_dataset_sel(self, *args, **full_kwargs)
 
