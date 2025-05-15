@@ -138,7 +138,7 @@ class Hindcast:
         print_progress: bool | None = None,
         variables: list[Variables] | list[str] | None = None,
         time: datetime | list[datetime] | slice | None = None,
-        prediction_timedelta: PredictionTimeDelta = None,
+        prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
         points: list[LatLon] | LatLon | None = None,
