@@ -1,21 +1,41 @@
 # Jua Python SDK
 
-Access industry-leading weather forecasts wtih ease
+**Access industry-leading weather forecasts with ease**
+
+The Jua Python SDK provides a simple and powerful interface to Jua's state-of-the-art weather forecasting capabilities. Easily integrate accurate weather data into your applications, research, or analysis workflows.
 
 ## Getting Started 🚀
 
-### Install
+### Prerequisites
 
-We strongly recommend using [uv](https://docs.astral.sh/uv/) to manage dependencies. `python>=3.11` is required.
-TODO: Create PyPI entry
+- Python 3.11 or higher
+- Internet connection for API access
+
+### Installation
+
+We strongly recommend using [uv](https://docs.astral.sh/uv/) to manage dependencies:
+
+```bash
+uv init && uv add jua
+```
+
+Alternatively, you can install with pip:
+
+```bash
+pip install jua
+```
 
 ### Authentication
 
-TODO: After installing run `jua auth`. This will open your webbrowser for authentication.
+Generate an API key from the [Jua dashboard](https://app.jua.sh/api-keys) and save it to `~/.jua/default/api-key.json`.
 
-Alternatively, generate an API Key [here](https://app.jua.sh/api-keys) and copy the file to `~/.jua/default/api-key.json`.
+_Coming soon: Simply run `jua auth` to authenticate via your web browser._
 
-### Access the latest 20-day forecast for a specific points
+## Examples
+
+### Access the latest 20-day forecast for a point location
+
+Retrieve temperature forecasts for Zurich and visualize the data:
 
 ```python
 import matplotlib.pyplot as plt
@@ -30,16 +50,25 @@ zurich = LatLon(lat=47.3769, lon=8.5417)
 forecast = model.forecast.get_forecast(
     points=[zurich]
 )
-temp_data = forecast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-temp_data.to_celcius().plot()
+temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+temp_data.to_celcius().to_absolute_time().plot()
+plt.show()
 ```
 
-### Plot the global forecast with 10h lead time
+<details>
+<summary>Show output</summary>
+
+![Forecast Zurich 20d](content/readme/forecast_zurich.png)
+
+</details>
+
+### Plot global forecast with 10-hour lead time
+
+Generate a global wind speed visualization:
 
 ```python
 import matplotlib.pyplot as plt
 from jua import JuaClient
-from jua.types.geo import LatLon
 from jua.weather import Models, Variables
 
 client = JuaClient()
@@ -56,43 +85,80 @@ dataset[Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M].plot()
 plt.show()
 ```
 
-### Access historical data with ease
+<details>
+<summary>Show output</summary>
+
+![Global Windspeed 10h](content/readme/global_windspeed_10h.png)
+
+</details>
+
+### Access historical weather data
+
+Retrieve and visualize temperature data for Europe from a specific date:
 
 ```python
 import matplotlib.pyplot as plt
 from jua import JuaClient
-from jua.types.geo import LatLon
 from jua.weather import Models, Variables
 
 client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5_EARLY)
 
-init_time = "2024-02-01T06:00:00.000000000"
+init_time = "2024-02-01 06:00:00"
 hindcast = model.hindcast.get_hindcast(
     variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
     init_time=init_time,
     prediction_timedelta=0,
     # Select Europe
-    latitude=slice(71, 36),  # Note: slice is inverted
+    latitude=slice(71, 36),
     longitude=slice(-15, 50),
     method="nearest",
 )
 
-data = hindcast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+data = hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
 data.plot()
 plt.show()
 ```
 
-## Development
+<details>
+<summary>Show Output</summary>
 
-To install all dependencies run
+![Europe Hindcast](content/readme/hindcast_europe.png)
 
-```
+</details>
+
+## Development Setup
+
+### Installing development dependencies
+
+Install all required dependencies including extras:
+
+```bash
 uv sync --all-extras
 ```
 
-Enable pre-commit for linting and formatting:
+### Running examples
 
+Execute example scripts:
+
+```bash
+uv run examples/weather/forecast.py
 ```
-uv run pre-commit install && uv run pre-commit install-hooks
-```
+
+For example notebooks, ensure you select the correct Python interpreter in your notebook environment.
+
+## Documentation
+
+For comprehensive documentation, visit [docs.jua.sh](https://docs.jua.sh).
+
+## Support
+
+If you encounter any issues or have questions, please:
+
+- Check the [documentation](https://docs.jua.sh)
+- Open an issue on GitHub
+- Contact support@jua.sh
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details.

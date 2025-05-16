@@ -1,7 +1,13 @@
 [project]
 name = "jua"
 version = "0.1.0"
-description = "Access Jua's API with ease"
+description = "Easy access to Jua's weather & power services"
+authors = [
+   {name = "Jua.ai AG", email = "contact@jua.ai"}
+]
+license = "MIT"
+license-files = ["LICENSE"]
+
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [
@@ -16,6 +22,29 @@ dependencies = [
     "xarray>=2025.4.0",
     "zarr>=3.0.0",
 ]
+
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Intended Audience :: Developers",
+    "Development Status :: 4 - Beta",
+]
+
+keywords = [
+    "weather",
+    "power",
+    "energy",
+    "trading",
+    "forecast",
+    "hindcast",
+    "weather forecast",
+    "energy trading",
+]
+
+[project.urls]
+Documentation = "https://docs.jua.ai"
+Source = "https://github.com/juaAI/jua-python-sdk"
 
 
 [project.scripts]

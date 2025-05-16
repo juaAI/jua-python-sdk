@@ -210,19 +210,24 @@ class ToAbsoluteTimeAccessor:
         self._xarray_obj = xarray_obj
 
     def __call__(self) -> xr.DataArray | xr.Dataset:
-        if "time" not in self._xarray_obj.dims:
+        if not hasattr(self._xarray_obj, "time"):
             raise ValueError("time must be a dimension")
-        if self._xarray_obj.time.shape != (1,):
+        # empty tuple is also valid
+        time = self._xarray_obj.time
+        if len(time.shape) != 0 and time.shape[0] != 1:
             raise ValueError("time must be a single value")
-        if "prediction_timedelta" not in self._xarray_obj.dims:
+        if not hasattr(self._xarray_obj, "prediction_timedelta"):
             raise ValueError("prediction_timedelta must be a dimension")
 
-        absolute_time = (
-            self._xarray_obj.time[0].values + self._xarray_obj.prediction_timedelta
-        )
+        prediction_timedelta = self._xarray_obj.prediction_timedelta
+        if len(time.shape) == 0:
+            absolute_time = time.values + prediction_timedelta
+        else:
+            absolute_time = time.values[0] + prediction_timedelta
         ds = self._xarray_obj.copy(deep=True)
         ds = ds.assign_coords({"absolute_time": absolute_time})
-        ds = ds.swap_dims({"prediction_timedelta": "absolute_time"})
+        if len(prediction_timedelta.shape) > 0:
+            ds = ds.swap_dims({"prediction_timedelta": "absolute_time"})
         return ds
 
 
