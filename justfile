@@ -19,3 +19,14 @@ clean-before-publish:
     rm -rf dist
 
 publish: lint test clean-before-publish build push-to-pypi
+
+docs-clean:
+    rm -rf docs/build
+
+docs-md:
+    uv run sphinx-build -M markdown docs/source docs/build
+
+docs-html:
+    uv run sphinx-build -M html docs/source docs/build
+
+docs: docs-clean docs-md docs-html

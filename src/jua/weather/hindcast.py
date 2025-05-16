@@ -9,8 +9,8 @@ from jua.client import JuaClient
 from jua.errors.model_errors import ModelHasNoHindcastData
 from jua.logging import get_logger
 from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
+from jua.weather import JuaDataset
 from jua.weather._api import WeatherAPI
-from jua.weather._jua_dataset import JuaDataset
 from jua.weather._model_meta import get_model_meta_info
 from jua.weather.models import Models
 from jua.weather.variables import Variables

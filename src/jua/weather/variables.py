@@ -104,7 +104,7 @@ class Variables(Enum):
     and unit of measurement.
 
     Examples:
-        >>> from jua.weather.variables import Variables
+        >>> from jua.weather import Variables
         >>> # Request air temperature in a forecast
         >>> ds[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M].plot()
     """

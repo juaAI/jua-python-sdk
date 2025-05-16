@@ -1,0 +1,32 @@
+/* Custom styling for function signatures */
+
+/* Improve spacing in parameter list */
+.sig-param {
+    padding-left: 0.2em;
+    padding-right: 0.2em;
+}
+
+/* Style the return annotation */
+.sig-return {
+    font-weight: normal;
+    opacity: 0.8;
+}
+
+/* Make the parameter type annotations slightly less prominent */
+.sig-param .sig-param-annotation {
+    font-weight: normal;
+    opacity: 0.8;
+}
+
+/* Make multi-line signatures more distinct with background color */
+dl.py.function > dt,
+dl.py.method > dt {
+    padding: 0.5em;
+    border-radius: 4px;
+}
+
+/* Ensure multi-line signatures are properly aligned */
+.sig.sig-object.py .sig-indent {
+    display: inline-block;
+    vertical-align: top;
+}
