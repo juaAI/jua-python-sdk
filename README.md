@@ -121,7 +121,7 @@ plt.show()
 ```
 
 <details>
-<summary>Show Output</summary>
+<summary>Show output</summary>
 
 ![Europe Hindcast](content/readme/hindcast_europe.png)
 
