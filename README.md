@@ -149,15 +149,15 @@ For example notebooks, ensure you select the correct Python interpreter in your 
 
 ## Documentation
 
-For comprehensive documentation, visit [docs.jua.sh](https://docs.jua.sh).
+For comprehensive documentation, visit [docs.jua.ai](https://docs.jua.ai).
 
 ## Support
 
 If you encounter any issues or have questions, please:
 
-- Check the [documentation](https://docs.jua.sh)
+- Check the [documentation](https://docs.jua.ai)
 - Open an issue on GitHub
-- Contact support@jua.sh
+- Contact support@jua.ai
 
 ## License
 
