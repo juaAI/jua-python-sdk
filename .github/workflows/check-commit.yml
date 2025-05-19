@@ -1,9 +1,11 @@
 name: Check Commit
 
 on:
-  # enable all branches
+  # enable all branches but main
   push:
-    branches: ["**"]
+    branches-ignore:
+      - main
+      - actions
   pull_request:
     branches: ["**"]
 

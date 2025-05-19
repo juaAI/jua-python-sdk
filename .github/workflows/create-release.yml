@@ -1,37 +1,79 @@
 name: Bump version
 
 on:
-  workflow_run:
-    workflows: ["check-commit.yml"]
-    types:
-      - completed
-    branches: ["**"]
+  push:
+    branches:
+      - main
+      - actions
 
 jobs:
+  lint:
+    name: Run Linting
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.11"
+
+      - name: Run linters with Just
+        run: just lint
+
+  test:
+    name: Run Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # test against multiple python versions
+        python-version: ["3.11", "3.12", "3.13"]
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python ${{ matrix.python-version }}, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: ${{ matrix.python-version }}
+
+      - name: Run tests with Just and generate report
+        run: just test-ci
+
+      - name: Publish Test Report
+        uses: dorny/test-reporter@v1
+        if: success() || failure() # Run this step even if tests fail, to report them
+        with:
+          name: Pytest Results (Python ${{ matrix.python-version }})
+          path: "**/pytest-report.xml" # Path to your JUnit XML report file(s)
+          reporter: java-junit # Reporter type for JUnit XML
+          # Optional: Configure behavior for failures, e.g., fail the check if tests fail
+          fail-on-error: "true"
+
   bump-version:
-    # if: >
-    #   github.event.workflow_run.conclusion == 'success' &&
-    #   !startsWith(github.event.workflow_run.head_commit.message, 'bump:')
+    if: >
+      github.event.workflow_run.conclusion == 'success' &&
+      !startsWith(github.event.workflow_run.head_commit.message, 'bump:')
     runs-on: ubuntu-latest
     name: "Bump version and create changelog with commitizen"
+    needs: [lint, test]
     steps:
-      - name: Confirm Trigger and Print Workflow Information
-        run: |
-          echo "Minimal triggered job was executed successfully!"
-          echo "This job was triggered by the completion of workflow: '${{ github.event.workflow_run.workflow.name }}'"
-          echo "The triggering workflow ran on branch: '${{ github.event.workflow_run.head_branch }}'"
-          echo "The triggering workflow ran for commit SHA: '${{ github.event.workflow_run.head_sha }}'"
-          echo "Conclusion of the triggering workflow: '${{ github.event.workflow_run.conclusion }}'"
-          echo "Commit message of the triggering commit: '${{ github.event.workflow_run.head_commit.message }}'"
-
-      - name: Checkout the specific commit (preparation for future bumping logic)
-        if: success() # Only checkout if the above conditions were met (job is running)
+      - name: Check out
         uses: actions/checkout@v4
         with:
-          # This checkouts out the code at the specific commit that completed the CI workflow
-          ref: ${{ github.event.workflow_run.head_sha }}
-          fetch-depth: 0 # Important if/when you add Commitizen back, as it needs full history
-
-      - name: Placeholder for Future Bumping Logic
-        if: success()
-        run: echo "Actual version bumping, changelog generation, and release creation logic would go here."
+          fetch-depth: 0
+      - name: Create bump and changelog
+        uses: commitizen-tools/commitizen-action@master
+        with:
+          changelog_increment_filename: body.md
+      - name: Release
+        uses: softprops/action-gh-release@v2
+        with:
+          body_path: "body.md"
+          tag_name: ${{ env.REVISION }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
