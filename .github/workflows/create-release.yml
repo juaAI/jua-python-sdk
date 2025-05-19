@@ -34,3 +34,11 @@ jobs:
           tag_name: v${{ env.REVISION }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Setup Python, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.11"
+
+      - name: Publish to PyPI
+        run: just publish-ci
