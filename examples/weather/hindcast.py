@@ -32,7 +32,7 @@ def main():
         method="nearest",
     )
 
-    data = hindcast.to_xarray()[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+    data = hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
     data.plot()
     plt.show()
 

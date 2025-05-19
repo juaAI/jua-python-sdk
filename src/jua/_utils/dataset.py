@@ -9,9 +9,8 @@ from jua._utils.spinner import Spinner
 from jua.client import JuaClient
 from jua.logging import get_logger
 from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
-from jua.weather._jua_dataset import rename_variables
 from jua.weather.conversions import bytes_to_gb
-from jua.weather.variables import Variables
+from jua.weather.variables import Variables, rename_variables
 
 logger = get_logger(__name__)
 
@@ -154,7 +153,7 @@ def open_dataset(
 
     with Spinner(
         "Preparing dataset...",
-        disable=not client.settings.should_print_progress(should_print_progress),
+        enabled=client.settings.should_print_progress(should_print_progress),
     ):
         if len(urls) == 1:
             dataset = _open_dataset(client, urls[0], **kwargs)

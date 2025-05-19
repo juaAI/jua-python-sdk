@@ -19,8 +19,26 @@ class _LazyModelWrapper:
 
 
 class Weather:
+    """Access to Jua's weather models and data services.
+
+    This class serves as the entry point for accessing weather forecast and hindcast
+    data through Jua's various weather models.
+
+    The class is typically accessed through the `weather` property of a JuaClient
+    instance.
+
+    Examples:
+        >>> from jua import JuaClient
+        >>> client = JuaClient()
+        >>> # Get a specific model
+        >>> ept2_model = client.weather.get_model(Models.EPT2)
+        >>> # Alternative dictionary-like access
+        >>> ept15_model = client.weather[Models.EPT1_5]
+    """
+
     def __init__(self, client: JuaClient) -> None:
         self._client = client
+        # Models are instatiated lazily
         self._lazy_models = {
             model: _LazyModelWrapper(client=client, model=model) for model in Models
         }

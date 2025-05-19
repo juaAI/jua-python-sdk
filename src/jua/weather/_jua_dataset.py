@@ -17,17 +17,38 @@ from jua.weather._xarray_patches import (
 )
 from jua.weather.conversions import bytes_to_gb
 from jua.weather.models import Models
-from jua.weather.variables import rename_variable
 
 logger = get_logger(__name__)
 
 
-def rename_variables(ds: xr.Dataset) -> xr.Dataset:
-    output_variable_names = {k: rename_variable(k) for k in ds.variables}
-    return ds.rename(output_variable_names)
-
-
 class JuaDataset:
+    """Weather dataset containing forecast or hindcast data from a Jua model.
+
+    JuaDataset is the primary container for weather data returned by forecast and
+    hindcast queries.
+
+    Use `to_xarray` to get the data as an xarray dataset.
+
+    You can access individual variables using dictionary-like syntax with either
+    variable names or Variables enum members.
+
+    Examples:
+        >>> from jua import JuaClient
+        >>> from jua.weather import Models, Variables
+        >>> client = JuaClient()
+        >>> model = client.weather.get_model(Models.EPT2)
+        >>> jua_ds = model.forecast.get_forecast()
+        >>> # Access temperature data
+        >>> temp = jua_ds[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+        >>> # Plot the data
+        >>> temp.to_celcius().plot()
+        >>> # Use xarray (equivalent to above)
+        >>> ds = jua_ds.to_xarray()
+        >>> temp = ds[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+        >>> # Plot the data
+        >>> temp.to_celcius().plot()
+    """
+
     _DOWLOAD_SIZE_WARNING_THRESHOLD_GB = 20
 
     def __init__(
@@ -37,6 +58,14 @@ class JuaDataset:
         raw_data: xr.Dataset,
         model: Models,
     ):
+        """Initialize a JuaDataset.
+
+        Args:
+            settings: Client settings.
+            dataset_name: Name identifier for the dataset.
+            raw_data: The underlying xarray Dataset.
+            model: The model that produced this data.
+        """
         self._settings = settings
         self._dataset_name = dataset_name
         self._raw_data = raw_data
@@ -44,23 +73,55 @@ class JuaDataset:
 
     @property
     def nbytes(self) -> int:
+        """Get the memory size of the dataset in bytes.
+
+        Returns:
+            Memory size in bytes.
+        """
         return self._raw_data.nbytes
 
     @property
     def nbytes_gb(self) -> float:
+        """Get the memory size of the dataset in gigabytes.
+
+        Returns:
+            Memory size in gigabytes.
+        """
         return bytes_to_gb(self.nbytes)
 
     @property
     def zarr_version(self) -> int | None:
+        """Get the Zarr format version used by this model.
+
+        Returns:
+            The Zarr format version number or None if not applicable.
+        """
         return get_model_meta_info(self._model).forecast_zarr_version
 
     def _get_default_output_path(self) -> Path:
         return Path.home() / ".jua" / "datasets" / self._model.value
 
     def to_xarray(self) -> TypedDataset:
+        """Convert to a TypedDataset for advanced xarray operations.
+
+        Returns:
+            A TypedDataset that extends xarray.Dataset with additional Jua-specific
+            functionality.
+        """
         return as_typed_dataset(self._raw_data)
 
     def __getitem__(self, key: Any) -> TypedDataArray:
+        """Access a specific variable from the dataset.
+
+        You can use either string variable names or Variables enum members
+        as keys.
+
+        Args:
+            key: Variable identifier (string name or Variables enum member).
+
+        Returns:
+            TypedDataArray for the requested variable.
+        """
         return as_typed_dataarray(self._raw_data[str(key)])
 
     @validate_call(config={"arbitrary_types_allowed": True})
@@ -71,6 +132,24 @@ class JuaDataset:
         overwrite: bool = False,
         ignore_size_warning: bool = False,
     ) -> None:
+        """Save the dataset to disk in Zarr format.
+
+        The dataset is saved to disk in Zarr format, which is an efficient format for
+        large multidimensional arrays. By default, datasets are saved to
+        ~/.jua/datasets/<model_name>/<dataset_name>.zarr.
+
+        Args:
+            output_path: Path to save the dataset to.
+                If None, uses the default location.
+            show_progress: Whether to display a progress bar during saving.
+                If None, uses the client's default setting.
+            overwrite: Whether to overwrite an existing dataset at the same location.
+            ignore_size_warning: Whether to skip the confirmation prompt for large
+                datasets.
+
+        Raises:
+            ValueError: If the dataset is too large and user declines to continue.
+        """
         if output_path is None:
             output_path = self._get_default_output_path()
 
@@ -107,7 +186,7 @@ class JuaDataset:
 
         with Spinner(
             "Preparing save. This might take a while...",
-            disable=not show_progress,
+            enabled=self._settings.should_print_progress(show_progress),
         ):
             zarr_version = get_model_meta_info(self._model).forecast_zarr_version
             logger.info(f"Initializing dataset (zarr_format={zarr_version})...")

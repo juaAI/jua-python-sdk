@@ -22,10 +22,44 @@ logger = get_logger(__name__)
 
 
 class Forecast:
+    """Access to weather forecast data for a specific model.
+
+    This class provides methods to retrieve and query weather forecast data
+    from Jua's forecasting models. It supports both point-based queries and
+    spatial area selection.
+
+    The class is typically accessed via a Model instance.
+
+    Examples:
+        >>> from jua import JuaClient
+        >>> from jua.weather import Models, Variables
+        >>> from jua.types.geo import LatLon
+        >>>
+        >>> client = JuaClient()
+        >>> model = client.weather.get_model(Models.EPT2)
+        >>>
+        >>> # Get latest global forecast
+        >>> forecast = model.forecast.get_forecast()
+        >>>
+        >>> # Get forecast for specific points
+        >>> zurich = LatLon(lat=47.3769, lon=8.5417)
+        >>> london = LatLon(lat=51.5074, lon=-0.1278)
+        >>> forecast = model.forecast.get_forecast(
+        ...     points=[zurich, london],
+        ...     variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+        ... )
+    """
+
     _MAX_INIT_TIME_PAST_FOR_API_H = 36
     _MAX_point_FOR_API = 25
 
     def __init__(self, client: JuaClient, model: Models):
+        """Initialize forecast access for a specific model.
+
+        Args:
+            client: JuaClient instance for authentication and settings.
+            model: Weather model to access forecast data for.
+        """
         self._client = client
         self._model = model
         self._model_name = model.value
@@ -40,18 +74,61 @@ class Forecast:
 
     @property
     def zarr_version(self) -> int | None:
+        """Get the Zarr version of the original data.
+
+        This is the Zarr format that was used to store the original data.
+
+        Returns:
+            The Zarr format version number or None if not applicable.
+        """
         return self._model_meta.forecast_zarr_version
 
     def is_global_data_available(self) -> bool:
+        """Check if global data access is available for this model.
+
+        Some models only support point forecasts while others allow
+        access to global forecast data.
+
+        Returns:
+            True if global data can be accessed, False otherwise.
+        """
         return self._model in self._FORECAST_ADAPTERS
 
     def _get_latest_metadata(self) -> ForecastMetadataResponse:
+        """Get metadata for the latest forecast of the current model.
+
+        This is an internal helper method that delegates to the API client.
+
+        Returns:
+            Metadata about the latest forecast.
+        """
         return self._api.get_latest_forecast_metadata(model_name=self._model_name)
 
     @validate_call
     def get_metadata(
         self, init_time: datetime | str = "latest"
     ) -> ForecastMetadataResponse | None:
+        """Get metadata about a forecast.
+
+        Retrieves information about a specific forecast, including initialization time,
+        available forecasted hours, and other model-specific metadata.
+
+        This metadata is useful for checking availability and planning data
+        retrieval operations.
+
+        Args:
+            init_time: The initialization time of the forecast. Use "latest" for the
+                most recent forecast, or provide a specific datetime or string in
+                ISO format (e.g., "2023-01-15T12:00:00"). Must be an exact match.
+
+        Returns:
+            Metadata about the forecast or None if not available.
+
+        Examples:
+            >>> metadata = model.forecast.get_metadata()
+            >>> print(f"Latest forecast from: {metadata.init_time}")
+            >>> print(f"Hours available: {metadata.available_forecasted_hours}")
+        """
         if init_time == "latest":
             return self._get_latest_metadata()
 
@@ -66,6 +143,26 @@ class Forecast:
         )
 
     def get_available_init_times(self) -> list[datetime]:
+        """Get a list of available forecast initialization times.
+
+        Retrieves the list of initialization times for which forecasts are
+        available for the current model.
+
+        Note:
+            For non-Jua models, only the latest forecast is typically available.
+            For EPT1.5 and EPT1.5 Early models, this returns initialization times
+            that are currently cached.
+            For EPT2, this returns all initialization times available in the database.
+
+        Returns:
+            A list of datetime objects representing available forecast init times,
+            sorted from most recent to oldest.
+
+        Examples:
+            >>> init_times = model.forecast.get_available_init_times()
+            >>> print(f"Most recent forecast: {init_times[0]}")
+            >>> print(f"Total forecasts available: {len(init_times)}")
+        """
         if not self._model_meta.is_jua_model:
             logger.warning(
                 f"Model {self._model_name} only supports loading the latest forecast"
@@ -78,6 +175,29 @@ class Forecast:
     def is_ready(
         self, forecasted_hours: int, init_time: datetime | str = "latest"
     ) -> bool:
+        """Check if a forecast is ready up to a specific lead time.
+
+        This method is useful for checking if a forecast has been processed
+        up to a certain number of hours into the future. Forecasts may become
+        available incrementally, with longer lead times becoming available
+        as processing completes.
+
+        Args:
+            forecasted_hours: The number of forecast hours needed.
+            init_time: The initialization time of the forecast to check.
+                Use "latest" for the most recent forecast, or provide a specific
+                datetime or string in ISO format. Must be an exact match.
+
+        Returns:
+            True if the forecast is available for the specified hours, False otherwise.
+
+        Examples:
+            >>> # Check if 10-day forecast is ready
+            >>> is_ten_day_ready = model.forecast.is_ready(240)
+            >>> if is_ten_day_ready:
+            >>>     # Now we can safely request 10-day forecast data
+            >>>     forecast = model.forecast.get_forecast(max_lead_time=240)
+        """
         maybe_metadata = self.get_metadata(init_time)
         if maybe_metadata is None:
             return False
@@ -87,6 +207,17 @@ class Forecast:
     def _rename_variables_for_api(
         self, variables: list[str] | list[Variables]
     ) -> list[str]:
+        """Convert variable identifiers to the format expected by the API.
+
+        This internal method ensures variables are correctly formatted for API requests
+        by standardizing identifiers across model versions.
+
+        Args:
+            variables: List of variable identifiers (string names or Variables enums)
+
+        Returns:
+            List of variable names formatted for API requests
+        """
         return [rename_to_ept2(v) for v in variables]
 
     def _dispatch_to_api(
@@ -97,6 +228,21 @@ class Forecast:
         max_lead_time: int = 0,
         variables: list[str] | list[Variables] | None = None,
     ) -> ForecastData:
+        """Send a forecast request to the API.
+
+        This internal method handles direct API communication for point forecasts,
+        handling both latest and historical forecasts.
+
+        Args:
+            init_time: Forecast initialization time
+            points: List of geographic points to get forecasts for
+            min_lead_time: Minimum lead time in hours
+            max_lead_time: Maximum lead time in hours
+            variables: List of weather variables to retrieve
+
+        Returns:
+            Forecast data response from the API
+        """
         if variables is not None:
             variables = self._rename_variables_for_api(variables)
 
@@ -132,6 +278,29 @@ class Forecast:
         longitude: SpatialSelection | None = None,
         method: str | None = None,
     ):
+        """Retrieve forecast data using the appropriate data adapter.
+
+        This internal method handles large spatial queries that require direct
+        access to forecast data files rather than API requests.
+
+        Args:
+            init_time: Forecast initialization time
+            variables: List of weather variables to retrieve
+            print_progress: Whether to display a progress bar
+            prediction_timedelta: Time range to include in the forecast
+            latitude: Latitude selection (point, list, or slice)
+            longitude: Longitude selection (point, list, or slice)
+            method: Interpolation method for selecting points
+
+        Returns:
+            JuaDataset containing the requested forecast data
+
+        Raises:
+            ModelDoesNotSupportForecastRawDataAccessError:
+                If the model doesn't support raw data access
+            ValueError:
+                If no metadata is found for the model
+        """
         if not self.is_global_data_available():
             raise ModelDoesNotSupportForecastRawDataAccessError(self._model_name)
 
@@ -159,6 +328,30 @@ class Forecast:
         longitude: SpatialSelection | None = None,
         points: list[LatLon] | None = None,
     ) -> bool:
+        """Determine if the request can be served via the API.
+
+        The API has certain limitations on what kinds of queries it can handle.
+        This method checks if the request falls within those limitations.
+
+        Constraints include:
+        - Forecast age (must be recent, less than 36 hours)
+        - Number of points (limited to _MAX_point_FOR_API)
+        - Query structure (slices not supported)
+        - Lead time structure (complex lead time slicing not supported)
+
+        Args:
+            init_time: Forecast initialization time
+            prediction_timedelta: Time range to include in the forecast
+            latitude: Latitude selection (point, list, or slice)
+            longitude: Longitude selection (point, list, or slice)
+            points: List of geographic points to get forecasts for
+
+        Returns:
+            True if the request can be dispatched to the API, False otherwise
+
+        Raises:
+            ValueError: If no metadata is found for the model
+        """
         if init_time == "latest":
             metadata = self.get_metadata()
             if metadata is None:
@@ -207,6 +400,18 @@ class Forecast:
         latitude: list[float] | float,
         longitude: list[float] | float,
     ) -> list[LatLon]:
+        """Convert separate latitude and longitude values to LatLon objects.
+
+        This internal method creates all possible combinations of lat/lon values
+        as individual points.
+
+        Args:
+            latitude: Single latitude value or list of values
+            longitude: Single longitude value or list of values
+
+        Returns:
+            List of LatLon objects representing all combinations
+        """
         if isinstance(latitude, float):
             latitude = [latitude]
         if isinstance(longitude, float):
@@ -219,6 +424,19 @@ class Forecast:
         max_lead_time: int | None,
         prediction_timedelta: PredictionTimeDelta | None,
     ) -> tuple[int, int]:
+        """Convert various time specifications to min/max lead time format.
+
+        This internal method normalizes different ways of specifying forecast periods
+        (prediction_timedelta, min/max lead times) to a single format used by the API.
+
+        Args:
+            min_lead_time: Minimum lead time in hours
+            max_lead_time: Maximum lead time in hours
+            prediction_timedelta: Alternative specification of forecast period
+
+        Returns:
+            Tuple of (min_lead_time, max_lead_time) in hours
+        """
         # Default to 480 hours
         min_lead_time = min_lead_time or 0
         max_lead_time = max_lead_time or 480
@@ -232,6 +450,17 @@ class Forecast:
         return min_lead_time, max_lead_time
 
     def _is_latest_init_time(self, init_time: datetime | str) -> bool:
+        """Check if the specified init time is the latest available.
+
+        This internal method determines if the requested initialization time
+        matches the latest available forecast.
+
+        Args:
+            init_time: Forecast initialization time to check
+
+        Returns:
+            True if it's the latest init time, False otherwise
+        """
         if init_time == "latest":
             return True
         init_time_dt = to_datetime(init_time)
@@ -246,6 +475,19 @@ class Forecast:
         max_lead_time: int | None,
         prediction_timedelta: PredictionTimeDelta | None,
     ) -> PredictionTimeDelta:
+        """Convert lead time parameters to prediction_timedelta format.
+
+        This internal method creates a suitable prediction_timedelta representation
+        for the data adapters from various time specifications.
+
+        Args:
+            min_lead_time: Minimum lead time in hours
+            max_lead_time: Maximum lead time in hours
+            prediction_timedelta: Existing prediction timedelta specification
+
+        Returns:
+            A PredictionTimeDelta (typically a slice) for data adapters
+        """
         if prediction_timedelta is not None:
             return prediction_timedelta
         min_lead_time = min_lead_time or 0
@@ -258,6 +500,19 @@ class Forecast:
         longitude: SpatialSelection | None,
         points: list[LatLon] | None,
     ) -> tuple[SpatialSelection | None, SpatialSelection | None]:
+        """Convert point-based selection to latitude/longitude selection.
+
+        This internal method converts from points to separate latitude and longitude
+        selections for use with data adapters.
+
+        Args:
+            latitude: Existing latitude selection
+            longitude: Existing longitude selection
+            points: Points to convert to lat/lon selection
+
+        Returns:
+            Tuple of (latitude_selection, longitude_selection)
+        """
         if points is None:
             return latitude, longitude
         lats, lons = zip(*[(p.lat, p.lon) for p in points])
@@ -277,6 +532,83 @@ class Forecast:
         method: str | None = "nearest",
         print_progress: bool | None = None,
     ) -> JuaDataset:
+        """Retrieve forecast data for the model.
+
+        This is the primary method for accessing weather forecast data. It supports
+        multiple ways to specify both spatial selection (points, list or slice of
+        latitude/longitude) and forecast time periods (prediction_timedelta or
+        min/max lead times).
+
+        The method automatically chooses the most efficient way to retrieve the data
+        based on the query parameters.
+
+        Args:
+            init_time: Forecast initialization time. Use "latest" for the most recent
+                forecast, or provide a specific datetime or ISO-format string.
+
+            variables: List of weather variables to retrieve. If None, all available
+                variables are included.
+
+            prediction_timedelta: Time period to include in the forecast. Can be:
+                - A single value (hours or timedelta) for a specific lead time
+                - A slice(start, stop) for a range of lead times
+                - A slice(start, stop, step) for lead times at regular intervals
+
+            latitude: Latitude selection. Can be a single value, list of values, or
+                a slice(min_lat, max_lat) for a range.
+
+            longitude: Longitude selection. Can be a single value, list of values, or
+                a slice(min_lon, max_lon) for a range.
+
+            points: Specific geographic points to get forecasts for. Can be a single
+                LatLon object or a list of LatLon objects.
+
+            min_lead_time: Minimum lead time in hours
+                (alternative to prediction_timedelta).
+
+            max_lead_time: Maximum lead time in hours
+                (alternative to prediction_timedelta).
+
+            method: Interpolation method for selecting points:
+                - "nearest" (default): Use nearest grid point
+                - All other methods supported by xarray
+
+            print_progress: Whether to display a progress bar during data loading.
+                If None, uses the client's default setting.
+
+        Returns:
+            JuaDataset containing the requested forecast data.
+
+        Raises:
+            ValueError: If both points and latitude/longitude are provided, or if
+                other parameter combinations are invalid.
+
+        Examples:
+            >>> # Get global forecast for temperature and wind speed
+            >>> forecast = model.forecast.get_forecast(
+            ...     variables=[
+            ...         Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
+            ...         Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M
+            ...     ]
+            ... )
+            >>>
+            >>> # Get forecast for a specific region (Europe)
+            >>> europe = model.forecast.get_forecast(
+            ...     latitude=slice(71, 36),  # North to South
+            ...     longitude=slice(-15, 50),  # West to East
+            ...     max_lead_time=120  # 5 days
+            ... )
+            >>>
+            >>> # Get forecast for specific cities
+            >>> cities = model.forecast.get_forecast(
+            ...     points=[
+            ...         LatLon(lat=40.7128, lon=-74.0060),  # New York
+            ...         LatLon(lat=51.5074, lon=-0.1278),   # London
+            ...         LatLon(lat=35.6762, lon=139.6503)   # Tokyo
+            ...     ],
+            ...     max_lead_time=72  # 3 days
+            ... )
+        """
         if points is not None and (latitude is not None or longitude is not None):
             raise ValueError(
                 "Cannot provide both points and latitude/longitude. "
@@ -341,6 +673,19 @@ class Forecast:
     def _open_dataset(
         self, url: str | list[str], print_progress: bool | None = None, **kwargs
     ) -> xr.Dataset:
+        """Open a dataset from a URL or list of URLs.
+
+        This internal helper method handles opening datasets with appropriate
+        chunking and progress display.
+
+        Args:
+            url: URL or list of URLs to open
+            print_progress: Whether to display a progress bar
+            **kwargs: Additional arguments for dataset opening
+
+        Returns:
+            Opened xarray Dataset
+        """
         model_meta = get_model_meta_info(self._model)
 
         return open_dataset(
@@ -354,6 +699,19 @@ class Forecast:
     def _v3_data_adapter(
         self, init_time: datetime, print_progress: bool | None = None, **kwargs
     ) -> JuaDataset:
+        """Adapter for EPT2 (and similar) forecast data access.
+
+        This internal adapter handles retrieving data for models that use
+        the v3 Zarr storage format (a single consolidated Zarr store).
+
+        Args:
+            init_time: Forecast initialization time
+            print_progress: Whether to display a progress bar
+            **kwargs: Additional selection parameters
+
+        Returns:
+            JuaDataset containing the requested forecast data
+        """
         data_base_url = self._client.settings.data_base_url
         model_name = get_model_meta_info(self._model).forecast_name_mapping
         init_time_str = init_time.strftime("%Y%m%d%H")
@@ -374,6 +732,22 @@ class Forecast:
         print_progress: bool | None = None,
         **kwargs,
     ) -> JuaDataset:
+        """Adapter for EPT1.5 (and similar) forecast data access.
+
+        This internal adapter handles retrieving data for models that use
+        the v2 Zarr storage format (separate Zarr stores for each lead time).
+
+        Args:
+            init_time: Forecast initialization time
+            print_progress: Whether to display a progress bar
+            **kwargs: Additional selection parameters including:
+                - prediction_timedelta: Time period to include
+                - latitude/longitude: Spatial selection
+                - method: Interpolation method
+
+        Returns:
+            JuaDataset containing the requested forecast data
+        """
         data_base_url = self._client.settings.data_base_url
         model_name = get_model_meta_info(self._model).forecast_name_mapping
         init_time_str = init_time.strftime("%Y%m%d%H")

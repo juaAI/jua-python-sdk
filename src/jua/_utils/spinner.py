@@ -14,7 +14,7 @@ class Spinner:
         message="Loading...",
         delay=0.1,
         size=1,
-        disable: bool = False,
+        enabled: bool = True,
     ):
         """
         Initialize the spinner.
@@ -23,6 +23,7 @@ class Spinner:
             message (str): Message to display alongside the spinner
             delay (float): Time between spinner updates in seconds
             size (int): Size multiplier for the spinner characters
+            enabled (bool): Whether to enable the spinner
         """
         self.message = message
         self.delay = delay
@@ -30,7 +31,7 @@ class Spinner:
         self.chars = ["|", "/", "-", "\\"]
         self._spinner_thread = None
         self._stop_event = threading.Event()
-        self._disable = disable
+        self._enabled = enabled
 
     def _spin(self):
         """Internal method that runs the spinner animation in a loop."""
@@ -47,7 +48,7 @@ class Spinner:
 
     def start(self):
         """Start the spinner animation in a separate thread."""
-        if self._disable:
+        if not self._enabled:
             return
 
         if self._spinner_thread is not None:
