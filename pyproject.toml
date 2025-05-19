@@ -1,6 +1,6 @@
 [project]
 name = "jua"
-version = "0.1.0"
+version = "0.2.0"
 description = "Easy access to Jua's weather & power services"
 authors = [
    {name = "Jua.ai AG", email = "contact@jua.ai"}
@@ -46,7 +46,16 @@ keywords = [
 Documentation = "https://docs.jua.ai"
 Source = "https://github.com/juaAI/jua-python-sdk"
 
+[tool.uv]
+package = true
 
+[tool.commitizen]
+name = "cz_conventional_commits"
+tag_format = "$version"
+version_scheme = "pep440"
+version_provider = "uv"
+update_changelog_on_bump = true
+major_version_zero = true
 [project.scripts]
 jua = "jua.scripts.jua:main"
 
@@ -64,20 +73,16 @@ docs = [
     "sphinx-book-theme>=1.1.4",
     "sphinx-markdown-builder>=0.6.8",
 ]
-dev = [
-    "sphinx-autodoc-typehints>=3.2.0",
-]
-
-[tool.uv]
-package = true
 
 [dependency-groups]
 dev = [
+    "commitizen>=4.7.2",
     "mypy>=1.15.0",
     "pre-commit>=4.2.0",
     "pytest>=8.3.5",
     "ruff>=0.11.8",
     "rust-just>=1.40.0",
+    "sphinx-autodoc-typehints>=3.2.0",
 ]
 
 [tool.ruff]
