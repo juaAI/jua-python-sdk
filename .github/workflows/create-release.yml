@@ -26,6 +26,7 @@ jobs:
         uses: commitizen-tools/commitizen-action@master
         with:
           changelog_increment_filename: body.md
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
