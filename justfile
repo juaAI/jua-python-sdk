@@ -18,6 +18,11 @@ check-commit: lint test
 push-to-pypi:
     uv publish
 
+publish-ci:
+    rm -rf dist
+    uv build
+    uv publish
+
 clean-before-publish:
     rm -rf dist
 
