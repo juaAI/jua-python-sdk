@@ -1,5 +1,7 @@
 from enum import Enum
 
+import xarray as xr
+
 
 class Variable:
     """Internal representation of a weather variable with associated metadata.
@@ -104,7 +106,7 @@ class Variables(Enum):
     and unit of measurement.
 
     Examples:
-        >>> from jua.weather.variables import Variables
+        >>> from jua.weather import Variables
         >>> # Request air temperature in a forecast
         >>> ds[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M].plot()
     """
@@ -273,3 +275,8 @@ def rename_to_ept2(variable: str | Variables) -> str:
         The EPT2 variable name if recognized, otherwise the original name.
     """
     return _RENAME_TO_EPT2_DICT.get(str(variable), str(variable))  # type: ignore
+
+
+def rename_variables(ds: xr.Dataset) -> xr.Dataset:
+    output_variable_names = {k: rename_variable(k) for k in ds.variables}
+    return ds.rename(output_variable_names)

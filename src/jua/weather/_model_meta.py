@@ -22,6 +22,8 @@ class Chunks:
 
 @dataclass
 class ModelMetaInfo:
+    """Internal class to store meta information"""
+
     forecast_name_mapping: str | None = None
     forecast_zarr_version: int | None = 3
     hindcast_zarr_version: int | None = 3

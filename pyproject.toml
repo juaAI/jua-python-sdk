@@ -57,6 +57,16 @@ plotting = [
 examples = [
     "ipykernel>=6.29.5",
 ]
+docs = [
+    "myst-parser>=4.0.1",
+    "sphinx>=8.2.3",
+    "sphinx-autoapi>=3.6.0",
+    "sphinx-book-theme>=1.1.4",
+    "sphinx-markdown-builder>=0.6.8",
+]
+dev = [
+    "sphinx-autodoc-typehints>=3.2.0",
+]
 
 [tool.uv]
 package = true
@@ -84,6 +94,11 @@ line-ending = "auto"
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
+exclude = [
+  "/.*",
+  "/docs",
+  "/tests",
+]
 
 [build-system]
 requires = ["hatchling"]
@@ -91,6 +106,13 @@ build-backend = "hatchling.build"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/jua"]
+
+[tool.hatch.build]
+exclude = [
+  "/.*",
+  "/docs",
+  "/tests",
+]
 
 [tool.pytest.ini_options]
 pythonpath = ["tests"]
