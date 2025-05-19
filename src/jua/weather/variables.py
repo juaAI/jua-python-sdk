@@ -135,8 +135,13 @@ class Variables(Enum):
         "z_500",
         "geopotential_500hpa",
     )
-    SURFACE_DOWNWELLING_SHORTWAVE_FLUX = Variable(
-        "surface_downwelling_shortwave_flux", "J m⁻²", "ssrd", None
+
+    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_6H = Variable(
+        "surface_downwelling_shortwave_flux_sum_6h", "J m⁻²", "ssrd", None
+    )
+
+    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
+        "surface_downwelling_shortwave_flux_sum_1h", "J m⁻²", "strd", None
     )
 
     # Additional variables from EPT2 that don't have a direct EPT1_5 equivalent
@@ -151,6 +156,22 @@ class Variables(Enum):
     )
     NORTHWARD_WIND_AT_HEIGHT_LEVEL_100M = Variable(
         "northward_wind_at_height_level_100m", "m s⁻¹", None, "northward_wind_100m"
+    )
+
+    HIGH_TYPE_CLOUD_AREA_FRACTION = Variable(
+        "high_type_cloud_area_fraction", "[0,1]", "hcc", None
+    )
+
+    MEDIUM_TYPE_CLOUD_AREA_FRACTION = Variable(
+        "medium_type_cloud_area_fraction", "[0,1]", "mcc", None
+    )
+
+    LOW_TYPE_CLOUD_AREA_FRACTION = Variable(
+        "low_type_cloud_area_fraction", "[0,1]", "lcc", None
+    )
+
+    CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE = Variable(
+        "cloud_area_fraction_at_entire_atmosphere", "[0,1]", "tcc", None
     )
 
     @property
