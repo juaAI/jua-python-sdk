@@ -1,0 +1,70 @@
+name: "Python, uv, and Just Setup"
+description: "Sets up Python, installs uv & Just, caches and installs Python dependencies using uv."
+
+inputs:
+  python-version:
+    description: "Python version to use"
+    required: false
+    default: "3.11"
+    type: string
+  uv-cache-key-prefix: # Optional: allows customizing the cache key prefix if needed
+    description: "Prefix for the uv cache key"
+    required: false
+    default: "uv-deps"
+    type: string
+  python-dependency-group: # Allows specifying which dependency group to sync
+    description: "Dependency group to install with uv sync (e.g., dev, main)"
+    required: false
+    default: "dev"
+    type: string
+
+runs:
+  using: "composite"
+  steps:
+    - name: Set up Python ${{ inputs.python-version }}
+      uses: actions/setup-python@v5
+      with:
+        python-version: ${{ inputs.python-version }}
+
+    - name: Install uv
+      shell: bash # Use bash for consistency with the install script
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+        echo "UV_BIN_PATH=$HOME/.cargo/bin" >> $GITHUB_ENV # Store for potential direct use
+
+    - name: Install Just
+      shell: bash # Use bash for consistency with the install script
+      run: |
+        mkdir -p "$HOME/.local/bin" # Ensure the directory exists
+        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
+        echo "$HOME/.local/bin" >> $GITHUB_PATH
+        echo "JUST_BIN_PATH=$HOME/.local/bin" >> $GITHUB_ENV # Store for potential direct use
+
+    - name: Get uv cache directory
+      id: uv-cache-dir # Give an ID to reference its output
+      shell: bash
+      run: echo "dir=$(uv cache dir)" >> $GITHUB_OUTPUT # uv must be on PATH here
+
+    - name: Cache uv global dependencies
+      uses: actions/cache@v4
+      id: cache-uv-global
+      with:
+        path: ${{ steps.uv-cache-dir.outputs.dir }} # Path to uv's own global cache
+        # A robust key includes the OS, Python version (if it affects venvs managed by uv), and lock/project files
+        key: ${{ runner.os }}-${{ inputs.uv-cache-key-prefix }}-${{ inputs.python-version }}-${{ hashFiles('**/pyproject.toml', '**/uv.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.uv-cache-key-prefix }}-${{ inputs.python-version }}-
+          ${{ runner.os }}-${{ inputs.uv-cache-key-prefix }}-
+
+    - name: Install Python dependencies with uv
+      shell: bash
+      run: uv sync --group ${{ inputs.python-dependency-group }}
+      # If you use a uv.lock file and want to ensure it's strictly followed:
+      # run: uv sync --frozen --group ${{ inputs.python-dependency-group }}
+# No explicit outputs needed from this composite action for basic setup.
+# If you needed to output something like the exact cache key used, you could define it:
+# outputs:
+#   uv-cache-hit:
+#     description: 'Whether the uv cache was hit'
+#     value: ${{ steps.cache-uv-global.outputs.cache-hit }}

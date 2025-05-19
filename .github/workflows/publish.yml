@@ -1,0 +1,27 @@
+name: Upload Python Package to PyPI
+
+on:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  publish:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    environment: pypi-release
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.11"
+
+      - name: Publish to PyPI
+        run: just publish-ci

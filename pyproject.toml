@@ -1,6 +1,6 @@
 [project]
 name = "jua"
-version = "0.3.0"
+version = "0.4.0"
 description = "Easy access to Jua's weather & power services"
 authors = [
    {name = "Jua.ai AG", email = "contact@jua.ai"}
@@ -27,6 +27,8 @@ classifiers = [
     "License :: OSI Approved :: MIT License",
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
     "Intended Audience :: Developers",
     "Development Status :: 4 - Beta",
 ]

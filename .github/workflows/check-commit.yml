@@ -1,0 +1,14 @@
+name: Check Commit
+
+on:
+  # enable all branches but main
+  push:
+    branches-ignore:
+      - main
+  pull_request:
+    branches: ["**"]
+
+jobs:
+  ci_checks:
+    name: Run CI Checks
+    uses: ./.github/workflows/checks-reusable.yml
