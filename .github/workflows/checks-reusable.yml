@@ -1,0 +1,43 @@
+name: Reusable CI Jobs
+
+on:
+  workflow_call:
+
+jobs:
+  lint:
+    name: Run Linting
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.11"
+      - name: Run linters with Just
+        run: just lint
+
+  test:
+    name: Run Tests (Python ${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"] # Your test matrix
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      - name: Setup Python ${{ matrix.python-version }}, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: ${{ matrix.python-version }}
+      - name: Run tests with Just and generate report
+        run: just test-ci
+      - name: Publish Test Report
+        uses: dorny/test-reporter@v1
+        if: always() # Use always() for robust reporting
+        with:
+          name: Pytest Results (Python ${{ matrix.python-version }})
+          path: "**/pytest-report.xml"
+          reporter: java-junit
+          fail-on-error: "true"
