@@ -10,6 +10,9 @@ build:
 test:
     uv run pytest
 
+test-ci:
+    uv run pytest --junitxml=pytest-report.xml
+
 check-commit: lint test
 
 push-to-pypi:
