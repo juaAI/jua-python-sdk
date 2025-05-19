@@ -5,6 +5,7 @@ on:
     workflows: ["Check Commit"]
     types:
       - completed
+    branches: ["**"]
 
 jobs:
   bump-version:
