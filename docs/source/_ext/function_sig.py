@@ -11,11 +11,41 @@ def patch_markdown_builder(app):
         return
 
     # Get the original visit_desc_parameterlist method
+    from docutils import nodes
     from sphinx_markdown_builder.translator import MarkdownTranslator
 
     original_visit_desc_parameterlist = MarkdownTranslator.visit_desc_parameterlist
     original_depart_desc_parameterlist = MarkdownTranslator.depart_desc_parameterlist
     original_visit_desc_parameter = MarkdownTranslator.visit_desc_parameter
+
+    def process_node_with_references(self, node):
+        """Process a node, preserving links in references"""
+        result = ""
+
+        if isinstance(node, nodes.reference) and "refuri" in node.attributes:
+            # Handle references with links
+            link_text = node.astext()
+            refuri = node["refuri"]
+            result += f"[{link_text}]({refuri})"
+        elif isinstance(node, nodes.Text):
+            # Plain text node
+            result += node.astext()
+        else:
+            # Process this node's text
+            if hasattr(node, "astext"):
+                # Check if this node has children to process
+                if node.children:
+                    # Process all children and combine their results
+                    for child in node.children:
+                        result += process_node_with_references(self, child)
+                else:
+                    # No children, just use the text
+                    result += node.astext()
+            else:
+                # Fallback for nodes without astext method
+                result += str(node)
+
+        return result
 
     # Use a completely different approach for long signatures
     def patched_visit_desc_parameterlist(self, node):
@@ -33,7 +63,9 @@ def patch_markdown_builder(app):
             # Just collect parameter texts for now
             node._param_texts = []
             for param_node in node.children:
-                node._param_texts.append(param_node.astext())
+                # Process the parameter node with reference preservation
+                param_text = process_node_with_references(self, param_node)
+                node._param_texts.append(param_text)
 
             # Just output the opening parenthesis for now
             self.add("(")
@@ -70,8 +102,6 @@ def patch_markdown_builder(app):
             and node.parent._is_long_signature
         ):
             # We've already collected and processed these in visit_desc_parameterlist
-            from docutils import nodes
-
             raise nodes.SkipNode
         else:
             # Use the original method for short signatures
@@ -88,7 +118,11 @@ def patch_markdown_builder(app):
         if original_visit_desc_returns:
             original_visit_desc_returns(self, node)
         else:
+            # Handle return type with references
             self.add("→ ")
+            if node.children:
+                return_text = process_node_with_references(self, node)
+                self.add(return_text)
 
     # Apply the patches
     MarkdownTranslator.visit_desc_parameterlist = patched_visit_desc_parameterlist
@@ -96,6 +130,8 @@ def patch_markdown_builder(app):
     MarkdownTranslator.visit_desc_parameter = patched_visit_desc_parameter
 
     if original_visit_desc_returns:
+        MarkdownTranslator.visit_desc_returns = patched_visit_desc_returns
+    else:
         MarkdownTranslator.visit_desc_returns = patched_visit_desc_returns
 
 

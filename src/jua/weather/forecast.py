@@ -104,6 +104,158 @@ class Forecast:
         """
         return self._api.get_latest_forecast_metadata(model_name=self._model_name)
 
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_forecast(
+        self,
+        init_time: datetime | str = "latest",
+        variables: list[Variables] | list[str] | None = None,
+        prediction_timedelta: PredictionTimeDelta | None = None,
+        latitude: SpatialSelection | None = None,
+        longitude: SpatialSelection | None = None,
+        points: list[LatLon] | LatLon | None = None,
+        min_lead_time: int | None = None,
+        max_lead_time: int | None = None,
+        method: str | None = "nearest",
+        print_progress: bool | None = None,
+    ) -> JuaDataset:
+        """Retrieve forecast data for the model.
+
+        This is the primary method for accessing weather forecast data. It supports
+        multiple ways to specify both spatial selection (points, list or slice of
+        latitude/longitude) and forecast time periods (prediction_timedelta or
+        min/max lead times).
+
+        The method automatically chooses the most efficient way to retrieve the data
+        based on the query parameters.
+
+        Args:
+            init_time: Forecast initialization time. Use "latest" for the most recent
+                forecast, or provide a specific datetime or ISO-format string.
+
+            variables: List of weather variables to retrieve. If None, all available
+                variables are included.
+
+            prediction_timedelta: Time period to include in the forecast. Can be:
+                - A single value (hours or timedelta) for a specific lead time
+                - A slice(start, stop) for a range of lead times
+                - A slice(start, stop, step) for lead times at regular intervals
+
+            latitude: Latitude selection. Can be a single value, list of values, or
+                a slice(min_lat, max_lat) for a range.
+
+            longitude: Longitude selection. Can be a single value, list of values, or
+                a slice(min_lon, max_lon) for a range.
+
+            points: Specific geographic points to get forecasts for. Can be a single
+                LatLon object or a list of LatLon objects.
+
+            min_lead_time: Minimum lead time in hours
+                (alternative to prediction_timedelta).
+
+            max_lead_time: Maximum lead time in hours
+                (alternative to prediction_timedelta).
+
+            method: Interpolation method for selecting points:
+                - "nearest" (default): Use nearest grid point
+                - All other methods supported by xarray
+
+            print_progress: Whether to display a progress bar during data loading.
+                If None, uses the client's default setting.
+
+        Returns:
+            JuaDataset containing the requested forecast data.
+
+        Raises:
+            ValueError: If both points and latitude/longitude are provided, or if
+                other parameter combinations are invalid.
+
+        Examples:
+            >>> # Get global forecast for temperature and wind speed
+            >>> forecast = model.forecast.get_forecast(
+            ...     variables=[
+            ...         Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
+            ...         Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M
+            ...     ]
+            ... )
+            >>>
+            >>> # Get forecast for a specific region (Europe)
+            >>> europe = model.forecast.get_forecast(
+            ...     latitude=slice(71, 36),  # North to South
+            ...     longitude=slice(-15, 50),  # West to East
+            ...     max_lead_time=120  # 5 days
+            ... )
+            >>>
+            >>> # Get forecast for specific cities
+            >>> cities = model.forecast.get_forecast(
+            ...     points=[
+            ...         LatLon(lat=40.7128, lon=-74.0060),  # New York
+            ...         LatLon(lat=51.5074, lon=-0.1278),   # London
+            ...         LatLon(lat=35.6762, lon=139.6503)   # Tokyo
+            ...     ],
+            ...     max_lead_time=72  # 3 days
+            ... )
+        """
+        if points is not None and (latitude is not None or longitude is not None):
+            raise ValueError(
+                "Cannot provide both points and latitude/longitude. "
+                "Please provide either points or latitude/longitude."
+            )
+        if points is not None and not isinstance(points, list):
+            points = [points]
+
+        if self._can_be_dispatched_to_api(
+            init_time=init_time,
+            latitude=latitude,
+            longitude=longitude,
+            points=points,
+        ):
+            # As _can_be_dispatched_to_api has passed, either points are not none
+            # or we can convert the latitude and longitude to points
+            points = points or self._convert_lat_lon_to_point(latitude, longitude)  # type: ignore
+            min_lead_time, max_lead_time = (
+                self._convert_prediction_timedelta_to_api_call(
+                    min_lead_time, max_lead_time, prediction_timedelta
+                )
+            )
+
+            data = self._dispatch_to_api(
+                init_time=init_time,
+                points=points,
+                variables=variables,
+                min_lead_time=min_lead_time,
+                max_lead_time=max_lead_time,
+            )
+            raw_data = data.to_xarray()
+            if points is not None and raw_data is not None:
+                raw_data = raw_data.select_point(points=points)
+            dataset_name = f"{self._model_name}_{data.init_time.strftime('%Y%m%d%H')}"
+            return JuaDataset(
+                settings=self._client.settings,
+                dataset_name=dataset_name,
+                raw_data=raw_data,
+                model=self._model,
+            )
+
+        logger.warning("Large query, this might take some time.")
+        latitude, longitude = self._get_spatial_selection_for_adapter(
+            latitude=latitude, longitude=longitude, points=points
+        )
+        prediction_timedelta = self._get_prediction_timedelta_for_adapter(
+            min_lead_time=min_lead_time,
+            max_lead_time=max_lead_time,
+            prediction_timedelta=prediction_timedelta,
+        )
+
+        return self._dispatch_to_data_adapter(
+            init_time=init_time,
+            variables=variables,
+            print_progress=print_progress,
+            prediction_timedelta=prediction_timedelta,
+            latitude=latitude,
+            longitude=longitude,
+            method=method,
+        )
+
     @validate_call
     def get_metadata(
         self, init_time: datetime | str = "latest"
@@ -517,158 +669,6 @@ class Forecast:
             return latitude, longitude
         lats, lons = zip(*[(p.lat, p.lon) for p in points])
         return list(lats), list(lons)
-
-    @validate_call(config=dict(arbitrary_types_allowed=True))
-    def get_forecast(
-        self,
-        init_time: datetime | str = "latest",
-        variables: list[Variables] | list[str] | None = None,
-        prediction_timedelta: PredictionTimeDelta | None = None,
-        latitude: SpatialSelection | None = None,
-        longitude: SpatialSelection | None = None,
-        points: list[LatLon] | LatLon | None = None,
-        min_lead_time: int | None = None,
-        max_lead_time: int | None = None,
-        method: str | None = "nearest",
-        print_progress: bool | None = None,
-    ) -> JuaDataset:
-        """Retrieve forecast data for the model.
-
-        This is the primary method for accessing weather forecast data. It supports
-        multiple ways to specify both spatial selection (points, list or slice of
-        latitude/longitude) and forecast time periods (prediction_timedelta or
-        min/max lead times).
-
-        The method automatically chooses the most efficient way to retrieve the data
-        based on the query parameters.
-
-        Args:
-            init_time: Forecast initialization time. Use "latest" for the most recent
-                forecast, or provide a specific datetime or ISO-format string.
-
-            variables: List of weather variables to retrieve. If None, all available
-                variables are included.
-
-            prediction_timedelta: Time period to include in the forecast. Can be:
-                - A single value (hours or timedelta) for a specific lead time
-                - A slice(start, stop) for a range of lead times
-                - A slice(start, stop, step) for lead times at regular intervals
-
-            latitude: Latitude selection. Can be a single value, list of values, or
-                a slice(min_lat, max_lat) for a range.
-
-            longitude: Longitude selection. Can be a single value, list of values, or
-                a slice(min_lon, max_lon) for a range.
-
-            points: Specific geographic points to get forecasts for. Can be a single
-                LatLon object or a list of LatLon objects.
-
-            min_lead_time: Minimum lead time in hours
-                (alternative to prediction_timedelta).
-
-            max_lead_time: Maximum lead time in hours
-                (alternative to prediction_timedelta).
-
-            method: Interpolation method for selecting points:
-                - "nearest" (default): Use nearest grid point
-                - All other methods supported by xarray
-
-            print_progress: Whether to display a progress bar during data loading.
-                If None, uses the client's default setting.
-
-        Returns:
-            JuaDataset containing the requested forecast data.
-
-        Raises:
-            ValueError: If both points and latitude/longitude are provided, or if
-                other parameter combinations are invalid.
-
-        Examples:
-            >>> # Get global forecast for temperature and wind speed
-            >>> forecast = model.forecast.get_forecast(
-            ...     variables=[
-            ...         Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
-            ...         Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M
-            ...     ]
-            ... )
-            >>>
-            >>> # Get forecast for a specific region (Europe)
-            >>> europe = model.forecast.get_forecast(
-            ...     latitude=slice(71, 36),  # North to South
-            ...     longitude=slice(-15, 50),  # West to East
-            ...     max_lead_time=120  # 5 days
-            ... )
-            >>>
-            >>> # Get forecast for specific cities
-            >>> cities = model.forecast.get_forecast(
-            ...     points=[
-            ...         LatLon(lat=40.7128, lon=-74.0060),  # New York
-            ...         LatLon(lat=51.5074, lon=-0.1278),   # London
-            ...         LatLon(lat=35.6762, lon=139.6503)   # Tokyo
-            ...     ],
-            ...     max_lead_time=72  # 3 days
-            ... )
-        """
-        if points is not None and (latitude is not None or longitude is not None):
-            raise ValueError(
-                "Cannot provide both points and latitude/longitude. "
-                "Please provide either points or latitude/longitude."
-            )
-        if points is not None and not isinstance(points, list):
-            points = [points]
-
-        if self._can_be_dispatched_to_api(
-            init_time=init_time,
-            latitude=latitude,
-            longitude=longitude,
-            points=points,
-        ):
-            # As _can_be_dispatched_to_api has passed, either points are not none
-            # or we can convert the latitude and longitude to points
-            points = points or self._convert_lat_lon_to_point(latitude, longitude)  # type: ignore
-            min_lead_time, max_lead_time = (
-                self._convert_prediction_timedelta_to_api_call(
-                    min_lead_time, max_lead_time, prediction_timedelta
-                )
-            )
-
-            data = self._dispatch_to_api(
-                init_time=init_time,
-                points=points,
-                variables=variables,
-                min_lead_time=min_lead_time,
-                max_lead_time=max_lead_time,
-            )
-            raw_data = data.to_xarray()
-            if points is not None and raw_data is not None:
-                raw_data = raw_data.select_point(points=points)
-            dataset_name = f"{self._model_name}_{data.init_time.strftime('%Y%m%d%H')}"
-            return JuaDataset(
-                settings=self._client.settings,
-                dataset_name=dataset_name,
-                raw_data=raw_data,
-                model=self._model,
-            )
-
-        logger.warning("Large query, this might take some time.")
-        latitude, longitude = self._get_spatial_selection_for_adapter(
-            latitude=latitude, longitude=longitude, points=points
-        )
-        prediction_timedelta = self._get_prediction_timedelta_for_adapter(
-            min_lead_time=min_lead_time,
-            max_lead_time=max_lead_time,
-            prediction_timedelta=prediction_timedelta,
-        )
-
-        return self._dispatch_to_data_adapter(
-            init_time=init_time,
-            variables=variables,
-            print_progress=print_progress,
-            prediction_timedelta=prediction_timedelta,
-            latitude=latitude,
-            longitude=longitude,
-            method=method,
-        )
 
     def _open_dataset(
         self, url: str | list[str], print_progress: bool | None = None, **kwargs
