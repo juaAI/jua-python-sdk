@@ -20,7 +20,7 @@ jobs:
     environment: pypi-release
     permissions:
       id-token: write
-      contents: read
+      contents: write
     steps:
       - name: Check out
         uses: actions/checkout@v4
