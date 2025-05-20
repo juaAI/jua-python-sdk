@@ -224,7 +224,7 @@ def launch_frontend(client: JuaClient):
     full_url = (
         f"{_get_frontend_url(client)}?callback={callback_url}&api_key_name={key_name}"
     )
-
+    print(f"Opening browser: {full_url}")
     webbrowser.open(full_url)
 
 
@@ -250,8 +250,6 @@ async def main_async(args=None):
         try:
             api_key = await auth_server.wait_for_credentials()
             print("\nAuthentication successful!")
-            print(f"API Key ID: {api_key.id}")
-            print(f"API Key Secret: {api_key.secret[:5]}..." if api_key.secret else "")
 
             auth_settings = jua_settings.auth
             secrets_path = auth_settings.secrets_file_path
