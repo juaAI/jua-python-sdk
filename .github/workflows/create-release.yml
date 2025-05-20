@@ -8,6 +8,7 @@ on:
 
 jobs:
   ci-checks:
+    if: ${{ ! startsWith(github.event.head_commit.message, 'bump:') }}
     name: Run CI Checks
     uses: ./.github/workflows/checks-reusable.yml
 
@@ -42,33 +43,10 @@ jobs:
           changelog_increment_filename: body.md
           github_token: ${{ steps.generate-token.outputs.token }}
 
-      - name: Check if version has changed
-        id: version_check
-        run: |
-          CURRENT_VERSION=$(grep -m 1 'version = "' pyproject.toml | sed 's/version = "\(.*\)"/\1/')
-          if [ "$CURRENT_VERSION" == "${{ steps.commitizen.outputs.version }}" ]; then
-            echo "No version change detected. Current version: $CURRENT_VERSION"
-            echo "version_changed=false" >> $GITHUB_OUTPUT
-          else
-            echo "Version changed from $CURRENT_VERSION to ${{ steps.commitizen.outputs.version }}"
-            echo "version_changed=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Release
-        if: steps.version_check.outputs.version_changed == 'true'
         uses: softprops/action-gh-release@v2
         with:
           body_path: "body.md"
           tag_name: v${{ steps.commitizen.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Setup Python, uv, Just, and Dependencies
-        if: steps.version_check.outputs.version_changed == 'true'
-        uses: ./.github/actions/setup
-        with:
-          python-version: "3.11"
-
-      - name: Publish to PyPI
-        if: steps.version_check.outputs.version_changed == 'true'
-        run: just publish-ci
