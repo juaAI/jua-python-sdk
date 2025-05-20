@@ -67,9 +67,6 @@ class Hindcast:
         >>>
         >>> # Check if hindcast data is available
         >>> if model.hindcast.is_file_access_available():
-        >>>     # Get metadata about available hindcasts
-        >>>     meta = model.hindcast.metadata
-        >>>     print(f"Date range: {meta.start_date} to {meta.end_date}")
         >>>
         >>>     # Get hindcast data for specific time period and region
         >>>     data = model.hindcast.get_hindcast(
@@ -78,36 +75,6 @@ class Hindcast:
         >>>         longitude=slice(-10, 30)  # West to East
         >>>     )
     """
-
-    _MODEL_METADATA = {
-        Models.EPT2: HindcastMetadata(
-            start_date=datetime(2023, 1, 1),
-            end_date=datetime(2024, 12, 28),
-            available_regions=[Region(region="Global", coverage="")],
-        ),
-        Models.EPT1_5: HindcastMetadata(
-            start_date=datetime(2022, 1, 1),
-            end_date=datetime(2024, 7, 31),
-            available_regions=[
-                Region(region="Europe", coverage="36°-72°N, -15°-35°E"),
-                Region(region="North America", coverage="Various"),
-            ],
-        ),
-        Models.EPT1_5_EARLY: HindcastMetadata(
-            start_date=datetime(2022, 1, 1),
-            end_date=datetime(2024, 7, 31),
-            available_regions=[
-                Region(region="Europe", coverage=""),
-            ],
-        ),
-        Models.ECMWF_AIFS025_SINGLE: HindcastMetadata(
-            start_date=datetime(2023, 1, 2),
-            end_date=datetime(2024, 12, 27),
-            available_regions=[
-                Region(region="Global", coverage=""),
-            ],
-        ),
-    }
 
     def __init__(self, client: JuaClient, model: Models):
         """Initialize hindcast access for a specific model.
@@ -139,31 +106,6 @@ class Hindcast:
         """
         if not self.is_file_access_available():
             raise ModelHasNoHindcastData(self._model_name)
-
-    @property
-    def metadata(self) -> HindcastMetadata:
-        """Get metadata about the available hindcast data for this model.
-
-        Retrieves information about the time range and geographic coverage
-        of hindcast data available for the current model.
-
-        Returns:
-            HindcastMetadata with date ranges and available regions.
-
-        Raises:
-            ModelHasNoHindcastData: If the model doesn't support hindcasts.
-
-        Examples:
-            >>> metadata = model.hindcast.metadata
-            >>> print(
-            ...     "Hindcast available from "
-            ...     f"{metadata.start_date} to {metadata.end_date}"
-            ... )
-            >>> for region in metadata.available_regions:
-            >>>     print(f"Region: {region.region}, Coverage: {region.coverage}")
-        """
-        self._raise_if_no_file_access()
-        return self._MODEL_METADATA[self._model]
 
     def is_file_access_available(self) -> bool:
         """Check if hindcast data is available for this model.
@@ -295,6 +237,16 @@ class Hindcast:
             method=method,
         )
 
+    def _get_hindcast_files(self) -> list[str]:
+        """Get the list of hindcast files for the current model.
+
+        Returns:
+            List of hindcast file URLs.
+        """
+        files = self._api.get_hindcast_files(self._model_name)
+        print(files)
+        return [f"{self._client.settings.data_base_url}/{file}" for file in files]
+
     def _open_dataset(
         self,
         url: str | list[str],
@@ -336,15 +288,14 @@ class Hindcast:
         Returns:
             JuaDataset containing the EPT2 hindcast data.
         """
-        data_base_url = self._client.settings.data_base_url
-        data_url = (
-            f"{data_base_url}/hindcasts/ept-2/v2/global/2023-01-01-to-2024-12-28.zarr"
-        )
+        zarr_urls = self._get_hindcast_files()
 
-        raw_data = self._open_dataset(data_url, print_progress=print_progress, **kwargs)
+        raw_data = self._open_dataset(
+            zarr_urls, print_progress=print_progress, **kwargs
+        )
         return JuaDataset(
             settings=self._client.settings,
-            dataset_name="hindcast-2023-01-01-to-2024-12-28",
+            dataset_name="hindcast-ept-2",
             raw_data=raw_data,
             model=self._model,
         )
@@ -364,13 +315,14 @@ class Hindcast:
         Returns:
             JuaDataset containing the EPT1.5 Early hindcast data.
         """
-        data_base_url = self._client.settings.data_base_url
-        data_url = f"{data_base_url}/hindcasts/ept-1.5-early/europe/2024.zarr/"
+        zarr_urls = self._get_hindcast_files()
 
-        raw_data = self._open_dataset(data_url, print_progress=print_progress, **kwargs)
+        raw_data = self._open_dataset(
+            zarr_urls, print_progress=print_progress, **kwargs
+        )
         return JuaDataset(
             settings=self._client.settings,
-            dataset_name="hindcast-2024-europe",
+            dataset_name="hindcast-ept-1.5-early",
             raw_data=raw_data,
             model=self._model,
         )
@@ -391,22 +343,14 @@ class Hindcast:
         Returns:
             JuaDataset containing the combined EPT1.5 hindcast data.
         """
-        data_base_url = self._client.settings.data_base_url
-
-        zarr_urls = [
-            f"{data_base_url}/hindcasts/ept-1.5/europe/2023.zarr/",
-            f"{data_base_url}/hindcasts/ept-1.5/europe/2024.zarr/",
-            f"{data_base_url}/hindcasts/ept-1.5/north-america/2023-00H.zarr/",
-            f"{data_base_url}/hindcasts/ept-1.5/north-america/2024-00H.zarr/",
-            f"{data_base_url}/hindcasts/ept-1.5/north-america/2024.zarr/",
-        ]
+        zarr_urls = self._get_hindcast_files()
 
         raw_data = self._open_dataset(
             zarr_urls, print_progress=print_progress, **kwargs
         )
         return JuaDataset(
             settings=self._client.settings,
-            dataset_name="hindcast-ept-1.5-europe-north-america",
+            dataset_name="hindcast-ept-1.5",
             raw_data=raw_data,
             model=self._model,
         )
@@ -426,12 +370,11 @@ class Hindcast:
         Returns:
             JuaDataset containing the AIFS025 hindcast data.
         """
-        data_base_url = self._client.settings.data_base_url
-        zarr_url = (
-            f"{data_base_url}/hindcasts/aifs/v1/global/2023-01-02-to-2024-12-27.zarr/"
-        )
+        zarr_urls = self._get_hindcast_files()
 
-        raw_data = self._open_dataset(zarr_url, print_progress=print_progress, **kwargs)
+        raw_data = self._open_dataset(
+            zarr_urls, print_progress=print_progress, **kwargs
+        )
 
         return JuaDataset(
             settings=self._client.settings,

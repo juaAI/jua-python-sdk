@@ -38,6 +38,7 @@ class WeatherAPI:
         "forecasting/{model_name}/forecasts/{init_time}/{lat},{lon}"
     )
     _BROWSE_FILES_ENDPOINT = "files/browse"
+    _HINDCAST_FILES_ENDPOINT = "hindcasts/sdk/{model_name}"
 
     def __init__(self, jua_client: JuaClient):
         """Initialize the weather API client.
@@ -274,3 +275,16 @@ class WeatherAPI:
                 DirectoryResponse(**content) for content in response_json["contents"]
             ]
         return [FileResponse(**response_json)]
+
+    @validate_call
+    def get_hindcast_files(self, model_name: str) -> list[str]:
+        """Get the list of hindcast files for the current model.
+
+        Returns:
+            List of hindcast file URLs.
+        """
+        response = self._api.get(
+            self._HINDCAST_FILES_ENDPOINT.format(model_name=model_name)
+        )
+        response_json = response.json()
+        return response_json["files"]

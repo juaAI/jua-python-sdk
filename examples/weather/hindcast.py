@@ -15,12 +15,6 @@ def main():
     client = JuaClient()
     model = client.weather.get_model(Models.EPT1_5)
 
-    start_date = model.hindcast.metadata.start_date
-    end_date = model.hindcast.metadata.end_date
-    print(f"Hindcast from {start_date} to {end_date}")
-    regions = model.hindcast.metadata.available_regions
-    print(f"Regions: {', '.join([r.region for r in regions])}")
-
     time = "2024-02-01T06:00:00.000000000"
     hindcast = model.hindcast.get_hindcast(
         init_time=time,
