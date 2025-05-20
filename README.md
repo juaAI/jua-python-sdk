@@ -19,7 +19,7 @@ Install `jua` with pip:
 pip install jua
 ```
 
-Checkout [uv](https://docs.astral.sh/uv/) for managing dependencies and Python versions:
+Alternatively, checkout [uv](https://docs.astral.sh/uv/) for managing dependencies and Python versions:
 
 ```bash
 uv init && uv add jua
