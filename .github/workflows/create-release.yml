@@ -11,8 +11,7 @@ jobs:
     uses: ./.github/workflows/checks-reusable.yml
 
   bump-version:
-    if: >
-      !startsWith(github.event.workflow_run.head_commit.message, 'bump:')
+    if: ${{ ! startsWith(github.event.head_commit.message, 'bump:') }}
     runs-on: ubuntu-latest
     name: "Bump version and create changelog with commitizen"
     needs: [ci-checks]
@@ -25,16 +24,18 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - name: Create bump and changelog
+        id: commitizen
         uses: commitizen-tools/commitizen-action@master
         with:
           changelog_increment_filename: body.md
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Release
         uses: softprops/action-gh-release@v2
         with:
           body_path: "body.md"
-          tag_name: v${{ env.REVISION }}
+          tag_name: ${{ steps.commitizen.outputs.version }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
