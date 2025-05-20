@@ -4,6 +4,7 @@ on:
   push:
     branches:
       - main
+      - test-ci
 
 jobs:
   ci-checks:
@@ -20,6 +21,13 @@ jobs:
       id-token: write
       contents: write
     steps:
+      - name: Generate a token
+        id: generate-token
+        uses: actions/create-github-app-token@v1
+        with:
+          app-id: ${{ vars.JUABOT_APP_ID }}
+          private-key: ${{ secrets.JUABOT_PRIVATE_KEY }}
+
       - name: Check out
         uses: actions/checkout@v4
         with:
@@ -30,7 +38,7 @@ jobs:
         uses: commitizen-tools/commitizen-action@master
         with:
           changelog_increment_filename: body.md
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ steps.generate-token.outputs.token }}
 
       - name: Check if version has changed
         id: version_check
