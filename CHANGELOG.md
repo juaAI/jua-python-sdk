@@ -14,6 +14,13 @@
 
 - **Added-commitizen-for-automated-versioning**: added the necessary dependencies
 
+## v0.5.5 (2025-05-20)
+
+### Fix
+
+- test tag permissions
+- test tag permissions
+
 ## v0.5.4 (2025-05-20)
 
 ### Fix
