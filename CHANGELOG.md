@@ -14,6 +14,13 @@
 
 - **Added-commitizen-for-automated-versioning**: added the necessary dependencies
 
+## v0.5.4 (2025-05-20)
+
+### Fix
+
+- push permissions for ci
+- push permissions for ci
+
 ## v0.5.3 (2025-05-20)
 
 ### Fix
