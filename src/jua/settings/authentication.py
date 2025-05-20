@@ -14,8 +14,7 @@ class AuthenticationSettings(BaseSettings):
 
     1. Direct initialization via constructor arguments
     2. Environment variables (JUA_API_KEY_ID, JUA_API_KEY_SECRET)
-    3. .env file in the current directory
-    4. JSON file at the specified secrets_path or default location
+    3. JSON file at the specified secrets_path or default location
        (~/.jua/<environment>/api-key.json)
 
     Attributes:
@@ -33,7 +32,7 @@ class AuthenticationSettings(BaseSettings):
             api_key_secret="your_secret",
         )
 
-        Create using credentials from .env file or environment variables:
+        Create using credentials from environment variables:
         >>> auth = AuthenticationSettings()
 
         Create with custom JSON file location:
@@ -55,8 +54,6 @@ class AuthenticationSettings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
         extra="ignore",
         env_prefix="JUA_",
     )
@@ -80,7 +77,7 @@ class AuthenticationSettings(BaseSettings):
         if api_key_path is not None:
             self.api_key_path = api_key_path
 
-        # If credentials are not set via env vars or .env, try loading from JSON file
+        # If credentials are not set via env vars, try loading from JSON file
         if not self.api_key_id or not self.api_key_secret:
             self._load_from_json_file()
 
