@@ -10,7 +10,7 @@ class JuaSettings(BaseSettings):
     This class contains all configuration options for the Jua API client,
     including API endpoint, authentication, and behavior preferences.
     Settings can be provided via environment variables prefixed with 'JUA_',
-    a .env file, or directly in code.
+    or directly in code.
 
     Attributes:
         api_url: Base URL for the JUA API endpoint.
@@ -32,6 +32,10 @@ class JuaSettings(BaseSettings):
         Load from environment variables:
         JUA_API_URL=https://api.example.com JUA_PRINT_PROGRESS=false python script.py
     """
+
+    frontend_url: str = Field(
+        default="https://app.jua.sh", description="Base URL for the JUA frontend"
+    )
 
     api_url: str = Field(
         default="https://api.jua.sh", description="Base URL for the JUA API"
@@ -55,8 +59,6 @@ class JuaSettings(BaseSettings):
     )
 
     model_config = SettingsConfigDict(
-        env_file=".env",
-        env_file_encoding="utf-8",
         extra="ignore",
         env_prefix="JUA_",
     )
