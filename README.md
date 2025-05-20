@@ -13,16 +13,16 @@ The Jua Python SDK provides a simple and powerful interface to Jua's state-of-th
 
 ### Installation
 
-We strongly recommend using [uv](https://docs.astral.sh/uv/) to manage dependencies:
+Install `jua` with pip:
+
+```
+pip install jua
+```
+
+Checkout [uv](https://docs.astral.sh/uv/) for managing dependencies and Python versions:
 
 ```bash
 uv init && uv add jua
-```
-
-Alternatively, you can install with pip:
-
-```bash
-pip install jua
 ```
 
 ### Authentication
@@ -127,29 +127,17 @@ plt.show()
 
 </details>
 
-## Development Setup
-
-### Installing development dependencies
-
-Install all required dependencies including extras:
-
-```bash
-uv sync --all-extras
-```
-
-### Running examples
-
-Execute example scripts:
-
-```bash
-uv run examples/weather/forecast.py
-```
-
-For example notebooks, ensure you select the correct Python interpreter in your notebook environment.
-
 ## Documentation
 
 For comprehensive documentation, visit [docs.jua.ai](https://docs.jua.ai).
+
+## Contributing
+
+See the [contribution guide](./CONTRIBUTING.md) to get started.
+
+## Changes
+
+See the [changelog](./CHANGELOG.md) for the latest changes.
 
 ## Support
 
