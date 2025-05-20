@@ -14,6 +14,8 @@
 
 - **Added-commitizen-for-automated-versioning**: added the necessary dependencies
 
+## v0.5.1 (2025-05-20)
+
 ## v0.5.0 (2025-05-20)
 
 ### BREAKING CHANGE
