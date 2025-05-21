@@ -38,7 +38,7 @@ class WeatherAPI:
         "forecasting/{model_name}/forecasts/{init_time}/{lat},{lon}"
     )
     _BROWSE_FILES_ENDPOINT = "files/browse"
-    _HINDCAST_FILES_ENDPOINT = "hindcasts/sdk/{model_name}"
+    _HINDCAST_FILES_ENDPOINT = "hindcasts/sdk/files/{model_name}"
 
     def __init__(self, jua_client: JuaClient):
         """Initialize the weather API client.

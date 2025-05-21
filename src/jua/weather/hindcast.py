@@ -244,7 +244,6 @@ class Hindcast:
             List of hindcast file URLs.
         """
         files = self._api.get_hindcast_files(self._model_name)
-        print(files)
         return [f"{self._client.settings.data_base_url}/{file}" for file in files]
 
     def _open_dataset(
