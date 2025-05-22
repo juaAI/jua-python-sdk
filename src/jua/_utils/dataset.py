@@ -78,6 +78,10 @@ def _open_dataset(
             message=".*Numcodecs codecs are not in the Zarr version"
             " 3 specification and may not be supported by other zarr implementations.*",
         )
+        warnings.filterwarnings(
+            "ignore",
+            message=".*Failed to open Zarr store with consolidated metadata.*",
+        )
         dataset = xr.open_dataset(dataset_config.path, **kwargs)
 
     dataset = rename_variables(dataset)
