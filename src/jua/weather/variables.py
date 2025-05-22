@@ -136,28 +136,20 @@ class Variables(Enum):
         "geopotential_500hpa",
     )
 
-    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_6H = Variable(
-        "surface_downwelling_shortwave_flux_sum_6h", "J m⁻²", "ssrd", None
-    )
-
     SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
-        "surface_downwelling_shortwave_flux_sum_1h", "J m⁻²", "strd", None
-    )
-
-    SURFACE_NET_DOWNWARD_LONGWAVE_FLUX_SUM_1H = Variable(
-        "surface_net_downward_longwave_flux_sum_1h", "J m⁻²", None, None
-    )
-
-    SURFACE_DOWNWELLING_LONGWAVE_FLUX_SUM_1H = Variable(
-        "surface_downwelling_longwave_flux_sum_1h", "J m⁻²", None, None
+        "surface_downwelling_shortwave_flux_sum_1h", "J m⁻²", "ssrd", None
     )
 
     SURFACE_DIRECT_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
-        "surface_direct_downwelling_shortwave_flux_sum_1h", "J m⁻²", None, None
+        "surface_direct_downwelling_shortwave_flux_sum_1h", "J m⁻²", "fdir", None
     )
 
     SURFACE_NET_DOWNWARD_SHORTWAVE_FLUX_SUM_1H = Variable(
-        "surface_net_downward_shortwave_flux_sum_1h", "J m⁻²", None, None
+        "surface_net_downward_shortwave_flux_sum_1h", "J m⁻²", "ssr", None
+    )
+
+    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_6H = Variable(
+        "surface_downwelling_shortwave_flux_sum_6h", "J m⁻²", "ssrd", None
     )
 
     # Additional variables from EPT2 that don't have a direct EPT1_5 equivalent
