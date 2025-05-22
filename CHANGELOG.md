@@ -1,3 +1,17 @@
+## v0.6.0 (2025-05-22)
+
+### Feat
+
+- retrieve hindcast files from api to be always up to date
+- get chunk recommendations from api
+- get latest hindcast files from api and drop metadata
+
+### Fix
+
+- adjust variable emcwf names
+- add warning filter
+- rename endpoint and remove debug pring
+
 ## v0.5.6 (2025-05-20)
 
 ### Fix
