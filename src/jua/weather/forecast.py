@@ -3,7 +3,7 @@ from datetime import datetime
 import xarray as xr
 from pydantic import validate_call
 
-from jua._utils.dataset import open_dataset
+from jua._utils.dataset import DatasetConfig, open_dataset
 from jua.client import JuaClient
 from jua.errors.model_errors import ModelDoesNotSupportForecastRawDataAccessError
 from jua.logging import get_logger
@@ -71,17 +71,6 @@ class Forecast:
             Models.EPT1_5: self._v2_data_adapter,
             Models.EPT1_5_EARLY: self._v2_data_adapter,
         }
-
-    @property
-    def zarr_version(self) -> int | None:
-        """Get the Zarr version of the original data.
-
-        This is the Zarr format that was used to store the original data.
-
-        Returns:
-            The Zarr format version number or None if not applicable.
-        """
-        return self._model_meta.forecast_zarr_version
 
     def is_global_data_available(self) -> bool:
         """Check if global data access is available for this model.
@@ -686,13 +675,18 @@ class Forecast:
         Returns:
             Opened xarray Dataset
         """
-        model_meta = get_model_meta_info(self._model)
-
+        if isinstance(url, str):
+            url = [url]
+        dataset_configs = [
+            DatasetConfig(
+                path=u,
+            )
+            for u in url
+        ]
         return open_dataset(
             self._client,
-            url,
+            dataset_config=dataset_configs,
             should_print_progress=print_progress,
-            chunks=model_meta.forecast_chunks,
             **kwargs,
         )
 

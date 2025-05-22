@@ -35,9 +35,7 @@ def main():
         "~/data/ept15_early_air_temperature_2024-02-01.zarr"
     ).expanduser()
     with ProgressBar():
-        data.to_zarr(
-            output_path, mode="w", zarr_format=hindcast.zarr_version, compute=True
-        )
+        data.to_zarr(output_path, mode="w", compute=True)
 
 
 if __name__ == "__main__":

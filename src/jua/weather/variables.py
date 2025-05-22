@@ -144,6 +144,22 @@ class Variables(Enum):
         "surface_downwelling_shortwave_flux_sum_1h", "J m⁻²", "strd", None
     )
 
+    SURFACE_NET_DOWNWARD_LONGWAVE_FLUX_SUM_1H = Variable(
+        "surface_net_downward_longwave_flux_sum_1h", "J m⁻²", None, None
+    )
+
+    SURFACE_DOWNWELLING_LONGWAVE_FLUX_SUM_1H = Variable(
+        "surface_downwelling_longwave_flux_sum_1h", "J m⁻²", None, None
+    )
+
+    SURFACE_DIRECT_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
+        "surface_direct_downwelling_shortwave_flux_sum_1h", "J m⁻²", None, None
+    )
+
+    SURFACE_NET_DOWNWARD_SHORTWAVE_FLUX_SUM_1H = Variable(
+        "surface_net_downward_shortwave_flux_sum_1h", "J m⁻²", None, None
+    )
+
     # Additional variables from EPT2 that don't have a direct EPT1_5 equivalent
     EASTWARD_WIND_AT_HEIGHT_LEVEL_10M = Variable(
         "eastward_wind_at_height_level_10m", "m s⁻¹", None, "eastward_wind_10m"
