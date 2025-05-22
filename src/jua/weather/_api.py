@@ -3,6 +3,7 @@ from datetime import datetime
 from pydantic import validate_call
 
 from jua._api import API
+from jua._utils.dataset import DatasetConfig
 from jua._utils.remove_none_from_dict import remove_none_from_dict
 from jua.client import JuaClient
 from jua.errors.jua_error import JuaError
@@ -13,6 +14,7 @@ from jua.weather._types.api_response_types import (
     AvailableModelsResponse,
     ForecastMetadataResponse,
     ForecastResponse,
+    ListDatasetsResponse,
 )
 from jua.weather._types.forecast import ForecastData
 from jua.weather._types.raw_file_access import DirectoryResponse, FileResponse
@@ -38,6 +40,7 @@ class WeatherAPI:
         "forecasting/{model_name}/forecasts/{init_time}/{lat},{lon}"
     )
     _BROWSE_FILES_ENDPOINT = "files/browse"
+    _HINDCAST_FILES_ENDPOINT = "hindcasts/sdk/files/{model_name}"
 
     def __init__(self, jua_client: JuaClient):
         """Initialize the weather API client.
@@ -274,3 +277,17 @@ class WeatherAPI:
                 DirectoryResponse(**content) for content in response_json["contents"]
             ]
         return [FileResponse(**response_json)]
+
+    @validate_call
+    def get_hindcast_files(self, model_name: str) -> list[DatasetConfig]:
+        """Get the list of hindcast files for the current model.
+
+        Returns:
+            List of hindcast file URLs.
+        """
+        response = self._api.get(
+            self._HINDCAST_FILES_ENDPOINT.format(model_name=model_name)
+        )
+        response_json = response.json()
+        response = ListDatasetsResponse(**response_json)
+        return response.files

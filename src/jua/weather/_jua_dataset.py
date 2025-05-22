@@ -8,7 +8,6 @@ from jua._utils.optional_progress_bar import OptionalProgressBar
 from jua._utils.spinner import Spinner
 from jua.logging import get_logger
 from jua.settings.jua_settings import JuaSettings
-from jua.weather._model_meta import get_model_meta_info
 from jua.weather._xarray_patches import (
     TypedDataArray,
     TypedDataset,
@@ -88,15 +87,6 @@ class JuaDataset:
             Memory size in gigabytes.
         """
         return bytes_to_gb(self.nbytes)
-
-    @property
-    def zarr_version(self) -> int | None:
-        """Get the Zarr format version used by this model.
-
-        Returns:
-            The Zarr format version number or None if not applicable.
-        """
-        return get_model_meta_info(self._model).forecast_zarr_version
 
     def _get_default_output_path(self) -> Path:
         return Path.home() / ".jua" / "datasets" / self._model.value
@@ -188,11 +178,7 @@ class JuaDataset:
             "Preparing save. This might take a while...",
             enabled=self._settings.should_print_progress(show_progress),
         ):
-            zarr_version = get_model_meta_info(self._model).forecast_zarr_version
-            logger.info(f"Initializing dataset (zarr_format={zarr_version})...")
-            delayed = data_to_save.to_zarr(
-                output_path, mode="w", zarr_format=zarr_version, compute=False
-            )
+            delayed = data_to_save.to_zarr(output_path, mode="w", compute=False)
 
         with OptionalProgressBar(self._settings, show_progress):
             logger.info("Saving dataset...")
