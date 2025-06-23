@@ -68,6 +68,10 @@ class Forecast:
 
         self._FORECAST_ADAPTERS = {
             Models.EPT2: self._v3_data_adapter,
+            Models.EPT2_EARLY: self._v3_data_adapter,
+            Models.AURORA: self._v3_data_adapter,
+            Models.AIFS: self._v3_data_adapter,
+            Models.JUA_ENSEMBLE: self._v3_data_adapter,
             Models.EPT1_5: self._v2_data_adapter,
             Models.EPT1_5_EARLY: self._v2_data_adapter,
         }
@@ -273,7 +277,7 @@ class Forecast:
         if init_time == "latest":
             return self._get_latest_metadata()
 
-        if not self._model_meta.is_jua_model:
+        if not self._model_meta.has_forecast_file_access:
             logger.warning(
                 f"Model {self._model_name} only supports loading the latest metadata"
             )
@@ -304,7 +308,7 @@ class Forecast:
             >>> print(f"Most recent forecast: {init_times[0]}")
             >>> print(f"Total forecasts available: {len(init_times)}")
         """
-        if not self._model_meta.is_jua_model:
+        if not self._model_meta.has_forecast_file_access:
             logger.warning(
                 f"Model {self._model_name} only supports loading the latest forecast"
             )
