@@ -31,4 +31,4 @@ class Models(str, Enum):
     GFS_GRAPHCAST = "gfs_graphcast025"
     AURORA = "aurora"
     AIFS = "aifs"
-    JUA_ENSEMBLE = "jua_ensemble"
+    EPT2_E = "ept2_e"

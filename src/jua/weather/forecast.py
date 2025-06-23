@@ -71,7 +71,7 @@ class Forecast:
             Models.EPT2_EARLY: self._v3_data_adapter,
             Models.AURORA: self._v3_data_adapter,
             Models.AIFS: self._v3_data_adapter,
-            Models.JUA_ENSEMBLE: self._v3_data_adapter,
+            Models.EPT2_E: self._v3_data_adapter,
             Models.EPT1_5: self._v2_data_adapter,
             Models.EPT1_5_EARLY: self._v2_data_adapter,
         }

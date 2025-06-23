@@ -44,8 +44,8 @@ _MODEL_META_INFO[Models.AIFS] = ModelMetaInfo(
     full_forecasted_hours=480,
     has_forecast_file_access=True,
 )
-_MODEL_META_INFO[Models.JUA_ENSEMBLE] = ModelMetaInfo(
-    forecast_name_mapping="jua-ensemble",
+_MODEL_META_INFO[Models.EPT2_E] = ModelMetaInfo(
+    forecast_name_mapping="ept2-e",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
 )
