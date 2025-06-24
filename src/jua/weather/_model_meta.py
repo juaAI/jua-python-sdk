@@ -10,27 +10,47 @@ class ModelMetaInfo:
 
     forecast_name_mapping: str | None = None
     full_forecasted_hours: int | None = None
-    is_jua_model: bool = False
+    has_forecast_file_access: bool = False
 
 
 _MODEL_META_INFO = defaultdict(ModelMetaInfo)
 _MODEL_META_INFO[Models.EPT2] = ModelMetaInfo(
     forecast_name_mapping="ept-2",
     full_forecasted_hours=480,
-    is_jua_model=True,
+    has_forecast_file_access=True,
 )
 _MODEL_META_INFO[Models.EPT1_5] = ModelMetaInfo(
     forecast_name_mapping="ept-1.5",
     full_forecasted_hours=480,
-    is_jua_model=True,
+    has_forecast_file_access=True,
 )
 _MODEL_META_INFO[Models.EPT1_5_EARLY] = ModelMetaInfo(
     forecast_name_mapping="ept-1.5-early",
     full_forecasted_hours=480,
-    is_jua_model=True,
+    has_forecast_file_access=True,
 )
-_MODEL_META_INFO[Models.ECMWF_AIFS025_SINGLE] = ModelMetaInfo(
-    forecast_name_mapping=None,  # No forecast data available
+_MODEL_META_INFO[Models.EPT2_EARLY] = ModelMetaInfo(
+    forecast_name_mapping="ept-2-early",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+)
+_MODEL_META_INFO[Models.AURORA] = ModelMetaInfo(
+    forecast_name_mapping="aurora",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+)
+_MODEL_META_INFO[Models.AIFS] = ModelMetaInfo(
+    forecast_name_mapping="aifs",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+)
+_MODEL_META_INFO[Models.EPT2_E] = ModelMetaInfo(
+    forecast_name_mapping="ept2-e",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+)
+_MODEL_META_INFO[Models.ECMWF_IFS_SINGLE] = ModelMetaInfo(
+    has_forecast_file_access=False,
 )
 
 
