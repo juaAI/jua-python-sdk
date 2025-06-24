@@ -1,3 +1,15 @@
+## v0.7.0 (2025-06-24)
+
+### Feat
+
+- add new models
+- add ept2 ensemble
+- add new models
+
+### Fix
+
+- model name
+
 ## v0.6.0 (2025-05-22)
 
 ### Feat
