@@ -1,3 +1,9 @@
+## v0.7.2 (2025-06-25)
+
+### Fix
+
+- better support for points when requesting forecast
+
 ## v0.7.1 (2025-06-25)
 
 ### Fix
