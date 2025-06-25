@@ -230,9 +230,6 @@ class Forecast:
             )
 
         logger.warning("Large query, this might take some time.")
-        latitude, longitude = self._get_spatial_selection_for_adapter(
-            latitude=latitude, longitude=longitude, points=points
-        )
         prediction_timedelta = self._get_prediction_timedelta_for_adapter(
             min_lead_time=min_lead_time,
             max_lead_time=max_lead_time,
@@ -246,6 +243,7 @@ class Forecast:
             prediction_timedelta=prediction_timedelta,
             latitude=latitude,
             longitude=longitude,
+            points=points,
             method=method,
         )
 
@@ -421,6 +419,7 @@ class Forecast:
         prediction_timedelta: PredictionTimeDelta = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
+        points: list[LatLon] | None = None,
         method: str | None = None,
     ):
         """Retrieve forecast data using the appropriate data adapter.
@@ -462,6 +461,7 @@ class Forecast:
             prediction_timedelta=prediction_timedelta,
             latitude=latitude,
             longitude=longitude,
+            points=points,
             method=method,
         )
 
@@ -638,30 +638,6 @@ class Forecast:
         min_lead_time = min_lead_time or 0
         max_lead_time = max_lead_time or 480
         return slice(min_lead_time, max_lead_time)
-
-    def _get_spatial_selection_for_adapter(
-        self,
-        latitude: SpatialSelection | None,
-        longitude: SpatialSelection | None,
-        points: list[LatLon] | None,
-    ) -> tuple[SpatialSelection | None, SpatialSelection | None]:
-        """Convert point-based selection to latitude/longitude selection.
-
-        This internal method converts from points to separate latitude and longitude
-        selections for use with data adapters.
-
-        Args:
-            latitude: Existing latitude selection
-            longitude: Existing longitude selection
-            points: Points to convert to lat/lon selection
-
-        Returns:
-            Tuple of (latitude_selection, longitude_selection)
-        """
-        if points is None:
-            return latitude, longitude
-        lats, lons = zip(*[(p.lat, p.lon) for p in points])
-        return list(lats), list(lons)
 
     def _open_dataset(
         self, url: str | list[str], print_progress: bool | None = None, **kwargs
