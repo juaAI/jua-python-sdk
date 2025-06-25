@@ -1,3 +1,9 @@
+## v0.7.1 (2025-06-25)
+
+### Fix
+
+- missing support for time slices and lists
+
 ## v0.7.0 (2025-06-24)
 
 ### Feat
