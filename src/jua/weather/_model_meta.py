@@ -11,6 +11,7 @@ class ModelMetaInfo:
     forecast_name_mapping: str | None = None
     full_forecasted_hours: int | None = None
     has_forecast_file_access: bool = False
+    has_statistics: bool = False
 
 
 _MODEL_META_INFO = defaultdict(ModelMetaInfo)
@@ -48,6 +49,7 @@ _MODEL_META_INFO[Models.EPT2_E] = ModelMetaInfo(
     forecast_name_mapping="ept2-e",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
+    has_statistics=True,
 )
 _MODEL_META_INFO[Models.ECMWF_IFS_SINGLE] = ModelMetaInfo(
     has_forecast_file_access=False,

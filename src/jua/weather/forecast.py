@@ -16,6 +16,7 @@ from jua.weather._types.api_response_types import ForecastMetadataResponse
 from jua.weather._types.forecast import ForecastData
 from jua.weather.conversions import timedelta_to_hours, to_datetime
 from jua.weather.models import Models
+from jua.weather.statistics import Statistics
 from jua.weather.variables import Variables, rename_to_ept2
 
 logger = get_logger(__name__)
@@ -108,6 +109,7 @@ class Forecast:
         points: list[LatLon] | LatLon | None = None,
         min_lead_time: int | None = None,
         max_lead_time: int | None = None,
+        statistics: list[str] | list[Statistics] | None = None,
         method: str | None = "nearest",
         print_progress: bool | None = None,
     ) -> JuaDataset:
@@ -217,6 +219,7 @@ class Forecast:
                 variables=variables,
                 min_lead_time=min_lead_time,
                 max_lead_time=max_lead_time,
+                statistics=statistics,
             )
             raw_data = data.to_xarray()
             if points is not None and raw_data is not None:
@@ -370,6 +373,7 @@ class Forecast:
         min_lead_time: int = 0,
         max_lead_time: int = 0,
         variables: list[str] | list[Variables] | None = None,
+        statistics: list[str] | list[Statistics] | None = None,
     ) -> ForecastData:
         """Send a forecast request to the API.
 
@@ -382,12 +386,18 @@ class Forecast:
             min_lead_time: Minimum lead time in hours
             max_lead_time: Maximum lead time in hours
             variables: List of weather variables to retrieve
+            statistics: List of statistics to retrieve
 
         Returns:
             Forecast data response from the API
         """
         if variables is not None:
             variables = self._rename_variables_for_api(variables)
+
+        if statistics is not None:
+            statistics = [
+                s.key if (isinstance(s, Statistics)) else s for s in statistics
+            ]
 
         if init_time == "latest":
             return self._api.get_latest_forecast(
@@ -397,6 +407,7 @@ class Forecast:
                     min_lead_time=min_lead_time,
                     max_lead_time=max_lead_time,
                     variables=variables,
+                    ensemble_stats=statistics,
                 ),
             )
 
@@ -408,6 +419,7 @@ class Forecast:
                 min_lead_time=min_lead_time,
                 max_lead_time=max_lead_time,
                 variables=variables,
+                ensemble_stats=statistics,
             ),
         )
 
@@ -490,6 +502,7 @@ class Forecast:
             latitude: Latitude selection (point, list, or slice)
             longitude: Longitude selection (point, list, or slice)
             points: List of geographic points to get forecasts for
+            statistics: List of statistics to retrieve
 
         Returns:
             True if the request can be dispatched to the API, False otherwise
