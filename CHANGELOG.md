@@ -1,3 +1,9 @@
+## v0.8.0 (2025-06-30)
+
+### Feat
+
+- Add support to pull statistics from ensemble forecasts through the Jua Client
+
 ## v0.7.2 (2025-06-25)
 
 ### Fix
