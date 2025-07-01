@@ -1,3 +1,9 @@
+## v0.8.1 (2025-07-01)
+
+### Refactor
+
+- use the jua production domain names
+
 ## v0.8.0 (2025-06-30)
 
 ### Feat
