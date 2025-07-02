@@ -1,3 +1,9 @@
+## v0.8.2 (2025-07-02)
+
+### Fix
+
+- remove trailing slash causing troubles opening dataset
+
 ## v0.8.1 (2025-07-01)
 
 ### Refactor
