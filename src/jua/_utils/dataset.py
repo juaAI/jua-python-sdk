@@ -82,7 +82,10 @@ def _open_dataset(
             "ignore",
             message=".*Failed to open Zarr store with consolidated metadata.*",
         )
-        dataset = xr.open_dataset(dataset_config.path, **kwargs)
+        path = str(dataset_config.path)
+        # remove trailing "/"
+        path = path.rstrip("/")
+        dataset = xr.open_dataset(path, **kwargs)
 
     dataset = rename_variables(dataset)
 
