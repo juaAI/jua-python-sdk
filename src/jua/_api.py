@@ -1,3 +1,5 @@
+import importlib.metadata
+
 import requests  # type: ignore[import-untyped]
 
 from jua.client import JuaClient
@@ -23,6 +25,7 @@ class API:
             jua_client: Client instance containing configuration settings.
         """
         self._jua_client = jua_client
+        self._user_agent = _get_user_agent()
 
     def _get_headers(self, requires_auth: bool = True) -> dict:
         """Construct HTTP headers for API requests.
@@ -36,6 +39,7 @@ class API:
         headers = {
             "Content-Type": "application/json",
             "Accept": "application/json",
+            "User-Agent": self._user_agent,
         }
         if requires_auth:
             auth_settings = self._jua_client.settings.auth
@@ -216,3 +220,11 @@ class API:
         response = requests.patch(self._get_url(url), headers=headers, json=data)
         self._validate_response_status(response)
         return response
+
+
+def _get_user_agent() -> str:
+    try:
+        jua_version = importlib.metadata.version("jua") or "unknown"
+    except importlib.metadata.PackageNotFoundError:
+        jua_version = "unknown"
+    return f"jua-python-sdk/{jua_version}"
