@@ -188,7 +188,18 @@ class ForecastData:
                             var_key
                         )
                     else:
-                        data_array[0, :, lat_idx, lon_idx] = point[var_key]
+                        point_data = point[var_key]
+                        if point_data is None or len(point_data) != len(
+                            prediction_timedeltas
+                        ):
+                            num_values = None if point_data is None else len(point_data)
+                            raise ValueError(
+                                f"Forecast data for variable {var_key} at ({lat}, "
+                                f"{lon}) has {num_values} values, but "
+                                f"{len(prediction_timedeltas)} are expected."
+                            )
+
+                        data_array[0, :, lat_idx, lon_idx] = point_data
 
             # Add the variable to the dataset
             ds[var_key] = (dims, data_array)
