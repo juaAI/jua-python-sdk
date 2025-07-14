@@ -1,3 +1,9 @@
+## v0.8.3 (2025-07-14)
+
+### Refactor
+
+- **_api.py**: send user-agent header with every request
+
 ## v0.8.2 (2025-07-02)
 
 ### Fix
