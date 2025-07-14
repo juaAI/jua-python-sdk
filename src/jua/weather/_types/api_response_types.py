@@ -21,7 +21,7 @@ class ForecastMetadataResponse(BaseModel):
     init_time: datetime
     available_forecasted_hours: int
     available_variables: list[str]
-    available_ensemble_stats: list[str]
+    available_ensemble_stats: list[str] | None = None
 
 
 class ForecastResponse(BaseModel):
