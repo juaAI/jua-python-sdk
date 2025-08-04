@@ -1,3 +1,10 @@
+## v0.8.4 (2025-08-04)
+
+### Fix
+
+- fix the type annotation for ForecastMetadataResponse.available_ensemble_stats
+- set a more verbose error message when the number of values for a variable does not match the number of lead times
+
 ## v0.8.3 (2025-07-14)
 
 ### Refactor
