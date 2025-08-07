@@ -1,3 +1,9 @@
+## v0.8.5 (2025-08-07)
+
+### Fix
+
+- resolves bug where zarr and xarray interfere with each other
+
 ## v0.8.4 (2025-08-04)
 
 ### Fix
