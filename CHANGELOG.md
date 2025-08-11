@@ -1,3 +1,9 @@
+## v0.8.6 (2025-08-11)
+
+### Fix
+
+- update the `forecast_name_mapping` for ept-1.5 and ept-1.5 early and use the v3 adapter
+
 ## v0.8.5 (2025-08-07)
 
 ### Fix
