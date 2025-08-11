@@ -73,8 +73,8 @@ class Forecast:
             Models.AURORA: self._v3_data_adapter,
             Models.AIFS: self._v3_data_adapter,
             Models.EPT2_E: self._v3_data_adapter,
-            Models.EPT1_5: self._v2_data_adapter,
-            Models.EPT1_5_EARLY: self._v2_data_adapter,
+            Models.EPT1_5: self._v3_data_adapter,
+            Models.EPT1_5_EARLY: self._v3_data_adapter,
         }
 
     def is_global_data_available(self) -> bool:
@@ -686,7 +686,7 @@ class Forecast:
     def _v3_data_adapter(
         self, init_time: datetime, print_progress: bool | None = None, **kwargs
     ) -> JuaDataset:
-        """Adapter for EPT2 (and similar) forecast data access.
+        """Adapter for EPT1.5, EPT2 (and similar) forecast data access.
 
         This internal adapter handles retrieving data for models that use
         the v3 Zarr storage format (a single consolidated Zarr store).
@@ -706,79 +706,6 @@ class Forecast:
         data_url = f"{data_base_url}/forecasts/{model_name}/{dataset_name}.zarr"
 
         raw_data = self._open_dataset(data_url, print_progress=print_progress, **kwargs)
-        return JuaDataset(
-            settings=self._client.settings,
-            dataset_name=dataset_name,
-            raw_data=raw_data,
-            model=self._model,
-        )
-
-    def _v2_data_adapter(
-        self,
-        init_time: datetime,
-        print_progress: bool | None = None,
-        **kwargs,
-    ) -> JuaDataset:
-        """Adapter for EPT1.5 (and similar) forecast data access.
-
-        This internal adapter handles retrieving data for models that use
-        the v2 Zarr storage format (separate Zarr stores for each lead time).
-
-        Args:
-            init_time: Forecast initialization time
-            print_progress: Whether to display a progress bar
-            **kwargs: Additional selection parameters including:
-                - prediction_timedelta: Time period to include
-                - latitude/longitude: Spatial selection
-                - method: Interpolation method
-
-        Returns:
-            JuaDataset containing the requested forecast data
-        """
-        data_base_url = self._client.settings.data_base_url
-        model_name = get_model_meta_info(self._model).forecast_name_mapping
-        init_time_str = init_time.strftime("%Y%m%d%H")
-        # This is a bit hacky:
-        # For EPT1.5, get_metadata will result in an error
-        # if the forecast is no longer in cache.
-        # For now, we try and if it fails default to 480 hours
-        try:
-            maybe_metadata = self.get_metadata(init_time=init_time)
-            if maybe_metadata is None:
-                max_available_hours = 480
-            else:
-                max_available_hours = maybe_metadata.available_forecasted_hours
-        except Exception:
-            max_available_hours = 480
-
-        hours_to_load = list(range(max_available_hours + 1))
-        prediction_timedelta = kwargs.get("prediction_timedelta", None)
-        if prediction_timedelta is not None:
-            if isinstance(prediction_timedelta, list):
-                hours_to_load = [timedelta_to_hours(td) for td in prediction_timedelta]
-
-            elif isinstance(prediction_timedelta, slice):
-                hours_to_load = list(
-                    range(
-                        timedelta_to_hours(prediction_timedelta.start),
-                        timedelta_to_hours(prediction_timedelta.stop),
-                        timedelta_to_hours(prediction_timedelta.step or 1),
-                    )
-                )
-            else:
-                hours_to_load = [timedelta_to_hours(prediction_timedelta)]
-
-            # Already handled above, remove from kwargs
-            del kwargs["prediction_timedelta"]
-
-        zarr_urls = [
-            f"{data_base_url}/forecasts/{model_name}/{init_time_str}/{hour}.zarr"
-            for hour in hours_to_load
-        ]
-        dataset_name = f"{init_time_str}"
-        raw_data = self._open_dataset(
-            zarr_urls, print_progress=print_progress, **kwargs
-        )
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,

@@ -21,12 +21,12 @@ _MODEL_META_INFO[Models.EPT2] = ModelMetaInfo(
     has_forecast_file_access=True,
 )
 _MODEL_META_INFO[Models.EPT1_5] = ModelMetaInfo(
-    forecast_name_mapping="ept-1.5",
+    forecast_name_mapping="ept-1.5-b",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
 )
 _MODEL_META_INFO[Models.EPT1_5_EARLY] = ModelMetaInfo(
-    forecast_name_mapping="ept-1.5-early",
+    forecast_name_mapping="ept-1.5-early-b",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
 )
