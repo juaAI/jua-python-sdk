@@ -1,3 +1,10 @@
+## v0.9.1 (2025-08-12)
+
+### Fix
+
+- querying slices with ept2-rr
+- in the .sel(_) patch, only swap the (start, end) for latitude slices if they are incorrect
+
 ## v0.9.0 (2025-08-12)
 
 ### Feat
