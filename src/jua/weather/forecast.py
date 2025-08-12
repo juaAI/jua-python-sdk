@@ -70,6 +70,7 @@ class Forecast:
         self._FORECAST_ADAPTERS = {
             Models.EPT2: self._v3_data_adapter,
             Models.EPT2_EARLY: self._v3_data_adapter,
+            Models.EPT2_RR: self._v3_data_adapter,
             Models.AURORA: self._v3_data_adapter,
             Models.AIFS: self._v3_data_adapter,
             Models.EPT2_E: self._v3_data_adapter,

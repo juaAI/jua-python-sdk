@@ -154,12 +154,6 @@ def _patch_args(
     """
     prediction_timedelta = _check_prediction_timedelta(prediction_timedelta)
 
-    # Invert latitude slice if needed
-    # (since latitude is typically ordered from North to South)
-    if isinstance(latitude, slice):
-        if latitude.start < latitude.stop:
-            latitude = slice(latitude.stop, latitude.start, latitude.step)
-
     # Collect Jua-specific arguments
     jua_args = {}
     if prediction_timedelta is not None:
@@ -232,6 +226,22 @@ def _patched_sel(
     Returns:
         Selected xarray object (Dataset or DataArray)
     """
+    # Ensure latitude slice is in correct order, since latitude is typically
+    # ordered from North to South
+    if (
+        "latitude" in self.coords
+        and len(self.latitude.values) > 1
+        and isinstance(latitude, slice)
+    ):
+        if (
+            self.latitude.values[0] > self.latitude.values[-1]
+            and latitude.start < latitude.stop
+        ) or (
+            self.latitude.values[0] < self.latitude.values[-1]
+            and latitude.start > latitude.stop
+        ):
+            latitude = slice(latitude.stop, latitude.start, latitude.step)
+
     # Process and normalize the arguments
     full_kwargs = _patch_args(
         time=time,
