@@ -1,3 +1,9 @@
+## v0.9.0 (2025-08-12)
+
+### Feat
+
+- add ept2-rr and ecmwf_aifs025_ensemble models to the sdk
+
 ## v0.8.6 (2025-08-11)
 
 ### Fix
