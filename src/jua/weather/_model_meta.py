@@ -20,6 +20,11 @@ _MODEL_META_INFO[Models.EPT2] = ModelMetaInfo(
     full_forecasted_hours=480,
     has_forecast_file_access=True,
 )
+_MODEL_META_INFO[Models.EPT2_RR] = ModelMetaInfo(
+    forecast_name_mapping="ept-2-rr",
+    full_forecasted_hours=48,
+    has_forecast_file_access=True,
+)
 _MODEL_META_INFO[Models.EPT1_5] = ModelMetaInfo(
     forecast_name_mapping="ept-1.5-b",
     full_forecasted_hours=480,
@@ -49,6 +54,12 @@ _MODEL_META_INFO[Models.EPT2_E] = ModelMetaInfo(
     forecast_name_mapping="ept2-e",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
+    has_statistics=True,
+)
+_MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
+    forecast_name_mapping="ecmwf_aifs025_ensemble",
+    full_forecasted_hours=360,
+    has_forecast_file_access=False,
     has_statistics=True,
 )
 _MODEL_META_INFO[Models.ECMWF_IFS_SINGLE] = ModelMetaInfo(
