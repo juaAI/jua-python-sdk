@@ -130,6 +130,7 @@ class Hindcast:
         max_lead_time: int | None = None,
         method: str | None = "nearest",
         print_progress: bool | None = None,
+        lazy_load: bool = False,
     ) -> JuaDataset:
         """Retrieve historical weather data (hindcast) for this model.
 
@@ -227,6 +228,7 @@ class Hindcast:
             longitude=longitude,
             points=points,
             method=method,
+            lazy_load=lazy_load,
         )
 
     def _get_hindcast_files(self) -> list[DatasetConfig]:
@@ -247,6 +249,7 @@ class Hindcast:
     def _open_dataset(
         self,
         print_progress: bool | None = None,
+        lazy_load: bool = False,
         **kwargs,
     ) -> JuaDataset:
         """Open a dataset from the given URL with appropriate chunking.
@@ -267,6 +270,7 @@ class Hindcast:
             self._client,
             dataset_configs,
             should_print_progress=print_progress,
+            compute=not lazy_load,
             **kwargs,
         )
 

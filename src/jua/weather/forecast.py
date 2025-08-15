@@ -113,6 +113,7 @@ class Forecast:
         statistics: list[str] | list[Statistics] | None = None,
         method: str | None = "nearest",
         print_progress: bool | None = None,
+        lazy_load: bool = False,
     ) -> JuaDataset:
         """Retrieve forecast data for the model.
 
@@ -199,6 +200,9 @@ class Forecast:
         if points is not None and not isinstance(points, list):
             points = [points]
 
+        if self._model == Models.EPT2_E and not statistics:
+            statistics = ["mean"]
+
         if self._can_be_dispatched_to_api(
             init_time=init_time,
             latitude=latitude,
@@ -249,6 +253,7 @@ class Forecast:
             longitude=longitude,
             points=points,
             method=method,
+            lazy_load=lazy_load,
         )
 
     @validate_call
@@ -434,6 +439,7 @@ class Forecast:
         longitude: SpatialSelection | None = None,
         points: list[LatLon] | None = None,
         method: str | None = None,
+        lazy_load: bool = False,
     ):
         """Retrieve forecast data using the appropriate data adapter.
 
@@ -476,6 +482,7 @@ class Forecast:
             longitude=longitude,
             points=points,
             method=method,
+            lazy_load=lazy_load,
         )
 
     def _can_be_dispatched_to_api(
@@ -654,7 +661,11 @@ class Forecast:
         return slice(min_lead_time, max_lead_time)
 
     def _open_dataset(
-        self, url: str | list[str], print_progress: bool | None = None, **kwargs
+        self,
+        url: str | list[str],
+        print_progress: bool | None = None,
+        lazy_load: bool = False,
+        **kwargs,
     ) -> xr.Dataset:
         """Open a dataset from a URL or list of URLs.
 
@@ -681,11 +692,16 @@ class Forecast:
             self._client,
             dataset_config=dataset_configs,
             should_print_progress=print_progress,
+            compute=not lazy_load,
             **kwargs,
         )
 
     def _v3_data_adapter(
-        self, init_time: datetime, print_progress: bool | None = None, **kwargs
+        self,
+        init_time: datetime,
+        print_progress: bool | None = None,
+        lazy_load: bool = False,
+        **kwargs,
     ) -> JuaDataset:
         """Adapter for EPT1.5, EPT2 (and similar) forecast data access.
 
@@ -706,7 +722,9 @@ class Forecast:
         dataset_name = f"{init_time_str}"
         data_url = f"{data_base_url}/forecasts/{model_name}/{dataset_name}.zarr"
 
-        raw_data = self._open_dataset(data_url, print_progress=print_progress, **kwargs)
+        raw_data = self._open_dataset(
+            data_url, print_progress=print_progress, lazy_load=lazy_load, **kwargs
+        )
         return JuaDataset(
             settings=self._client.settings,
             dataset_name=dataset_name,
