@@ -198,7 +198,6 @@ def open_dataset(
                 )
             else:
                 logger.info(f"Loading dataset of size {dataset_size_gb:.2f}GB")
-            dataset = dataset.compute()
 
             # Clear all encoding to prevent issues when saving data
             for var in dataset.data_vars:
