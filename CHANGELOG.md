@@ -1,3 +1,9 @@
+## v0.11.0 (2025-08-18)
+
+### Feat
+
+- convert pandas timedelta objects to_timedelta
+
 ## v0.10.0 (2025-08-15)
 
 ### Feat
