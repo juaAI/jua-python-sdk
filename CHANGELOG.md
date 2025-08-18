@@ -1,3 +1,14 @@
+## v0.10.0 (2025-08-15)
+
+### Feat
+
+- optional lazy loading
+- support lazy loading
+
+### Fix
+
+- statistics might not be none but empty
+
 ## v0.9.1 (2025-08-12)
 
 ### Fix

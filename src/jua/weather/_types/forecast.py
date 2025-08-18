@@ -39,12 +39,12 @@ class PointResponse(BaseModel, extra="allow"):
             }
 
         var_names = {k for k in self._variables.keys()}
-        if self._statistics is not None:
+        if self._statistics:
             var_names.update({k for k in self._statistics.keys()})
         self._variable_names = list(sorted(var_names))
 
         self._statistic_names = []
-        if self._statistics is not None:
+        if self._statistics:
             self._statistic_names = list(
                 self._statistics[self._variable_names[0]].keys()
             )
@@ -144,7 +144,7 @@ class ForecastData:
             "latitude",
             "longitude",
         )
-        if self.points[0].statistics is not None:
+        if self.points[0].statistics:
             dims = ("time", "stat", "prediction_timedelta", "latitude", "longitude")
             coords["stat"] = self.points[0].statistic_names
 
@@ -165,7 +165,7 @@ class ForecastData:
                 len(lats),
                 len(lons),
             )
-            if self.points[0].statistics is not None:
+            if self.points[0].statistics:
                 num_stats = len(coords["stat"])
                 data_shape = (
                     1,
@@ -183,7 +183,7 @@ class ForecastData:
                         continue
 
                     point = point_mapping[(lat, lon)]
-                    if point.statistics is not None:
+                    if point.statistics:
                         data_array[0, :, :, lat_idx, lon_idx] = point.get_statistics(
                             var_key
                         )
