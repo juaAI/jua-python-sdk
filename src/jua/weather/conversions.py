@@ -64,7 +64,13 @@ def bytes_to_gb(bytes: int) -> float:
 
 
 def to_timedelta(
-    hours: int | np.timedelta64 | list[int] | list[np.timedelta64] | None,
+    hours: int
+    | np.timedelta64
+    | pd.Timedelta
+    | list[int]
+    | list[np.timedelta64]
+    | list[pd.Timedelta]
+    | None,
 ) -> np.timedelta64 | list[np.timedelta64] | None:
     """Convert hours or existing timedeltas to numpy timedelta64 objects.
 
@@ -86,6 +92,8 @@ def to_timedelta(
         return np.timedelta64(hours, "h").astype("timedelta64[ns]")
     if isinstance(hours, np.timedelta64):
         return hours
+    if isinstance(hours, pd.Timedelta):
+        return hours.to_timedelta64()
     if hours is None:
         return None
     raise ValueError(f"unexpected timedelta type: {hours}")
