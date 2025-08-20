@@ -237,7 +237,11 @@ class Forecast:
                 model=self._model,
             )
 
-        logger.warning("Large query, this might take some time.")
+        if not lazy_load:
+            logger.warning(
+                "Query might produce a large amount of data and might take some time."
+            )
+
         prediction_timedelta = self._get_prediction_timedelta_for_adapter(
             min_lead_time=min_lead_time,
             max_lead_time=max_lead_time,
