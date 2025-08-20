@@ -1,6 +1,6 @@
 [project]
 name = "jua"
-version = "0.11.0"
+version = "0.12.0"
 description = "Easy access to Jua's weather & power services"
 authors = [
    {name = "Jua.ai AG", email = "contact@jua.ai"}

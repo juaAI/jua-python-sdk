@@ -1,3 +1,13 @@
+## v0.12.0 (2025-08-20)
+
+### Feat
+
+- allow setting the log level of jua. loggers
+
+### Fix
+
+- improve warning message and show only when eagerly loaded
+
 ## v0.11.0 (2025-08-18)
 
 ### Feat
