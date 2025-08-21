@@ -52,7 +52,7 @@ class Forecast:
     """
 
     _MAX_INIT_TIME_PAST_FOR_API_H = 36
-    _MAX_point_FOR_API = 25
+    _MAX_POINT_FOR_API = 1000
 
     def __init__(self, client: JuaClient, model: Models):
         """Initialize forecast access for a specific model.
@@ -504,7 +504,7 @@ class Forecast:
 
         Constraints include:
         - Forecast age (must be recent, less than 36 hours)
-        - Number of points (limited to _MAX_point_FOR_API)
+        - Number of points (limited to _MAX_POINT_FOR_API)
         - Query structure (slices not supported)
         - Lead time structure (complex lead time slicing not supported)
 
@@ -555,7 +555,7 @@ class Forecast:
         if not self._is_latest_init_time(init_time) and len(points) > 1:
             return False
 
-        if len(points) > self._MAX_point_FOR_API:
+        if len(points) > self._MAX_POINT_FOR_API:
             return False
 
         if prediction_timedelta is not None:
