@@ -1,3 +1,13 @@
+## v0.13.0 (2025-08-21)
+
+### Feat
+
+- adds dew_point_temperature_at_height_level_2m, relative_humidity_at_height_level_2m and precipitation_amount_sum_1h variables
+
+### Perf
+
+- allow querying up to 1000 points in a single api call
+
 ## v0.12.0 (2025-08-20)
 
 ### Feat
