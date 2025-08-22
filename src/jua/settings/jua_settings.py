@@ -34,7 +34,8 @@ class JuaSettings(BaseSettings):
     """
 
     frontend_url: str = Field(
-        default="https://app.jua.sh", description="Base URL for the JUA frontend"
+        default="https://developer.jua.ai",
+        description="Base URL for the JUA developer frontend",
     )
 
     api_url: str = Field(
