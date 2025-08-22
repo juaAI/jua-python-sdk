@@ -161,7 +161,7 @@ class Variables(Enum):
     )
 
     SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_6H = Variable(
-        "surface_downwelling_shortwave_flux_sum_6h", "J m⁻²", "ssrd", None
+        "surface_downwelling_shortwave_flux_sum_6h", "J m⁻²", "ssrd_6hr", None
     )
 
     # Additional variables from EPT2 that don't have a direct EPT1_5 equivalent
