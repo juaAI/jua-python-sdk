@@ -2,8 +2,16 @@ import json
 from pathlib import Path
 
 from aiohttp import BasicAuth
-from pydantic import Field
+from pydantic import BaseModel, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class ApiKey(BaseModel):
+    name: str | None = None
+    id: str
+    secret: str
+    created_at: str | None = None
+    expires_at: str | None = None
 
 
 class AuthenticationSettings(BaseSettings):
@@ -81,6 +89,12 @@ class AuthenticationSettings(BaseSettings):
         if not self.api_key_id or not self.api_key_secret:
             self._load_from_json_file()
 
+    @property
+    def secrets_file_path(self) -> Path:
+        if self.api_key_path:
+            return Path(self.api_key_path)
+        return Path.home() / ".jua" / self.environment / "api-key.json"
+
     def _load_from_json_file(self) -> None:
         """Load credentials from JSON file if needed.
 
@@ -88,11 +102,7 @@ class AuthenticationSettings(BaseSettings):
         or the default location (~/.jua/<environment>/api-key.json). Silently
         fails if the file doesn't exist or contains invalid JSON.
         """
-        # Determine the secrets file path
-        if self.api_key_path:
-            file_path = Path(self.api_key_path)
-        else:
-            file_path = Path.home() / ".jua" / self.environment / "api-key.json"
+        file_path = self.secrets_file_path
 
         if not file_path.exists():
             return
@@ -101,8 +111,10 @@ class AuthenticationSettings(BaseSettings):
             with open(file_path, "r") as f:
                 secrets_data = json.load(f)
 
-            self.api_key_id = secrets_data.get("id")
-            self.api_key_secret = secrets_data.get("secret")
+            api_key = ApiKey(**secrets_data)
+
+            self.api_key_id = api_key.id
+            self.api_key_secret = api_key.secret
         except (json.JSONDecodeError, IOError):
             # Silently fail if file cannot be read or parsed
             pass
