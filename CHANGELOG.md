@@ -1,3 +1,13 @@
+## v0.14.0 (2025-08-22)
+
+### Feat
+
+- add auth cli logic
+
+### Fix
+
+- move auth frontend to developer dashboard
+
 ## v0.13.1 (2025-08-22)
 
 ### Fix
