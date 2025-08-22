@@ -1,6 +1,6 @@
 [project]
 name = "jua"
-version = "0.5.6"
+version = "0.13.0"
 description = "Easy access to Jua's weather & power services"
 authors = [
    {name = "Jua.ai AG", email = "contact@jua.ai"}
@@ -19,8 +19,8 @@ dependencies = [
     "pydantic-settings>=2.8.1",
     "requests>=2.32.3",
     "types-requests>=2.32.0.20250328",
-    "xarray>=2025.4.0",
-    "zarr>=3.0.0",
+    "xarray>=2025.7.0",
+    "zarr>=3.1.0",
 ]
 
 classifiers = [

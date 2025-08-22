@@ -6,6 +6,7 @@ from pydantic import validate_call
 
 from jua.types.geo import LatLon, PredictionTimeDelta
 from jua.weather.conversions import to_timedelta
+from jua.weather.statistics import Statistics
 from jua.weather.variables import Variables
 
 """
@@ -130,6 +131,7 @@ def _patch_args(
     time: np.datetime64 | slice | None,
     latitude: float | slice | None,
     longitude: float | slice | None,
+    stat: str | Statistics | None = None,
     **kwargs,
 ):
     """Process and normalize arguments for patched xarray selection methods.
@@ -144,18 +146,13 @@ def _patch_args(
         time: Time selection parameter
         latitude: Latitude selection parameter
         longitude: Longitude selection parameter
+        stat: Statistic selection parameter
         **kwargs: Additional xarray selection parameters
 
     Returns:
         Dictionary of processed arguments ready for use with xarray selection methods
     """
     prediction_timedelta = _check_prediction_timedelta(prediction_timedelta)
-
-    # Invert latitude slice if needed
-    # (since latitude is typically ordered from North to South)
-    if isinstance(latitude, slice):
-        if latitude.start < latitude.stop:
-            latitude = slice(latitude.stop, latitude.start, latitude.step)
 
     # Collect Jua-specific arguments
     jua_args = {}
@@ -167,6 +164,11 @@ def _patch_args(
         jua_args["latitude"] = latitude
     if longitude is not None:
         jua_args["longitude"] = longitude
+    if stat is not None:
+        if isinstance(stat, Statistics):
+            jua_args["stat"] = stat.key
+        else:
+            jua_args["stat"] = stat
 
     return {**jua_args, **kwargs}
 
@@ -199,6 +201,7 @@ def _patched_sel(
     latitude: float | slice | None = None,
     longitude: float | slice | None = None,
     points: LatLon | list[LatLon] | None = None,
+    stat: str | Statistics | None = None,
     **kwargs,
 ):
     """Core implementation of the patched selection method.
@@ -223,12 +226,29 @@ def _patched_sel(
     Returns:
         Selected xarray object (Dataset or DataArray)
     """
+    # Ensure latitude slice is in correct order, since latitude is typically
+    # ordered from North to South
+    if (
+        "latitude" in self.coords
+        and len(self.latitude.values) > 1
+        and isinstance(latitude, slice)
+    ):
+        if (
+            self.latitude.values[0] > self.latitude.values[-1]
+            and latitude.start < latitude.stop
+        ) or (
+            self.latitude.values[0] < self.latitude.values[-1]
+            and latitude.start > latitude.stop
+        ):
+            latitude = slice(latitude.stop, latitude.start, latitude.step)
+
     # Process and normalize the arguments
     full_kwargs = _patch_args(
         time=time,
         prediction_timedelta=prediction_timedelta,
         latitude=latitude,
         longitude=longitude,
+        stat=stat,
         **kwargs,
     )
 
@@ -483,10 +503,19 @@ class ToCelciusAccessor:
         """Convert temperature from Kelvin to Celsius.
 
         This method applies the K→°C conversion: T(°C) = T(K) - 273.15
+        If there's a stat dimension, standard deviation values are not converted
+        since they represent temperature differences, not absolute temperatures.
 
         Returns:
             Temperature data in Celsius
         """
+        # Check if there's a stat dimension
+        if "stat" in self._xarray_obj.dims:
+            is_not_std = self._xarray_obj.stat != "std"
+            result = self._xarray_obj.copy()
+            result = result.where(~is_not_std, self._xarray_obj - 273.15)
+            return result
+
         return self._xarray_obj - 273.15
 
 
@@ -656,6 +685,7 @@ if TYPE_CHECKING:
             latitude: float | slice | None = None,
             longitude: float | slice | None = None,
             points: LatLon | list[LatLon] | None = None,
+            stat: Statistics | None = None,
             **kwargs,
         ) -> "TypedDataArray": ...
 

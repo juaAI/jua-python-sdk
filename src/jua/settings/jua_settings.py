@@ -38,7 +38,7 @@ class JuaSettings(BaseSettings):
     )
 
     api_url: str = Field(
-        default="https://api.jua.sh", description="Base URL for the JUA API"
+        default="https://api.jua.ai", description="Base URL for the JUA API"
     )
 
     api_version: str = Field(
@@ -46,7 +46,7 @@ class JuaSettings(BaseSettings):
     )
 
     data_base_url: str = Field(
-        default="https://data.jua.sh", description="Base URL for JUA data services"
+        default="https://data.jua.ai", description="Base URL for JUA data services"
     )
 
     auth: AuthenticationSettings = Field(

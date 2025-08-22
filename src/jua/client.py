@@ -1,3 +1,5 @@
+import logging
+
 from pydantic import validate_call
 
 from jua.settings.jua_settings import JuaSettings
@@ -20,7 +22,11 @@ class JuaClient:
     """
 
     @validate_call
-    def __init__(self, settings: JuaSettings = JuaSettings()):
+    def __init__(
+        self,
+        settings: JuaSettings = JuaSettings(),
+        jua_log_level: int | None = None,
+    ):
         """Initialize a new Jua client.
 
         Args:
@@ -29,6 +35,9 @@ class JuaClient:
         """
         self.settings = settings
         self._weather = None
+
+        if jua_log_level is not None:
+            logging.getLogger("jua").setLevel(jua_log_level)
 
     @property
     def weather(self):

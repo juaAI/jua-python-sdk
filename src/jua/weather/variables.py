@@ -114,6 +114,18 @@ class Variables(Enum):
     AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M = Variable(
         "air_temperature_at_height_level_2m", "K", "2t", "air_temperature_2m"
     )
+    DEW_POINT_TEMPERATURE_AT_HEIGHT_LEVEL_2M = Variable(
+        "dew_point_temperature_at_height_level_2m",
+        "K",
+        "2d",
+        "dew_point_temperature_2m",
+    )
+    RELATIVE_HUMIDITY_AT_HEIGHT_LEVEL_2M = Variable(
+        "relative_humidity_at_height_level_2m",
+        "K",
+        "r",
+        "relative_humidity_2m",
+    )
     AIR_PRESSURE_AT_MEAN_SEA_LEVEL = Variable(
         "air_pressure_at_mean_sea_level", "Pa", "msl", "air_pressure_at_mean_sea_level"
     )
@@ -136,12 +148,20 @@ class Variables(Enum):
         "geopotential_500hpa",
     )
 
-    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_6H = Variable(
-        "surface_downwelling_shortwave_flux_sum_6h", "J m⁻²", "ssrd", None
+    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
+        "surface_downwelling_shortwave_flux_sum_1h", "J m⁻²", "ssrd", None
     )
 
-    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
-        "surface_downwelling_shortwave_flux_sum_1h", "J m⁻²", "strd", None
+    SURFACE_DIRECT_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
+        "surface_direct_downwelling_shortwave_flux_sum_1h", "J m⁻²", "fdir", None
+    )
+
+    SURFACE_NET_DOWNWARD_SHORTWAVE_FLUX_SUM_1H = Variable(
+        "surface_net_downward_shortwave_flux_sum_1h", "J m⁻²", "ssr", None
+    )
+
+    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_6H = Variable(
+        "surface_downwelling_shortwave_flux_sum_6h", "J m⁻²", "ssrd", None
     )
 
     # Additional variables from EPT2 that don't have a direct EPT1_5 equivalent
@@ -168,6 +188,9 @@ class Variables(Enum):
 
     LOW_TYPE_CLOUD_AREA_FRACTION = Variable(
         "low_type_cloud_area_fraction", "[0,1]", "lcc", None
+    )
+    PRECIPITATION_AMOUNT_SUM_1H = Variable(
+        "precipitation_amount_sum_1h", "mm m⁻2", "tp", "precipitation_amount"
     )
 
     CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE = Variable(

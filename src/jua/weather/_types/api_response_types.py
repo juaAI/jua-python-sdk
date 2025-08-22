@@ -2,6 +2,7 @@ from datetime import datetime
 
 from pydantic import BaseModel
 
+from jua._utils.dataset import DatasetConfig
 from jua.weather._types.forecast import ForecastData
 from jua.weather._types.raw_file_access import DirectoryResponse, FileResponse
 
@@ -20,6 +21,7 @@ class ForecastMetadataResponse(BaseModel):
     init_time: datetime
     available_forecasted_hours: int
     available_variables: list[str]
+    available_ensemble_stats: list[str] | None = None
 
 
 class ForecastResponse(BaseModel):
@@ -28,6 +30,10 @@ class ForecastResponse(BaseModel):
 
 class BrowseFilesDirectoryResponse(BaseModel):
     contents: list[DirectoryResponse | FileResponse]
+
+
+class ListDatasetsResponse(BaseModel):
+    files: list[DatasetConfig]
 
 
 BrowseFilesResponse = BrowseFilesDirectoryResponse | FileResponse

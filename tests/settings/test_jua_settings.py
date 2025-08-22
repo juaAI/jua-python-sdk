@@ -9,9 +9,9 @@ class TestJuaSettings:
         """Test initialization with default values."""
         settings = JuaSettings()
 
-        assert settings.api_url == "https://api.jua.sh"
+        assert settings.api_url == "https://api.jua.ai"
         assert settings.api_version == "v1"
-        assert settings.data_base_url == "https://data.jua.sh"
+        assert settings.data_base_url == "https://data.jua.ai"
         assert settings.print_progress is True
         assert isinstance(settings.auth, AuthenticationSettings)
 

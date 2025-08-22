@@ -9,3 +9,4 @@ class ForecastRequestPayload(BaseModel):
     max_lead_time: int = 0
     variables: list[str] | None = None
     full: bool = False
+    ensemble_stats: list[str] | None = None

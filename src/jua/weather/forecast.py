@@ -3,7 +3,7 @@ from datetime import datetime
 import xarray as xr
 from pydantic import validate_call
 
-from jua._utils.dataset import open_dataset
+from jua._utils.dataset import DatasetConfig, open_dataset
 from jua.client import JuaClient
 from jua.errors.model_errors import ModelDoesNotSupportForecastRawDataAccessError
 from jua.logging import get_logger
@@ -16,6 +16,7 @@ from jua.weather._types.api_response_types import ForecastMetadataResponse
 from jua.weather._types.forecast import ForecastData
 from jua.weather.conversions import timedelta_to_hours, to_datetime
 from jua.weather.models import Models
+from jua.weather.statistics import Statistics
 from jua.weather.variables import Variables, rename_to_ept2
 
 logger = get_logger(__name__)
@@ -51,7 +52,7 @@ class Forecast:
     """
 
     _MAX_INIT_TIME_PAST_FOR_API_H = 36
-    _MAX_point_FOR_API = 25
+    _MAX_POINT_FOR_API = 1000
 
     def __init__(self, client: JuaClient, model: Models):
         """Initialize forecast access for a specific model.
@@ -68,20 +69,14 @@ class Forecast:
 
         self._FORECAST_ADAPTERS = {
             Models.EPT2: self._v3_data_adapter,
-            Models.EPT1_5: self._v2_data_adapter,
-            Models.EPT1_5_EARLY: self._v2_data_adapter,
+            Models.EPT2_EARLY: self._v3_data_adapter,
+            Models.EPT2_RR: self._v3_data_adapter,
+            Models.AURORA: self._v3_data_adapter,
+            Models.AIFS: self._v3_data_adapter,
+            Models.EPT2_E: self._v3_data_adapter,
+            Models.EPT1_5: self._v3_data_adapter,
+            Models.EPT1_5_EARLY: self._v3_data_adapter,
         }
-
-    @property
-    def zarr_version(self) -> int | None:
-        """Get the Zarr version of the original data.
-
-        This is the Zarr format that was used to store the original data.
-
-        Returns:
-            The Zarr format version number or None if not applicable.
-        """
-        return self._model_meta.forecast_zarr_version
 
     def is_global_data_available(self) -> bool:
         """Check if global data access is available for this model.
@@ -115,8 +110,10 @@ class Forecast:
         points: list[LatLon] | LatLon | None = None,
         min_lead_time: int | None = None,
         max_lead_time: int | None = None,
+        statistics: list[str] | list[Statistics] | None = None,
         method: str | None = "nearest",
         print_progress: bool | None = None,
+        lazy_load: bool = False,
     ) -> JuaDataset:
         """Retrieve forecast data for the model.
 
@@ -203,6 +200,9 @@ class Forecast:
         if points is not None and not isinstance(points, list):
             points = [points]
 
+        if self._model == Models.EPT2_E and not statistics:
+            statistics = ["mean"]
+
         if self._can_be_dispatched_to_api(
             init_time=init_time,
             latitude=latitude,
@@ -224,6 +224,7 @@ class Forecast:
                 variables=variables,
                 min_lead_time=min_lead_time,
                 max_lead_time=max_lead_time,
+                statistics=statistics,
             )
             raw_data = data.to_xarray()
             if points is not None and raw_data is not None:
@@ -236,10 +237,11 @@ class Forecast:
                 model=self._model,
             )
 
-        logger.warning("Large query, this might take some time.")
-        latitude, longitude = self._get_spatial_selection_for_adapter(
-            latitude=latitude, longitude=longitude, points=points
-        )
+        if not lazy_load:
+            logger.warning(
+                "Query might produce a large amount of data and might take some time."
+            )
+
         prediction_timedelta = self._get_prediction_timedelta_for_adapter(
             min_lead_time=min_lead_time,
             max_lead_time=max_lead_time,
@@ -253,7 +255,9 @@ class Forecast:
             prediction_timedelta=prediction_timedelta,
             latitude=latitude,
             longitude=longitude,
+            points=points,
             method=method,
+            lazy_load=lazy_load,
         )
 
     @validate_call
@@ -284,7 +288,7 @@ class Forecast:
         if init_time == "latest":
             return self._get_latest_metadata()
 
-        if not self._model_meta.is_jua_model:
+        if not self._model_meta.has_forecast_file_access:
             logger.warning(
                 f"Model {self._model_name} only supports loading the latest metadata"
             )
@@ -315,7 +319,7 @@ class Forecast:
             >>> print(f"Most recent forecast: {init_times[0]}")
             >>> print(f"Total forecasts available: {len(init_times)}")
         """
-        if not self._model_meta.is_jua_model:
+        if not self._model_meta.has_forecast_file_access:
             logger.warning(
                 f"Model {self._model_name} only supports loading the latest forecast"
             )
@@ -379,6 +383,7 @@ class Forecast:
         min_lead_time: int = 0,
         max_lead_time: int = 0,
         variables: list[str] | list[Variables] | None = None,
+        statistics: list[str] | list[Statistics] | None = None,
     ) -> ForecastData:
         """Send a forecast request to the API.
 
@@ -391,12 +396,18 @@ class Forecast:
             min_lead_time: Minimum lead time in hours
             max_lead_time: Maximum lead time in hours
             variables: List of weather variables to retrieve
+            statistics: List of statistics to retrieve
 
         Returns:
             Forecast data response from the API
         """
         if variables is not None:
             variables = self._rename_variables_for_api(variables)
+
+        if statistics is not None:
+            statistics = [
+                s.key if (isinstance(s, Statistics)) else s for s in statistics
+            ]
 
         if init_time == "latest":
             return self._api.get_latest_forecast(
@@ -406,6 +417,7 @@ class Forecast:
                     min_lead_time=min_lead_time,
                     max_lead_time=max_lead_time,
                     variables=variables,
+                    ensemble_stats=statistics,
                 ),
             )
 
@@ -417,6 +429,7 @@ class Forecast:
                 min_lead_time=min_lead_time,
                 max_lead_time=max_lead_time,
                 variables=variables,
+                ensemble_stats=statistics,
             ),
         )
 
@@ -428,7 +441,9 @@ class Forecast:
         prediction_timedelta: PredictionTimeDelta = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
+        points: list[LatLon] | None = None,
         method: str | None = None,
+        lazy_load: bool = False,
     ):
         """Retrieve forecast data using the appropriate data adapter.
 
@@ -469,7 +484,9 @@ class Forecast:
             prediction_timedelta=prediction_timedelta,
             latitude=latitude,
             longitude=longitude,
+            points=points,
             method=method,
+            lazy_load=lazy_load,
         )
 
     def _can_be_dispatched_to_api(
@@ -487,7 +504,7 @@ class Forecast:
 
         Constraints include:
         - Forecast age (must be recent, less than 36 hours)
-        - Number of points (limited to _MAX_point_FOR_API)
+        - Number of points (limited to _MAX_POINT_FOR_API)
         - Query structure (slices not supported)
         - Lead time structure (complex lead time slicing not supported)
 
@@ -497,6 +514,7 @@ class Forecast:
             latitude: Latitude selection (point, list, or slice)
             longitude: Longitude selection (point, list, or slice)
             points: List of geographic points to get forecasts for
+            statistics: List of statistics to retrieve
 
         Returns:
             True if the request can be dispatched to the API, False otherwise
@@ -537,7 +555,7 @@ class Forecast:
         if not self._is_latest_init_time(init_time) and len(points) > 1:
             return False
 
-        if len(points) > self._MAX_point_FOR_API:
+        if len(points) > self._MAX_POINT_FOR_API:
             return False
 
         if prediction_timedelta is not None:
@@ -646,32 +664,12 @@ class Forecast:
         max_lead_time = max_lead_time or 480
         return slice(min_lead_time, max_lead_time)
 
-    def _get_spatial_selection_for_adapter(
-        self,
-        latitude: SpatialSelection | None,
-        longitude: SpatialSelection | None,
-        points: list[LatLon] | None,
-    ) -> tuple[SpatialSelection | None, SpatialSelection | None]:
-        """Convert point-based selection to latitude/longitude selection.
-
-        This internal method converts from points to separate latitude and longitude
-        selections for use with data adapters.
-
-        Args:
-            latitude: Existing latitude selection
-            longitude: Existing longitude selection
-            points: Points to convert to lat/lon selection
-
-        Returns:
-            Tuple of (latitude_selection, longitude_selection)
-        """
-        if points is None:
-            return latitude, longitude
-        lats, lons = zip(*[(p.lat, p.lon) for p in points])
-        return list(lats), list(lons)
-
     def _open_dataset(
-        self, url: str | list[str], print_progress: bool | None = None, **kwargs
+        self,
+        url: str | list[str],
+        print_progress: bool | None = None,
+        lazy_load: bool = False,
+        **kwargs,
     ) -> xr.Dataset:
         """Open a dataset from a URL or list of URLs.
 
@@ -686,20 +684,30 @@ class Forecast:
         Returns:
             Opened xarray Dataset
         """
-        model_meta = get_model_meta_info(self._model)
-
+        if isinstance(url, str):
+            url = [url]
+        dataset_configs = [
+            DatasetConfig(
+                path=u,
+            )
+            for u in url
+        ]
         return open_dataset(
             self._client,
-            url,
+            dataset_config=dataset_configs,
             should_print_progress=print_progress,
-            chunks=model_meta.forecast_chunks,
+            compute=not lazy_load,
             **kwargs,
         )
 
     def _v3_data_adapter(
-        self, init_time: datetime, print_progress: bool | None = None, **kwargs
+        self,
+        init_time: datetime,
+        print_progress: bool | None = None,
+        lazy_load: bool = False,
+        **kwargs,
     ) -> JuaDataset:
-        """Adapter for EPT2 (and similar) forecast data access.
+        """Adapter for EPT1.5, EPT2 (and similar) forecast data access.
 
         This internal adapter handles retrieving data for models that use
         the v3 Zarr storage format (a single consolidated Zarr store).
@@ -718,79 +726,8 @@ class Forecast:
         dataset_name = f"{init_time_str}"
         data_url = f"{data_base_url}/forecasts/{model_name}/{dataset_name}.zarr"
 
-        raw_data = self._open_dataset(data_url, print_progress=print_progress, **kwargs)
-        return JuaDataset(
-            settings=self._client.settings,
-            dataset_name=dataset_name,
-            raw_data=raw_data,
-            model=self._model,
-        )
-
-    def _v2_data_adapter(
-        self,
-        init_time: datetime,
-        print_progress: bool | None = None,
-        **kwargs,
-    ) -> JuaDataset:
-        """Adapter for EPT1.5 (and similar) forecast data access.
-
-        This internal adapter handles retrieving data for models that use
-        the v2 Zarr storage format (separate Zarr stores for each lead time).
-
-        Args:
-            init_time: Forecast initialization time
-            print_progress: Whether to display a progress bar
-            **kwargs: Additional selection parameters including:
-                - prediction_timedelta: Time period to include
-                - latitude/longitude: Spatial selection
-                - method: Interpolation method
-
-        Returns:
-            JuaDataset containing the requested forecast data
-        """
-        data_base_url = self._client.settings.data_base_url
-        model_name = get_model_meta_info(self._model).forecast_name_mapping
-        init_time_str = init_time.strftime("%Y%m%d%H")
-        # This is a bit hacky:
-        # For EPT1.5, get_metadata will result in an error
-        # if the forecast is no longer in cache.
-        # For now, we try and if it fails default to 480 hours
-        try:
-            maybe_metadata = self.get_metadata(init_time=init_time)
-            if maybe_metadata is None:
-                max_available_hours = 480
-            else:
-                max_available_hours = maybe_metadata.available_forecasted_hours
-        except Exception:
-            max_available_hours = 480
-
-        hours_to_load = list(range(max_available_hours + 1))
-        prediction_timedelta = kwargs.get("prediction_timedelta", None)
-        if prediction_timedelta is not None:
-            if isinstance(prediction_timedelta, list):
-                hours_to_load = [timedelta_to_hours(td) for td in prediction_timedelta]
-
-            elif isinstance(prediction_timedelta, slice):
-                hours_to_load = list(
-                    range(
-                        timedelta_to_hours(prediction_timedelta.start),
-                        timedelta_to_hours(prediction_timedelta.stop),
-                        timedelta_to_hours(prediction_timedelta.step or 1),
-                    )
-                )
-            else:
-                hours_to_load = [timedelta_to_hours(prediction_timedelta)]
-
-            # Already handled above, remove from kwargs
-            del kwargs["prediction_timedelta"]
-
-        zarr_urls = [
-            f"{data_base_url}/forecasts/{model_name}/{init_time_str}/{hour}.zarr"
-            for hour in hours_to_load
-        ]
-        dataset_name = f"{init_time_str}"
         raw_data = self._open_dataset(
-            zarr_urls, print_progress=print_progress, **kwargs
+            data_url, print_progress=print_progress, lazy_load=lazy_load, **kwargs
         )
         return JuaDataset(
             settings=self._client.settings,
