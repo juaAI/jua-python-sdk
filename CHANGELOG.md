@@ -1,3 +1,9 @@
+## v0.14.1 (2025-09-01)
+
+### Fix
+
+- patched latitude selection when a single latitude is returned fails as no len()
+
 ## v0.14.0 (2025-08-22)
 
 ### Feat
