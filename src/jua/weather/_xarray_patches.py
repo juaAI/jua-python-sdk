@@ -230,6 +230,7 @@ def _patched_sel(
     # ordered from North to South
     if (
         "latitude" in self.coords
+        and self.latitude.values.ndim > 0
         and len(self.latitude.values) > 1
         and isinstance(latitude, slice)
     ):
