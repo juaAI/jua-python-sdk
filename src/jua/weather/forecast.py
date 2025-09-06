@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import UTC, datetime
 
 import xarray as xr
 from pydantic import validate_call
@@ -51,7 +51,7 @@ class Forecast:
         ... )
     """
 
-    _MAX_INIT_TIME_PAST_FOR_API_H = 36
+    _MIN_INIT_TIME_PAST_FOR_API = datetime(2025, 8, 15, 0, tzinfo=UTC)
     _MAX_POINT_FOR_API = 1000
 
     def __init__(self, client: JuaClient, model: Models):
@@ -528,15 +528,8 @@ class Forecast:
                 raise ValueError("No metadata found for model")
             init_time = metadata.init_time
 
-        init_time_dt = to_datetime(init_time)
-        # Make now timezone-aware if init_time is timezone-aware
-        now = (
-            datetime.now(init_time_dt.tzinfo) if init_time_dt.tzinfo else datetime.now()
-        )
-
-        if (
-            now - init_time_dt
-        ).total_seconds() > self._MAX_INIT_TIME_PAST_FOR_API_H * 3600:
+        init_time_dt = to_datetime(init_time).replace(tzinfo=UTC)
+        if init_time_dt < self._MIN_INIT_TIME_PAST_FOR_API:
             return False
 
         if points is None and (latitude is None or longitude is None):
