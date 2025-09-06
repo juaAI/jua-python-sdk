@@ -1,3 +1,10 @@
+## v0.14.2 (2025-09-06)
+
+### Fix
+
+- comparing offset-naive and offset-aware datetimes
+- dispatching points to api for past data
+
 ## v0.14.1 (2025-09-01)
 
 ### Fix
