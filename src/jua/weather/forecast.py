@@ -528,7 +528,7 @@ class Forecast:
                 raise ValueError("No metadata found for model")
             init_time = metadata.init_time
 
-        init_time_dt = to_datetime(init_time)
+        init_time_dt = to_datetime(init_time).replace(tzinfo=UTC)
         if init_time_dt < self._MIN_INIT_TIME_PAST_FOR_API:
             return False
 
