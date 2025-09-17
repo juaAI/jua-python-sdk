@@ -51,7 +51,6 @@ class Forecast:
         ... )
     """
 
-    _MAX_INIT_TIME_PAST_FOR_API_H = 36
     _MAX_POINT_FOR_API = 1000
 
     def __init__(self, client: JuaClient, model: Models):
@@ -503,7 +502,7 @@ class Forecast:
         This method checks if the request falls within those limitations.
 
         Constraints include:
-        - Forecast age (must be recent, less than 36 hours)
+        - Forecast age (must be recent, threshold varies by model)
         - Number of points (limited to _MAX_POINT_FOR_API)
         - Query structure (slices not supported)
         - Lead time structure (complex lead time slicing not supported)
@@ -536,7 +535,7 @@ class Forecast:
 
         if (
             now - init_time_dt
-        ).total_seconds() > self._MAX_INIT_TIME_PAST_FOR_API_H * 3600:
+        ).total_seconds() > self._model_meta.get_api_threshold_hours() * 3600:
             return False
 
         if points is None and (latitude is None or longitude is None):
