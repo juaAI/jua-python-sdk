@@ -1,3 +1,9 @@
+## v0.14.3 (2025-09-24)
+
+### Fix
+
+- fixes access to fdir and dew point variables through the sdk
+
 ## v0.14.2 (2025-09-06)
 
 ### Fix
