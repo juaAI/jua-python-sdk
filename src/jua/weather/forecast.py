@@ -77,6 +77,9 @@ class Forecast:
             Models.EPT1_5: self._v3_data_adapter,
             Models.EPT1_5_EARLY: self._v3_data_adapter,
         }
+        self._MODEL_DATA_AVAILABILITY = {
+            Models.EPT2: datetime(2024, 3, 31, 0, tzinfo=UTC),
+        }
 
     def is_global_data_available(self) -> bool:
         """Check if global data access is available for this model.
@@ -532,7 +535,9 @@ class Forecast:
             init_time = metadata.init_time
 
         init_time_dt = to_datetime(init_time).replace(tzinfo=UTC)
-        if init_time_dt < self._MIN_INIT_TIME_PAST_FOR_API:
+        if init_time_dt < self._MODEL_DATA_AVAILABILITY.get(
+            self._model, self._MIN_INIT_TIME_PAST_FOR_API
+        ):
             return False
 
         if points is None and (latitude is None or longitude is None):
