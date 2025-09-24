@@ -283,19 +283,6 @@ _RENAMING_DICT = {
     },
 }
 
-_RENAME_TO_EPT2_DICT = {
-    **{
-        v.value.emcwf_code: v.value.name_ept2
-        for v in Variables
-        if v.value.emcwf_code is not None
-    },
-    **{
-        v.value.name: v.value.name_ept2
-        for v in Variables
-        if v.value.name_ept2 is not None
-    },
-}
-
 
 def rename_variable(variable: str) -> str:
     """Convert variable names from model-specific formats to standardized names.
@@ -307,18 +294,6 @@ def rename_variable(variable: str) -> str:
         The standardized variable name if recognized, otherwise the original name.
     """
     return _RENAMING_DICT.get(variable, variable)
-
-
-def rename_to_ept2(variable: str | Variables) -> str:
-    """Convert variable names from model-specific formats to EPT2 names.
-
-    Args:
-        variable: The source variable name to convert.
-
-    Returns:
-        The EPT2 variable name if recognized, otherwise the original name.
-    """
-    return _RENAME_TO_EPT2_DICT.get(str(variable), str(variable))  # type: ignore
 
 
 def rename_variables(ds: xr.Dataset) -> xr.Dataset:
