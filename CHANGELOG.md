@@ -1,3 +1,9 @@
+## v0.14.4 (2025-09-24)
+
+### Fix
+
+- makes ept2 forecasts available back to 2024-04-01
+
 ## v0.14.3 (2025-09-24)
 
 ### Fix
