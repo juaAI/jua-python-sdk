@@ -17,7 +17,7 @@ from jua.weather._types.forecast import ForecastData
 from jua.weather.conversions import timedelta_to_hours, to_datetime
 from jua.weather.models import Models
 from jua.weather.statistics import Statistics
-from jua.weather.variables import Variables, rename_to_ept2
+from jua.weather.variables import Variables, rename_variable
 
 logger = get_logger(__name__)
 
@@ -374,7 +374,10 @@ class Forecast:
         Returns:
             List of variable names formatted for API requests
         """
-        return [rename_to_ept2(v) for v in variables]
+        return [
+            rename_variable(v.name) if isinstance(v, Variables) else rename_variable(v)
+            for v in variables
+        ]
 
     def _dispatch_to_api(
         self,
