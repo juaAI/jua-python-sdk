@@ -151,7 +151,17 @@ _MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
     has_statistics=True,
 )
 _MODEL_META_INFO[Models.ECMWF_IFS_SINGLE] = ModelMetaInfo(
-    has_forecast_file_access=False,
+    has_forecast_file_access=True,
+    full_forecasted_hours=360,
+    num_lats=2160,
+    num_lons=4320,
+    temporal_resolution=TemporalResolution(
+        base=6,
+        special=(
+            (1, 0, 90),
+            (3, 90, 144),
+        ),
+    ),
 )
 
 

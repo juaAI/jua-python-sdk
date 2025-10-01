@@ -22,7 +22,7 @@ class Models(str, Enum):
     EPT2 = "ept2"
     EPT2_EARLY = "ept2_early"
     EPT2_RR = "ept2-rr"
-    ECMWF_IFS_SINGLE = "ecmwf_ifs025_single"
+    ECMWF_IFS_SINGLE = "ecmwf_ifs_single"
     ECMWF_IFS_ENSEMBLE = "ecmwf_ifs025_ensemble"
     ECMWF_AIFS_SINGLE = "ecmwf_aifs025_single"
     ECMWF_AIFS_ENSEMBLE = "ecmwf_aifs025_ensemble"
