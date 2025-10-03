@@ -13,12 +13,15 @@ class JuaClient:
     Attributes:
         settings: Configuration settings for the API client.
         weather: Property that provides access to weather data services.
+        market_aggregates: Property that provides access to market aggregate services.
 
     Examples:
         >>> from jua import JuaClient
         >>> client = JuaClient()
         >>> # Access weather services
         >>> forecast_model = client.weather.get_model(...)
+        >>> # Access market aggregates
+        >>> market_data = client.market_aggregates.compare_runs(...)
     """
 
     @validate_call
@@ -35,6 +38,7 @@ class JuaClient:
         """
         self.settings = settings
         self._weather = None
+        self._market_aggregates = None
 
         if jua_log_level is not None:
             logging.getLogger("jua").setLevel(jua_log_level)
@@ -51,6 +55,19 @@ class JuaClient:
 
             self._weather = Weather(self)
         return self._weather
+
+    @property
+    def market_aggregates(self):
+        """Access to Jua's market aggregate data services.
+
+        Returns:
+            MarketAggregates client interface for querying market aggregate data.
+        """
+        if self._market_aggregates is None:
+            from jua.market_aggregates import MarketAggregates
+
+            self._market_aggregates = MarketAggregates(self)
+        return self._market_aggregates
 
     def __enter__(self):
         return self
