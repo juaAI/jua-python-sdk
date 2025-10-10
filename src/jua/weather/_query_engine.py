@@ -125,8 +125,10 @@ class QueryEngine:
 
         data = remove_none_from_dict(payload.model_dump())
         if model == Models.EPT2_E:
-            data["aggregation"] = ["avg", "min", "max"]
+            data["aggregation"] = ["avg"]
             data["models"] = ["ept2_e"]
+        if model == Models.EPT2_RR:
+            data["models"] = ["ept2_rr"]
 
         response = self._api.post(
             self._FORECAST_ENDPOINT,
@@ -178,6 +180,13 @@ class QueryEngine:
 
         # Convert the DataFrame to a Dataset
         ds = xr.Dataset.from_dataframe(df)
+
+        # Rename data variables
+        rename_dict = {
+            var: var.replace("avg__", "") for var in ds.data_vars if "avg__" in var
+        }
+        if rename_dict:
+            ds = ds.rename(rename_dict)
 
         # Set the correct init_time encoding
         ds.init_time.encoding = {
