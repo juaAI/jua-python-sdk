@@ -94,7 +94,8 @@ class Model:
         points: list[LatLon] | LatLon | None = None,
         min_lead_time: int | None = None,
         max_lead_time: int | None = None,
-        method: Literal["nearest", "bilinear"] = "nearest",
+        method: Literal["nearest", "bilinear"] = "bilinear",
+        stream: bool | None = None,
         print_progress: bool | None = None,
     ) -> JuaDataset:
         """Retrieve forecasts for this model.
@@ -147,6 +148,11 @@ class Model:
             method: Interpolation method for selecting points:
                 - "nearest": Use nearest grid point (default).
                 - "bilinear": Bilinear interpolation to the selected point.
+
+            stream: Whether to stream the response content. Recommended when querying
+                slices or large amounts of data. Default is set to False for points,
+                and True for grid slices. Streaming does not support method="bilinear"
+                when requesting points.
 
             print_progress: Whether to display a progress bar during data loading.
                 If None, uses the client's default setting.
@@ -215,6 +221,7 @@ class Model:
             longitude=longitude,
             points=points,
             method=method,
+            stream=stream,
             print_progress=print_progress,
         )
         return JuaDataset(
