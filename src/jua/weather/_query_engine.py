@@ -136,6 +136,9 @@ class QueryEngine:
             stream=stream,
         )
         df = process_arrow_streaming_response(response, print_progress)
+        if df.empty:
+            raise ValueError("No data available for the given parameters.")
+
         return self._transform_dataframe(df)
 
     def _transform_dataframe(self, df: pd.DataFrame) -> xr.Dataset:
