@@ -177,24 +177,21 @@ class Variables(Enum):
     NORTHWARD_WIND_AT_HEIGHT_LEVEL_100M = Variable(
         "northward_wind_at_height_level_100m", "m s⁻¹", None, "northward_wind_100m"
     )
-
-    HIGH_TYPE_CLOUD_AREA_FRACTION = Variable(
-        "high_type_cloud_area_fraction", "[0,1]", "hcc", None
-    )
-
-    MEDIUM_TYPE_CLOUD_AREA_FRACTION = Variable(
-        "medium_type_cloud_area_fraction", "[0,1]", "mcc", None
-    )
-
-    LOW_TYPE_CLOUD_AREA_FRACTION = Variable(
-        "low_type_cloud_area_fraction", "[0,1]", "lcc", None
-    )
     PRECIPITATION_AMOUNT_SUM_1H = Variable(
         "precipitation_amount_sum_1h", "mm m⁻2", "tp", "precipitation_amount"
     )
 
     CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE = Variable(
         "cloud_area_fraction_at_entire_atmosphere", "[0,1]", "tcc", None
+    )
+    CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE_HIGH_TYPE = Variable(
+        "cloud_area_fraction_at_entire_atmosphere_high_type", "[0,1]", "hcc", None
+    )
+    CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE_LOW_TYPE = Variable(
+        "cloud_area_fraction_at_entire_atmosphere_low_type", "[0,1]", "lcc", None
+    )
+    CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE_MEDIUM_TYPE = Variable(
+        "cloud_area_fraction_at_entire_atmosphere_medium_type", "[0,1]", "mcc", None
     )
 
     @property
