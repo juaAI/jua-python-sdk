@@ -1,3 +1,9 @@
+## v0.14.5 (2025-10-17)
+
+### Fix
+
+- update model names to use underscores
+
 ## v0.14.4 (2025-09-24)
 
 ### Fix
