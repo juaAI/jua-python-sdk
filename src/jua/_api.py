@@ -67,7 +67,7 @@ class API:
         if response.ok:
             return
 
-        # Throw not authenticated error
+        # Check if the request exceed the maximum number of credits
         if response.status_code == 400:
             try:
                 content = response.json()
@@ -78,6 +78,7 @@ class API:
             except JSONDecodeError:
                 pass
 
+        # Throw not authenticated error
         if response.status_code == 401:
             raise NotAuthenticatedError(response.status_code)
 
