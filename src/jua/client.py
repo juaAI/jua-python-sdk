@@ -28,6 +28,7 @@ class JuaClient:
     def __init__(
         self,
         settings: JuaSettings = JuaSettings(),
+        request_credit_limit: int | None = None,
         jua_log_level: int | None = None,
     ):
         """Initialize a new Jua client.
@@ -35,8 +36,12 @@ class JuaClient:
         Args:
             settings: Optional configuration settings. If not provided,
                 default settings will be used.
+            request_credit_limit: Sets the maximum number of credits that can be
+                consumed by a single request. If None, the default maximum is
+                used.
         """
         self.settings = settings
+        self.request_credit_limit = request_credit_limit
         self._weather = None
         self._market_aggregates = None
 

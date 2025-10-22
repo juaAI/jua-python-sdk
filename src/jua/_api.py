@@ -1,11 +1,13 @@
 import importlib.metadata
 
 import requests  # type: ignore[import-untyped]
+from requests import JSONDecodeError
 
 from jua.client import JuaClient
 from jua.errors.api_errors import (
     NotAuthenticatedError,
     NotFoundError,
+    RequestExceedsCreditLimitError,
     UnauthorizedError,
 )
 from jua.errors.jua_error import JuaError
@@ -66,6 +68,16 @@ class API:
             return
 
         # Throw not authenticated error
+        if response.status_code == 400:
+            try:
+                content = response.json()
+                if "Request credit requirement exceeds limit. " in content.get(
+                    "detail", ""
+                ):
+                    raise RequestExceedsCreditLimitError(content["detail"])
+            except JSONDecodeError:
+                pass
+
         if response.status_code == 401:
             raise NotAuthenticatedError(response.status_code)
 
