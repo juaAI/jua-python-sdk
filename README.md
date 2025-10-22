@@ -46,9 +46,7 @@ client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5)
 zurich = LatLon(lat=47.3769, lon=8.5417)
 # Get latest forecast
-forecast = model.forecast.get_forecast(
-    points=[zurich]
-)
+forecast = model.get_forecasts(points=[zurich])
 temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
 temp_data.to_celcius().to_absolute_time().plot()
 plt.show()
@@ -61,68 +59,46 @@ plt.show()
 
 </details>
 
-### Plot global forecast with 10-hour lead time
-
-Generate a global wind speed visualization:
-
-```python
-import matplotlib.pyplot as plt
-from jua import JuaClient
-from jua.weather import Models, Variables
-
-client = JuaClient()
-model = client.weather.get_model(Models.EPT1_5)
-
-lead_time = 10 # hours
-dataset = model.forecast.get_forecast(
-    prediction_timedelta=lead_time,
-    variables=[
-        Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
-    ],
-)
-dataset[Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M].plot()
-plt.show()
-```
-
-<details>
-<summary>Show output</summary>
-
-![Global Windspeed 10h](content/readme/global_windspeed_10h.png)
-
-</details>
-
 ### Access historical weather data
 
-Retrieve and visualize temperature data for Europe from a specific date:
+Historical data can be accessed in the same way. In this case, we get all EPT2 forecasts from January 2024, and plot the first 5 together.
 
 ```python
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 from jua import JuaClient
 from jua.weather import Models, Variables
 
 client = JuaClient()
-model = client.weather.get_model(Models.EPT1_5_EARLY)
-
-init_time = "2024-02-01 06:00:00"
-hindcast = model.hindcast.get_hindcast(
+zurich = LatLon(lat=47.3769, lon=8.5417)
+model = client.weather.get_model(Models.EPT2)
+hindcast = model.get_forecasts(
+    init_time=slice(
+        datetime(2024, 1, 1, 0),
+        datetime(2024, 1, 31, 0),
+    ),
+    points=[zurich],
+    min_lead_time=0,
+    max_lead_time=(5 * 24),
     variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
-    init_time=init_time,
-    prediction_timedelta=0,
-    # Select Europe
-    latitude=slice(71, 36),
-    longitude=slice(-15, 50),
     method="nearest",
 )
-
 data = hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-data.plot()
+
+# Compare the first 5 runs of January
+fig, ax = plt.subplots(figsize=(15, 8))
+for i in range(5):
+    forecast_data = data.isel(init_time=i, points=0).to_celcius().to_absolute_time()
+    forecast_data.plot(ax=ax, label=forecast_data.init_time.values)
+plt.legend()
 plt.show()
 ```
 
 <details>
 <summary>Show output</summary>
 
-![Europe Hindcast](content/readme/hindcast_europe.png)
+![Europe Hindcast](content/readme/hindcast_zurich.png)
 
 </details>
 
