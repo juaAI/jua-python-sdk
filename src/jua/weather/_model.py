@@ -6,7 +6,6 @@ from pydantic import validate_call
 from jua.client import JuaClient
 from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
 from jua.weather import JuaDataset
-from jua.weather._model_meta import get_model_meta_info
 from jua.weather._query_engine import QueryEngine
 from jua.weather.forecast import Forecast
 from jua.weather.hindcast import Hindcast
@@ -190,13 +189,6 @@ class Model:
             ...     max_lead_time=24,
             ... )
         """
-        model_meta = get_model_meta_info(self._model)
-        if not model_meta.has_forecast_file_access:
-            raise ValueError(
-                f"There is no access to full slices with {self._model} - use the "
-                "existing model.forecast.get_forecast(...) method"
-            )
-
         if variables is None:
             variables = [Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M.name]
         else:

@@ -11,6 +11,7 @@ from jua._api import QueryEngineAPI
 from jua._utils.remove_none_from_dict import remove_none_from_dict
 from jua.client import JuaClient
 from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
+from jua.weather._model_meta import get_model_meta_info
 from jua.weather._stream import process_arrow_streaming_response
 from jua.weather._types.forecast import ForecastData
 from jua.weather._types.query_payload_types import (
@@ -105,6 +106,13 @@ class QueryEngine:
             ValueError: If the location parameters are invalid.
         """
         geo = build_geo_filter(latitude, longitude, points, method)
+        model_meta = get_model_meta_info(model)
+        if not model_meta.has_grid_access and geo.type != "point":
+            raise ValueError(
+                f"There is no access to full slices with {model} - use the "
+                "existing model.forecast.get_forecast(...) method"
+            )
+
         if stream is None:
             stream = geo.type != "point"
 
@@ -245,6 +253,10 @@ class QueryEngine:
         }
         if rename_dict:
             ds = ds.rename(rename_dict)
+
+        # Set the dtype for all data_vars to float32
+        for var in ds.data_vars:
+            ds[var] = ds[var].astype("float32")
 
         # Set the correct init_time encoding
         ds.init_time.encoding = {

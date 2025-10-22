@@ -75,6 +75,7 @@ class ModelMetaInfo:
     forecast_name_mapping: str | None = None
     full_forecasted_hours: int | None = None
     has_forecast_file_access: bool = False
+    has_grid_access: bool = False
     has_statistics: bool = False
     num_lats: int = 720
     num_lons: int = 1440
@@ -84,31 +85,8 @@ class ModelMetaInfo:
 
 
 _MODEL_META_INFO = defaultdict(ModelMetaInfo)
-_MODEL_META_INFO[Models.EPT2] = ModelMetaInfo(
-    forecast_name_mapping="ept-2",
-    full_forecasted_hours=480,
-    has_forecast_file_access=True,
-    num_lats=2160,
-    num_lons=4320,
-    temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
-)
-_MODEL_META_INFO[Models.EPT2_RR] = ModelMetaInfo(
-    forecast_name_mapping="ept-2-rr",
-    full_forecasted_hours=48,
-    has_forecast_file_access=True,
-    forecasts_per_day=24,
-    temporal_resolution=TemporalResolution(base=1),
-)
-_MODEL_META_INFO[Models.EPT2_HRRR] = ModelMetaInfo(
-    forecast_name_mapping="ept-2-hrrr",
-    full_forecasted_hours=48,
-    has_forecast_file_access=True,
-    num_lats=3600,
-    num_lons=7200,
-    forecasts_per_day=24,
-    temporal_resolution=TemporalResolution(base=1),
-)
 _MODEL_META_INFO[Models.EPT1_5] = ModelMetaInfo(
+    has_grid_access=True,
     forecast_name_mapping="ept-1.5-b",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
@@ -118,6 +96,7 @@ _MODEL_META_INFO[Models.EPT1_5] = ModelMetaInfo(
     temporal_resolution=TemporalResolution(base=1),
 )
 _MODEL_META_INFO[Models.EPT1_5_EARLY] = ModelMetaInfo(
+    has_grid_access=True,
     forecast_name_mapping="ept-1.5-early-b",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
@@ -126,7 +105,25 @@ _MODEL_META_INFO[Models.EPT1_5_EARLY] = ModelMetaInfo(
     has_both_poles=True,
     temporal_resolution=TemporalResolution(base=1),
 )
+_MODEL_META_INFO[Models.EPT2] = ModelMetaInfo(
+    has_grid_access=True,
+    forecast_name_mapping="ept-2",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+    num_lats=2160,
+    num_lons=4320,
+    temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
+)
+_MODEL_META_INFO[Models.EPT2_E] = ModelMetaInfo(
+    has_grid_access=True,
+    forecast_name_mapping="ept2-e",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+    has_statistics=True,
+    temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
+)
 _MODEL_META_INFO[Models.EPT2_EARLY] = ModelMetaInfo(
+    has_grid_access=True,
     forecast_name_mapping="ept-2-early",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
@@ -134,33 +131,38 @@ _MODEL_META_INFO[Models.EPT2_EARLY] = ModelMetaInfo(
     num_lons=2880,
     temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
 )
+_MODEL_META_INFO[Models.EPT2_HRRR] = ModelMetaInfo(
+    has_grid_access=True,
+    full_forecasted_hours=48,
+    num_lats=3600,
+    num_lons=7200,
+    forecasts_per_day=24,
+    temporal_resolution=TemporalResolution(base=1),
+)
+_MODEL_META_INFO[Models.EPT2_RR] = ModelMetaInfo(
+    has_grid_access=True,
+    forecast_name_mapping="ept-2-rr",
+    full_forecasted_hours=48,
+    has_forecast_file_access=True,
+    forecasts_per_day=24,
+    temporal_resolution=TemporalResolution(base=1),
+)
+_MODEL_META_INFO[Models.AIFS] = ModelMetaInfo(
+    has_grid_access=True,
+    forecast_name_mapping="aifs",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+)
 _MODEL_META_INFO[Models.AURORA] = ModelMetaInfo(
+    has_grid_access=True,
     forecast_name_mapping="aurora",
     full_forecasted_hours=480,
     has_forecast_file_access=True,
     num_lats=2160,
     num_lons=4320,
 )
-_MODEL_META_INFO[Models.AIFS] = ModelMetaInfo(
-    forecast_name_mapping="aifs",
-    full_forecasted_hours=480,
-    has_forecast_file_access=True,
-)
-_MODEL_META_INFO[Models.EPT2_E] = ModelMetaInfo(
-    forecast_name_mapping="ept2-e",
-    full_forecasted_hours=480,
-    has_forecast_file_access=True,
-    has_statistics=True,
-    temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
-)
-_MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
-    forecast_name_mapping="ecmwf_aifs025_ensemble",
-    full_forecasted_hours=360,
-    has_forecast_file_access=False,
-    has_statistics=True,
-)
 _MODEL_META_INFO[Models.ECMWF_IFS_SINGLE] = ModelMetaInfo(
-    has_forecast_file_access=True,
+    has_grid_access=True,
     full_forecasted_hours=360,
     num_lats=2160,
     num_lons=4320,
@@ -171,6 +173,12 @@ _MODEL_META_INFO[Models.ECMWF_IFS_SINGLE] = ModelMetaInfo(
             (3, 90, 144),
         ),
     ),
+)
+_MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
+    forecast_name_mapping="ecmwf_aifs025_ensemble",
+    full_forecasted_hours=360,
+    has_forecast_file_access=False,
+    has_statistics=True,
 )
 
 
