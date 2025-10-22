@@ -54,7 +54,7 @@ class QueryEngine:
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
         points: list[LatLon] | LatLon | None = None,
-        method: Literal["nearest", "bilinear"] = "bilinear",
+        method: Literal["nearest", "bilinear"] = "nearest",
         stream: bool | None = None,
         print_progress: bool | None = None,
     ) -> ForecastData:
@@ -133,14 +133,17 @@ class QueryEngine:
         data = remove_none_from_dict(payload.model_dump())
         if model == Models.EPT2_E:
             data["aggregation"] = ["avg"]
-            data["models"] = ["ept2_e"]
-        if model == Models.EPT2_RR:
-            data["models"] = ["ept2_rr"]
+
+        query_params = {"format": "arrow", "stream": str(stream).lower()}
+        if self._jua_client.request_credit_limit is not None:
+            query_params["request_credit_limit"] = str(
+                self._jua_client.request_credit_limit
+            )
 
         response = self._api.post(
             self._FORECAST_ENDPOINT,
             data=data,
-            query_params={"format": "arrow", "stream": str(stream).lower()},
+            query_params=query_params,
             extra_headers={"Accept": "*/*", "Accept-Encoding": "identity"},
             stream=stream,
         )

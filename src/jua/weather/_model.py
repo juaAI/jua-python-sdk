@@ -94,7 +94,7 @@ class Model:
         points: list[LatLon] | LatLon | None = None,
         min_lead_time: int | None = None,
         max_lead_time: int | None = None,
-        method: Literal["nearest", "bilinear"] = "bilinear",
+        method: Literal["nearest", "bilinear"] = "nearest",
         stream: bool | None = None,
         print_progress: bool | None = None,
     ) -> JuaDataset:
@@ -206,9 +206,9 @@ class Model:
 
         if prediction_timedelta is None:
             if min_lead_time is not None and max_lead_time is not None:
-                prediction_timedelta = slice(start=min_lead_time, stop=max_lead_time)  # type: ignore
+                prediction_timedelta = slice(min_lead_time, max_lead_time)  # type: ignore
             elif min_lead_time is not None:
-                prediction_timedelta = slice(start=min_lead_time, stop=60 * 24)  # type: ignore
+                prediction_timedelta = slice(min_lead_time, 60 * 24)  # type: ignore
             elif max_lead_time is not None:
                 prediction_timedelta = slice(0, max_lead_time)
 

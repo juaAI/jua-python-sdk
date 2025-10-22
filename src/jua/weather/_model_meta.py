@@ -96,7 +96,16 @@ _MODEL_META_INFO[Models.EPT2_RR] = ModelMetaInfo(
     forecast_name_mapping="ept-2-rr",
     full_forecasted_hours=48,
     has_forecast_file_access=True,
-    forecasts_per_day=48,
+    forecasts_per_day=24,
+    temporal_resolution=TemporalResolution(base=1),
+)
+_MODEL_META_INFO[Models.EPT2_HRRR] = ModelMetaInfo(
+    forecast_name_mapping="ept-2-hrrr",
+    full_forecasted_hours=48,
+    has_forecast_file_access=True,
+    num_lats=3600,
+    num_lons=7200,
+    forecasts_per_day=24,
     temporal_resolution=TemporalResolution(base=1),
 )
 _MODEL_META_INFO[Models.EPT1_5] = ModelMetaInfo(
