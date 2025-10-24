@@ -1,3 +1,4 @@
+import warnings
 from datetime import datetime
 from typing import Literal
 
@@ -423,6 +424,13 @@ class Model:
         Returns:
             Forecast instance configured for this model.
         """
+        warnings.warn(
+            "Accessing .forecast is deprecated and will be removed in a future release."
+            " Use model methods directly instead (e.g., model.get_forecasts()). "
+            "Check the docs for more information and examples: https://docs.jua.ai",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._forecast
 
     @property
@@ -432,6 +440,13 @@ class Model:
         Returns:
             Hindcast instance configured for this model.
         """
+        warnings.warn(
+            "Accessing .hindcast is deprecated and will be removed in a future release."
+            " Use model methods directly instead (e.g., model.get_forecasts()). "
+            "Check the docs for more information and examples: https://docs.jua.ai",
+            DeprecationWarning,
+            stacklevel=2,
+        )
         return self._hindcast
 
     def __repr__(self) -> str:
