@@ -338,27 +338,36 @@ class QueryEngine:
             point_mapping = {}
             if len(points) == len(returned_points):
                 point_mapping = {
-                    (lat, lon): point.label if point.label is not None else point.key
+                    (lat, lon): point
                     for (lat, lon), point in zip(returned_points, points)
                 }
             else:
                 point_mapping = {
-                    (lat, lon): LatLon(lat=lat, lon=lon).key
-                    for lat, lon in returned_points
+                    (lat, lon): LatLon(lat=lat, lon=lon) for lat, lon in returned_points
                 }
 
             df["points"] = df.apply(
-                lambda row: point_mapping[(row["latitude"], row["longitude"])], axis=1
+                lambda row: str(point_mapping[(row["latitude"], row["longitude"])]),
+                axis=1,
+            )
+            df["requested_lat"] = df.apply(
+                lambda row: point_mapping[(row["latitude"], row["longitude"])].lat,
+                axis=1,
+            )
+            df["requested_lon"] = df.apply(
+                lambda row: point_mapping[(row["latitude"], row["longitude"])].lon,
+                axis=1,
             )
 
             # Keep track of lat/lon for each point_id before dropping them
             point_coords = (
-                df[["points", "latitude", "longitude"]]
+                df[["points", "requested_lat", "requested_lon"]]
                 .drop_duplicates()
                 .set_index("points")
             )
 
-            df.drop(columns=["latitude", "longitude"], inplace=True)
+            cols_to_drop = ["latitude", "longitude", "requested_lat", "requested_lon"]
+            df.drop(cols_to_drop, inplace=True, axis=1)
             df.set_index(
                 ["points", "init_time", "prediction_timedelta"],
                 inplace=True,
@@ -368,8 +377,8 @@ class QueryEngine:
             ds = xr.Dataset.from_dataframe(df)
             ds = ds.assign_coords(
                 {
-                    "latitude": ("points", point_coords["latitude"].values),
-                    "longitude": ("points", point_coords["longitude"].values),
+                    "latitude": ("points", point_coords["requested_lat"].values),
+                    "longitude": ("points", point_coords["requested_lon"].values),
                 }
             )
         else:

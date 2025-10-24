@@ -15,10 +15,11 @@ def main():
     model = client.weather.get_model(Models.EPT1_5)
 
     # Query the second-to-last forecast for Zurich, Switzerland
-    # Note that only JUA's models support querying specific init times
-    second_to_last_init_time = model.forecast.get_available_init_times()[1]
+    # Note that only certain models
+    available = model.get_available_forecasts(limit=10)
+    second_to_last_init_time = available.forecasts[1].init_time
     print(f"Querying forecast for {second_to_last_init_time.isoformat()}")
-    forecast = model.forecast.get_forecast(
+    forecast = model.get_forecasts(
         init_time=second_to_last_init_time,
         latitude=47.3769,
         longitude=8.5417,
@@ -33,9 +34,8 @@ def main():
     # Let's compare Zurichs temperature to that of Cape Town
     zurich = LatLon(lat=47.3769, lon=8.5417, label="Zurich")
     cape_town = LatLon(lat=-33.9249, lon=18.4241, label="Cape Town")
-    forecast = model.forecast.get_forecast(
-        points=[zurich, cape_town],
-    )
+    forecast = model.get_forecasts(points=[zurich, cape_town], method="bilinear")
+
     # plot the temperature of the two points
     print(forecast.to_xarray())
     # jua.select_point allows us to use isel(points=0,1,2,...)
