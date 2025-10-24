@@ -20,6 +20,11 @@ from jua.weather._types.query_payload_types import (
     build_init_time_arg,
     build_prediction_timedelta,
 )
+from jua.weather._types.query_response_types import (
+    AvailableForecastsQueryResult,
+    LatestForecastInfoQueryResult,
+    MetaQueryResult,
+)
 from jua.weather.models import Models
 
 
@@ -44,6 +49,135 @@ class QueryEngine:
 
         # (30x30 HighRes grid), 1 month, 4 forecasts per day, 49 hours of forecast
         self._MAX_POINTS_PER_REQUEST = (361 * 361) * 31 * 4 * (2 * 24 + 1)
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_available_forecasts(
+        self,
+        model: Models,
+        since: datetime | None = None,
+        before: datetime | None = None,
+        limit: int = 20,
+        offset: int = 0,
+    ) -> AvailableForecastsQueryResult:
+        """Get available forecast initialization times for a model.
+
+        Args:
+            model: The model to query for available forecasts
+            since: Only return forecasts initialized on or after this datetime
+            before: Only return forecasts initialized before this datetime
+            limit: Maximum number of results to return per page
+            offset: Number of results to skip for pagination
+
+        Returns:
+            Query result containing available forecast times and pagination info.
+            The max_prediction_timedelta values are converted from minutes to hours.
+
+        Examples:
+            >>> api = QueryEngine(jua_client)
+            >>> result = api.get_available_forecasts(
+            ...     model=Models.EPT2,
+            ...     since=datetime(2025, 1, 1),
+            ...     limit=20
+            ... )
+            >>> for forecast in result.forecasts_per_model['ept2']:
+            ...     print(f"Init time: {forecast.init_time}")
+            ...     print(f"Max lead time: {forecast.max_prediction_timedelta} hours")
+        """
+        params = {
+            "models": [model.value],
+            "limit": limit,
+            "offset": offset,
+        }
+
+        if since is not None:
+            params["since"] = since.isoformat()
+
+        if before is not None:
+            params["before"] = before.isoformat()
+
+        response = self._api.get("forecast/available-forecasts", params=params)
+        result = AvailableForecastsQueryResult(**response.json())
+
+        # Convert max_prediction_timedelta from minutes to hours
+        for model_forecasts in result.forecasts_per_model.values():
+            for forecast_info in model_forecasts:
+                if forecast_info.max_prediction_timedelta is not None:
+                    forecast_info.max_prediction_timedelta = (
+                        forecast_info.max_prediction_timedelta // 60
+                    )
+
+        return result
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_latest_init_time(
+        self,
+        model: Models,
+        min_prediction_timedelta: int = 0,
+    ) -> LatestForecastInfoQueryResult:
+        """Get the latest available forecast initialization time for a model.
+
+        Args:
+            model: The model to query for latest forecast info
+            min_prediction_timedelta: Minimum required lead time in hours (default: 0)
+
+        Returns:
+            Query result containing the latest forecast initialization time and max
+            lead time.
+
+        Examples:
+            >>> api = QueryEngine(jua_client)
+            >>> result = api.get_latest_init_time(
+            >>>     model=Models.EPT2,
+            >>>     min_prediction_timedelta=48
+            >>> )
+            >>> latest = result.forecasts_per_model['ept2']
+            >>> print(f"Latest init time: {latest.init_time}")
+            >>> print(f"Max lead time: {latest.prediction_timedelta} hours")
+        """
+        # Convert hours to minutes for the API call
+        params = {
+            "models": [model.value],
+            "min_prediction_timedelta": min_prediction_timedelta * 60,
+        }
+
+        response = self._api.get("forecast/latest-init-time", params=params)
+        result = LatestForecastInfoQueryResult(**response.json())
+
+        # Convert prediction_timedelta from minutes to hours
+        for forecast_info in result.forecasts_per_model.values():
+            forecast_info.prediction_timedelta = (
+                forecast_info.prediction_timedelta // 60
+            )
+
+        return result
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_meta(
+        self,
+        model: Models,
+    ) -> MetaQueryResult:
+        """Get metadata for a forecast model including available variables and grid.
+
+        Args:
+            model: The model to query for metadata
+
+        Returns:
+            Query result containing model metadata including variables and grid
+
+        Examples:
+            >>> api = QueryEngine(jua_client)
+            >>> result = api.get_meta(model=Models.EPT2)
+            >>> model_info = result.models[0]
+            >>> print(f"Model: {model_info.model}")
+            >>> print(f"Variables: {model_info.variables}")
+            >>> print(f"Grid: {model_info.grid}")
+        """
+        params = {
+            "models": [model.value],
+        }
+
+        response = self._api.get("forecast/meta", params=params)
+        return MetaQueryResult(**response.json())
 
     @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_forecast(

@@ -32,6 +32,49 @@ Alternatively, generate an API key from the [Jua dashboard](https://developer.ju
 
 ## Examples
 
+### Obtaining the metadata for a model
+
+```python
+from jua import JuaClient
+from jua.weather import Models
+
+client = JuaClient()
+model = client.weather.get_model(Models.EPT1_5)
+metadata = model.get_metadata()
+
+# Print the metadata
+print(metadata)
+```
+
+### Getting the forecast runs available for a model
+
+```python
+from jua import JuaClient
+from jua.weather import Models
+
+client = JuaClient()
+
+# Getting metadata the latest forecast run
+latest = model.get_latest_init_time()
+print(latest)
+
+# Fetching model runs
+available_forecasts = model.get_available_forecasts()
+
+# Fetching all model runs for January 2025
+#   Results are paginated so we might need to iterate through
+result = model.get_available_forecasts(
+    since=datetime(2025, 1, 1),
+    before=datetime(2025, 1, 31, 23, 59),
+    limit=100,
+)
+all_forecasts = list(result.forecasts)
+while result.has_more:
+    print("Fetching next page")
+    result = result.next()
+    all_forecasts.extend(result.forecasts)
+```
+
 ### Access the latest 20-day forecast for a point location
 
 Retrieve temperature forecasts for Zurich and visualize the data:

@@ -4,13 +4,22 @@ from typing import Literal
 from pydantic import validate_call
 
 from jua.client import JuaClient
+from jua.logging import get_logger
 from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
 from jua.weather import JuaDataset
 from jua.weather._query_engine import QueryEngine
+from jua.weather._types.pagination import Pagination
+from jua.weather._types.query_response_types import (
+    AvailableForecasts,
+    LatestForecastInfo,
+    ModelMetadata,
+)
 from jua.weather.forecast import Forecast
 from jua.weather.hindcast import Hindcast
 from jua.weather.models import Models as ModelEnum
 from jua.weather.variables import Variables
+
+logger = get_logger(__name__)
 
 
 class Model:
@@ -157,10 +166,9 @@ class Model:
                 If None, uses the client's default setting.
 
         Returns:
-            JuaDataset containing the hindcast data matching your selection criteria.
+            JuaDataset containing the forecast data matching your selection criteria.
 
         Raises:
-            ModelHasNoHindcastData: If the model doesn't support hindcasts.
             ValueError: If incompatible parameter combinations are provided.
 
         Examples:
@@ -222,6 +230,191 @@ class Model:
             raw_data=raw_data,
             model=self._model,
         )
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_available_forecasts(
+        self,
+        since: datetime | None = None,
+        before: datetime | None = None,
+        limit: int = 20,
+    ) -> AvailableForecasts:
+        """Retrieve available forecast initialization times for this model.
+
+        This method queries the available forecast runs, returning their initialization
+        times and maximum available lead times. Results are paginated for easy
+        navigation through large datasets.
+
+        Args:
+            since: Only return forecasts initialized on or after this datetime
+                (optional). Useful for finding forecasts within a specific time range.
+
+            before: Only return forecasts initialized on or before before this datetime
+                (optional). Useful for filtering historical forecasts.
+
+            limit: Maximum number of results to return per page (default: 20).
+                Controls the page size for pagination.
+
+        Returns:
+            AvailableForecasts containing the query results with convenient
+            pagination support via the `.next()` method.
+
+        Examples:
+            >>> from datetime import datetime
+            >>> from jua import JuaClient
+            >>> from jua.weather import Models
+            >>>
+            >>> client = JuaClient()
+            >>> model = client.weather.get_model(Models.EPT2)
+            >>>
+            >>> # Get recent forecasts from January 2025
+            >>> result = model.get_available_forecasts(
+            ...     since=datetime(2025, 1, 1),
+            ...     limit=20
+            ... )
+            >>>
+            >>> # Access forecasts - can iterate directly or use .forecasts property
+            >>> for forecast_info in result:
+            ...     print(f"Init time: {forecast_info.init_time}")
+            ...     print(
+            ...         f"Max prediction timedelta: "
+            ...         f"{forecast_info.max_prediction_timedelta} hours"
+            ...     )
+            >>>
+            >>> # Or access via property
+            >>> print(f"Found {len(result.forecasts)} forecasts")
+            >>>
+            >>> # Paginate through results
+            >>> if result.has_more:
+            ...     next_page = result.next()
+            ...     print(f"Next page has {len(next_page)} forecasts")
+            >>>
+            >>> # Or iterate through all pages
+            >>> result = model.get_available_forecasts(
+            >>>     since=datetime(2025, 1, 1), limit=50
+            >>> )
+            >>> all_forecasts = list(result.forecasts)
+            >>> while result.has_more:
+            ...     result = result.next()
+            ...     all_forecasts.extend(result.forecasts)
+        """
+
+        def fetch_page(offset: int) -> AvailableForecasts:
+            """Internal helper to fetch a specific page of results."""
+            api_result = self._query_engine.get_available_forecasts(
+                model=self._model,
+                since=since,
+                before=before,
+                limit=limit,
+                offset=offset,
+            )
+            # Extract the forecasts for this specific model
+            model_name = self._model.value
+            forecasts = api_result.forecasts_per_model.get(model_name, [])
+
+            # Ensure pagination info exists (should always be present from API)
+            pagination = api_result.pagination or Pagination(limit=limit, offset=offset)
+
+            return AvailableForecasts(
+                forecasts=forecasts,
+                pagination=pagination,
+                fetch_next=fetch_page,
+            )
+
+        return fetch_page(offset=0)
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_latest_init_time(
+        self,
+        min_prediction_timedelta: int = 0,
+    ) -> LatestForecastInfo:
+        """Get the latest available forecast initialization time for this model.
+
+        This method retrieves information about the most recent forecast run, including
+        its initialization time and maximum available forecast horizon.
+
+        Args:
+            min_prediction_timedelta: Minimum required forecast horizon in hours.
+
+        Returns:
+            LatestForecastInfo containing the init_time and prediction_timedelta in
+            hours.
+
+        Examples:
+            >>> from jua import JuaClient
+            >>> from jua.weather import Models
+            >>>
+            >>> client = JuaClient()
+            >>> model = client.weather.get_model(Models.EPT2)
+            >>>
+            >>> # Get the latest forecast info
+            >>> latest = model.get_latest_init_time()
+            >>> print(f"Latest forecast initialized at: {latest.init_time}")
+            >>> print(f"Max lead time: {latest.prediction_timedelta} hours")
+            >>> print(f"Max lead time: {latest.prediction_timedelta / 24:.1f} days")
+            >>>
+            >>> # Get latest forecast with at least 48 hours of lead time
+            >>> latest_2day = model.get_latest_init_time(min_prediction_timedelta=48)
+            >>> print(f"Forecast horizon: {latest_2day.prediction_timedelta} hours")
+        """
+        api_result = self._query_engine.get_latest_init_time(
+            model=self._model,
+            min_prediction_timedelta=min_prediction_timedelta,
+        )
+
+        # Extract the info for this specific model
+        model_name = self._model.value
+        latest_info = api_result.forecasts_per_model.get(model_name)
+
+        if latest_info is None:
+            raise ValueError(
+                f"No latest forecast information available for model {model_name}"
+            )
+
+        return latest_info
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_metadata(self) -> ModelMetadata:
+        """Get metadata for this model including available variables and grid.
+
+        This method retrieves comprehensive metadata about the model, including:
+        - List of all available weather variables
+        - Spatial grid resolution (number of latitude/longitude points)
+        - Model identifier
+
+        Returns:
+            ModelMetadata containing variables list and grid information.
+
+        Examples:
+            >>> from jua import JuaClient
+            >>> from jua.weather import Models, Variables
+            >>>
+            >>> client = JuaClient()
+            >>> model = client.weather.get_model(Models.EPT2)
+            >>>
+            >>> # Get model metadata
+            >>> metadata = model.get_metadata()
+            >>> print(metadata)
+            >>>
+            >>> # List all available variables
+            >>> print("Available variables:")
+            >>> for var in metadata.variables:
+            ...     print(f"  - {var.value.name}")
+            >>>
+            >>> # Check if a specific variable is available
+            >>> if Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M in metadata.variables:
+            ...     print("Temperature data is available!")
+        """
+        api_result = self._query_engine.get_meta(
+            model=self._model,
+        )
+
+        # Extract the metadata for this specific model
+        # The API returns a list, and we requested only one model
+        if not api_result.models:
+            raise ValueError(f"No metadata available for model {self._model.value}")
+
+        # Get the first (and only) model metadata
+        return api_result.models[0]
 
     @property
     def forecast(self) -> Forecast:
