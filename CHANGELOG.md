@@ -1,3 +1,32 @@
+## v0.15.0 (2025-10-24)
+
+### Feat
+
+- add methods to obtain model metadata (available runs, available variables, latest run)
+- add models missing from the sdk
+- set the timedelta_unit in requests
+- add ept2-hrrr
+- adds the possibility to set the credit limit in the jua client
+- enable access to market aggregates in the sdk
+- add ecmwf ifs support
+- updated get_forecasts method allowing to grids for continuous times
+
+### Fix
+
+- use hours for the market aggregates, as updated in the qe
+- fix market aggregates and add docs
+- fix how point coordinates are added to returned xarray datasets, update examples
+- fix tests
+- fix xarray patches for init_time
+- update the cloud area variable names
+- fix multi-point queries and improve returned dataset for point queries
+- fix ept2e access through the new sdk method
+- better handling when no data is returned
+
+### Refactor
+
+- merge main
+
 ## v0.14.5 (2025-10-17)
 
 ### Fix
