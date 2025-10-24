@@ -208,9 +208,9 @@ class EnergyMarket:
                 "include_time": True,
             }
             if min_lead_time > 0:
-                params["min_prediction_timedelta"] = 60 * min_lead_time
+                params["min_prediction_timedelta"] = min_lead_time
             if max_lead_time is not None:
-                params["max_prediction_timedelta"] = 60 * max_lead_time
+                params["max_prediction_timedelta"] = max_lead_time
 
             try:
                 response = self._query_engine_api.get(
