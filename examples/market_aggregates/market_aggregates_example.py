@@ -75,9 +75,9 @@ def main():
     aus_zones = MarketZones.filter_by_country(Countries.AUSTRALIA)
     print(f"\nAustralian zones: {[z.zone_name for z in aus_zones]}")
 
-    # Example 7: Query different variables for filtered zones
+    # Example: Query different variables for 3 filtered Australian market zones
     print("\nExample: Query multiple variables for Australian zones")
-    australia = client.market_aggregates.get_market(market_zone=aus_zones)
+    australia = client.market_aggregates.get_market(market_zone=aus_zones[:3])
 
     wind = australia.compare_runs(
         agg_variable=AggregateVariables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,

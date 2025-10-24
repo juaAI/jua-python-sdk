@@ -143,6 +143,51 @@ plt.show()
 
 ![Europe Hindcast](content/readme/hindcast_zurich.png)
 
+### Accessing Market Aggregates
+
+The `AggregateVariables` enum provides the following variables:
+
+- `WIND_SPEED_AT_HEIGHT_LEVEL_10M` - Wind speed at 10m height (`Weighting.WIND_CAPACITY`)
+- `WIND_SPEED_AT_HEIGHT_LEVEL_100M` - Wind speed at 100m height (`Weighting.WIND_CAPACITY`)
+- `SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H` - Surface downwelling shortwave flux (`Weighting.SOLAR_CAPACITY`)
+- `AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M` - Air temperature at 2m height (`Weighting.POPULATION`)
+
+
+Comparing the latest EPT2 and ECMWF IFS run for the Ireland and Northern Ireland market zones:
+
+```python
+from jua import JuaClient
+from jua.market_aggregates import AggregateVariables, ModelRuns
+from jua.types import Countries, MarketZones
+from jua.weather import Models, Variables
+
+client = JuaClient()
+
+# Create energy market using MarketZones enum
+ir_nir = client.market_aggregates.get_market([MarketZones.IE, MarketZones.GB_NIR])
+
+# Get the market aggregates for the latest EPT2 and ECMWF IFS runs
+model_runs = [ModelRuns(Models.EPT2, 0), ModelRuns(Models.ECMWF_IFS_SINGLE, 0)]
+ds = ir_nir.compare_runs(
+    agg_variable=AggregateVariables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+    model_runs=model_runs,
+    max_lead_time=24,
+)
+
+print("Retrieved dataset:")
+print(ds)
+print()
+```
+
+Obtaining all market zones for a country:
+
+```python
+from jua.types import Countries, MarketZones
+
+norway_zones = MarketZones.filter_by_country(Countries.NORWAY)
+print(f"Norwegian zones: {[z.zone_name for z in norway_zones]}")
+```
+
 </details>
 
 ## Documentation

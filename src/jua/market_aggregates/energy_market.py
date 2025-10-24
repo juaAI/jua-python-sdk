@@ -205,7 +205,6 @@ class EnergyMarket:
                 "weighting": var.weighting.value,
                 "variables": [var.name],
                 "market_zones": self.market_zone,
-                "country_keys": "hi-mark",
                 "include_time": True,
             }
             if min_lead_time > 0:
