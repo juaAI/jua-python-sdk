@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime
 
 import matplotlib.pyplot as plt
 
@@ -11,18 +12,20 @@ logger = logging.getLogger(__name__)
 
 def main():
     client = JuaClient()
-    model = client.weather.get_model(Models.EPT1_5)
+    model = client.weather.get_model(Models.EPT2_RR)
 
     # Let' access the full, global dataset
-    lead_times_hours = [0, 12, 24]
+    lead_times_hours = [0, 24, 48]
     variables = [
         Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
         Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
     ]
-    init_time = model.forecast.get_available_init_times()[1]
-    dataset = model.forecast.get_forecast(
-        init_time=init_time,
+    # Get the forecast from 2025-01-01
+    dataset = model.get_forecasts(
+        init_time=datetime(2025, 1, 1, 0),
         prediction_timedelta=lead_times_hours,
+        latitude=slice(35, 71),
+        longitude=slice(-15, 50),
         variables=variables,
     )
 
@@ -118,7 +121,9 @@ def main():
     )
 
     # Add a title for the entire figure
-    fig.suptitle("Global Weather Forecast", fontsize=18, y=0.98, fontweight="bold")
+    fig.suptitle(
+        "European Weather Forecast - 2025-01-01", fontsize=18, y=0.98, fontweight="bold"
+    )
 
     plt.show()
 

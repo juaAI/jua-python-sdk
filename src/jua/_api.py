@@ -1,11 +1,13 @@
 import importlib.metadata
 
 import requests  # type: ignore[import-untyped]
+from requests import JSONDecodeError
 
 from jua.client import JuaClient
 from jua.errors.api_errors import (
     NotAuthenticatedError,
     NotFoundError,
+    RequestExceedsCreditLimitError,
     UnauthorizedError,
 )
 from jua.errors.jua_error import JuaError
@@ -64,6 +66,17 @@ class API:
         """
         if response.ok:
             return
+
+        # Check if the request exceed the maximum number of credits
+        if response.status_code == 400:
+            try:
+                content = response.json()
+                if "Request credit requirement exceeds limit. " in content.get(
+                    "detail", ""
+                ):
+                    raise RequestExceedsCreditLimitError(content["detail"])
+            except JSONDecodeError:
+                pass
 
         # Throw not authenticated error
         if response.status_code == 401:
@@ -124,6 +137,8 @@ class API:
         data: dict | None = None,
         query_params: dict | None = None,
         requires_auth: bool = True,
+        extra_headers: dict | None = None,
+        stream: bool = False,
     ) -> requests.Response:
         """Perform HTTP POST request.
 
@@ -132,6 +147,8 @@ class API:
             data: Optional JSON payload.
             query_params: Optional query parameters.
             requires_auth: Whether authentication is required.
+            extra_headers: Updates to the default headers.
+            stream: Whether to stream the result of the POST request.
 
         Returns:
             HTTP response object.
@@ -143,11 +160,15 @@ class API:
             JuaError: For other non-2xx responses.
         """
         headers = self._get_headers(requires_auth)
+        if extra_headers is not None:
+            headers.update(**extra_headers)
+
         response = requests.post(
             self._get_url(url),
             headers=headers,
             json=data,
             params=query_params,
+            stream=stream,
         )
         self._validate_response_status(response)
         return response
@@ -220,6 +241,28 @@ class API:
         response = requests.patch(self._get_url(url), headers=headers, json=data)
         self._validate_response_status(response)
         return response
+
+
+class QueryEngineAPI(API):
+    """Internal HTTP client for Jua Query Engine communication.
+
+    This class handles API requests, authentication, URL construction,
+    and error handling. Not intended for direct use by SDK users.
+    """
+
+    def _get_url(self, url: str) -> str:
+        """Construct full Query Engine URL from endpoint path.
+
+        Args:
+            url: API endpoint path.
+
+        Returns:
+            Complete URL including Query Engine base URL and version.
+        """
+        return (
+            f"{self._jua_client.settings.query_engine_url}/"
+            f"{self._jua_client.settings.query_engine_version}/{url}"
+        )
 
 
 def _get_user_agent() -> str:

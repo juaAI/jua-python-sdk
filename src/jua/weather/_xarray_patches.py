@@ -128,7 +128,7 @@ def _patch_timedelta_slicing(
 
 def _patch_args(
     prediction_timedelta: int | np.timedelta64 | slice | None,
-    time: np.datetime64 | slice | None,
+    init_time: np.datetime64 | slice | None,
     latitude: float | slice | None,
     longitude: float | slice | None,
     stat: str | Statistics | None = None,
@@ -143,7 +143,7 @@ def _patch_args(
 
     Args:
         prediction_timedelta: Time delta selection parameter
-        time: Time selection parameter
+        init_time: Time selection parameter
         latitude: Latitude selection parameter
         longitude: Longitude selection parameter
         stat: Statistic selection parameter
@@ -158,8 +158,8 @@ def _patch_args(
     jua_args = {}
     if prediction_timedelta is not None:
         jua_args["prediction_timedelta"] = prediction_timedelta
-    if time is not None:
-        jua_args["time"] = time
+    if init_time is not None:
+        jua_args["init_time"] = init_time
     if latitude is not None:
         jua_args["latitude"] = latitude
     if longitude is not None:
@@ -196,7 +196,7 @@ def _patched_sel(
     original_sel: Callable,
     self,
     *args,
-    time: np.datetime64 | slice | None = None,
+    init_time: np.datetime64 | slice | None = None,
     prediction_timedelta: PredictionTimeDelta | None = None,
     latitude: float | slice | None = None,
     longitude: float | slice | None = None,
@@ -216,7 +216,7 @@ def _patched_sel(
         original_sel: Original xarray selection method to call
         self: The xarray object (Dataset or DataArray)
         *args: Positional arguments for the selection method
-        time: Time selection parameter
+        init_time: Init time selection parameter
         prediction_timedelta: Time delta selection parameter
         latitude: Latitude selection parameter
         longitude: Longitude selection parameter
@@ -245,7 +245,7 @@ def _patched_sel(
 
     # Process and normalize the arguments
     full_kwargs = _patch_args(
-        time=time,
+        init_time=init_time,
         prediction_timedelta=prediction_timedelta,
         latitude=latitude,
         longitude=longitude,
@@ -455,29 +455,30 @@ class ToAbsoluteTimeAccessor:
             ValueError: If time or prediction_timedelta dimensions are missing
             or invalid
         """
-        if not hasattr(self._xarray_obj, "time"):
-            raise ValueError("time must be a dimension")
+        if not hasattr(self._xarray_obj, "init_time"):
+            raise ValueError("'init_time' must be a dimension")
+
         # empty tuple is also valid
-        time = self._xarray_obj.time
-        if len(time.shape) != 0 and time.shape[0] != 1:
-            raise ValueError("time must be a single value")
+        init_time = self._xarray_obj.init_time
+        if len(init_time.shape) != 0 and init_time.shape[0] != 1:
+            raise ValueError("'init_time' must be a single value")
         if not hasattr(self._xarray_obj, "prediction_timedelta"):
             raise ValueError("prediction_timedelta must be a dimension")
 
         # Calculate absolute time by adding prediction_timedelta to init time
         prediction_timedelta = self._xarray_obj.prediction_timedelta
-        if len(time.shape) == 0:
-            absolute_time = time.values + prediction_timedelta
+        if len(init_time.shape) == 0:
+            absolute_time = init_time.values + prediction_timedelta
         else:
-            absolute_time = time.values[0] + prediction_timedelta
+            absolute_time = init_time.values[0] + prediction_timedelta
 
         # Create a copy and add the new coordinate
         ds = self._xarray_obj.copy(deep=True)
-        ds = ds.assign_coords({"absolute_time": absolute_time})
+        ds = ds.assign_coords({"time": absolute_time})
 
         # If prediction_timedelta is a dimension, swap it with absolute_time
         if len(prediction_timedelta.shape) > 0:
-            ds = ds.swap_dims({"prediction_timedelta": "absolute_time"})
+            ds = ds.swap_dims({"prediction_timedelta": "time"})
 
         return ds
 

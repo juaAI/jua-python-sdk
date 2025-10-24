@@ -32,6 +32,49 @@ Alternatively, generate an API key from the [Jua dashboard](https://developer.ju
 
 ## Examples
 
+### Obtaining the metadata for a model
+
+```python
+from jua import JuaClient
+from jua.weather import Models
+
+client = JuaClient()
+model = client.weather.get_model(Models.EPT1_5)
+metadata = model.get_metadata()
+
+# Print the metadata
+print(metadata)
+```
+
+### Getting the forecast runs available for a model
+
+```python
+from jua import JuaClient
+from jua.weather import Models
+
+client = JuaClient()
+
+# Getting metadata the latest forecast run
+latest = model.get_latest_init_time()
+print(latest)
+
+# Fetching model runs
+available_forecasts = model.get_available_forecasts()
+
+# Fetching all model runs for January 2025
+#   Results are paginated so we might need to iterate through
+result = model.get_available_forecasts(
+    since=datetime(2025, 1, 1),
+    before=datetime(2025, 1, 31, 23, 59),
+    limit=100,
+)
+all_forecasts = list(result.forecasts)
+while result.has_more:
+    print("Fetching next page")
+    result = result.next()
+    all_forecasts.extend(result.forecasts)
+```
+
 ### Access the latest 20-day forecast for a point location
 
 Retrieve temperature forecasts for Zurich and visualize the data:
@@ -46,9 +89,7 @@ client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5)
 zurich = LatLon(lat=47.3769, lon=8.5417)
 # Get latest forecast
-forecast = model.forecast.get_forecast(
-    points=[zurich]
-)
+forecast = model.get_forecasts(points=[zurich])
 temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
 temp_data.to_celcius().to_absolute_time().plot()
 plt.show()
@@ -61,68 +102,91 @@ plt.show()
 
 </details>
 
-### Plot global forecast with 10-hour lead time
-
-Generate a global wind speed visualization:
-
-```python
-import matplotlib.pyplot as plt
-from jua import JuaClient
-from jua.weather import Models, Variables
-
-client = JuaClient()
-model = client.weather.get_model(Models.EPT1_5)
-
-lead_time = 10 # hours
-dataset = model.forecast.get_forecast(
-    prediction_timedelta=lead_time,
-    variables=[
-        Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
-    ],
-)
-dataset[Variables.WIND_SPEED_AT_HEIGHT_LEVEL_10M].plot()
-plt.show()
-```
-
-<details>
-<summary>Show output</summary>
-
-![Global Windspeed 10h](content/readme/global_windspeed_10h.png)
-
-</details>
-
 ### Access historical weather data
 
-Retrieve and visualize temperature data for Europe from a specific date:
+Historical data can be accessed in the same way. In this case, we get all EPT2 forecasts from January 2024, and plot the first 5 together.
 
 ```python
+from datetime import datetime
+
 import matplotlib.pyplot as plt
 from jua import JuaClient
 from jua.weather import Models, Variables
 
 client = JuaClient()
-model = client.weather.get_model(Models.EPT1_5_EARLY)
-
-init_time = "2024-02-01 06:00:00"
-hindcast = model.hindcast.get_hindcast(
+zurich = LatLon(lat=47.3769, lon=8.5417)
+model = client.weather.get_model(Models.EPT2)
+hindcast = model.get_forecasts(
+    init_time=slice(
+        datetime(2024, 1, 1, 0),
+        datetime(2024, 1, 31, 0),
+    ),
+    points=[zurich],
+    min_lead_time=0,
+    max_lead_time=(5 * 24),
     variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
-    init_time=init_time,
-    prediction_timedelta=0,
-    # Select Europe
-    latitude=slice(71, 36),
-    longitude=slice(-15, 50),
     method="nearest",
 )
-
 data = hindcast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-data.plot()
+
+# Compare the first 5 runs of January
+fig, ax = plt.subplots(figsize=(15, 8))
+for i in range(5):
+    forecast_data = data.isel(init_time=i, points=0).to_celcius().to_absolute_time()
+    forecast_data.plot(ax=ax, label=forecast_data.init_time.values)
+plt.legend()
 plt.show()
 ```
 
 <details>
 <summary>Show output</summary>
 
-![Europe Hindcast](content/readme/hindcast_europe.png)
+![Europe Hindcast](content/readme/hindcast_zurich.png)
+
+### Accessing Market Aggregates
+
+The `AggregateVariables` enum provides the following variables:
+
+- `WIND_SPEED_AT_HEIGHT_LEVEL_10M` - Wind speed at 10m height (`Weighting.WIND_CAPACITY`)
+- `WIND_SPEED_AT_HEIGHT_LEVEL_100M` - Wind speed at 100m height (`Weighting.WIND_CAPACITY`)
+- `SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H` - Surface downwelling shortwave flux (`Weighting.SOLAR_CAPACITY`)
+- `AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M` - Air temperature at 2m height (`Weighting.POPULATION`)
+
+
+Comparing the latest EPT2 and ECMWF IFS run for the Ireland and Northern Ireland market zones:
+
+```python
+from jua import JuaClient
+from jua.market_aggregates import AggregateVariables, ModelRuns
+from jua.types import Countries, MarketZones
+from jua.weather import Models, Variables
+
+client = JuaClient()
+
+# Create energy market using MarketZones enum
+ir_nir = client.market_aggregates.get_market([MarketZones.IE, MarketZones.GB_NIR])
+
+# Get the market aggregates for the latest EPT2 and ECMWF IFS runs
+model_runs = [ModelRuns(Models.EPT2, 0), ModelRuns(Models.ECMWF_IFS_SINGLE, 0)]
+ds = ir_nir.compare_runs(
+    agg_variable=AggregateVariables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+    model_runs=model_runs,
+    max_lead_time=24,
+)
+
+print("Retrieved dataset:")
+print(ds)
+print()
+```
+
+Obtaining all market zones for a country:
+
+```python
+from jua.types import Countries, MarketZones
+
+norway_zones = MarketZones.filter_by_country(Countries.NORWAY)
+print(f"Norwegian zones: {[z.zone_name for z in norway_zones]}")
+```
 
 </details>
 

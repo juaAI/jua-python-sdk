@@ -14,11 +14,14 @@ def main():
     zurich = LatLon(lat=47.3769, lon=8.5417)
 
     client = JuaClient()
-    models_to_use = [Models.EPT1_5, Models.EPT1_5_EARLY, Models.ECMWF_AIFS025_SINGLE]
+    models_to_use = [Models.EPT1_5, Models.EPT1_5_EARLY, Models.ECMWF_IFS_SINGLE]
     models = [client.weather.get_model(model) for model in models_to_use]
 
     for model in models:
-        forecast = model.forecast.get_forecast(
+        # Get the latest forecast for this model
+        latest = model.get_latest_init_time()
+        forecast = model.get_forecasts(
+            init_time=latest.init_time,
             points=zurich,
         )
         temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]

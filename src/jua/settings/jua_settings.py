@@ -50,6 +50,14 @@ class JuaSettings(BaseSettings):
         default="https://data.jua.ai", description="Base URL for JUA data services"
     )
 
+    query_engine_url: str = Field(
+        default="https://query.jua.ai", description="Base URL for the JUA Query Engine"
+    )
+
+    query_engine_version: str = Field(
+        default="v1", description="Query Engine version to use for requests"
+    )
+
     auth: AuthenticationSettings = Field(
         default_factory=AuthenticationSettings,
         description="Authentication settings for JUA API",

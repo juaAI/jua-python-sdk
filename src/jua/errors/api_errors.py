@@ -51,3 +51,21 @@ class NotFoundError(JuaError):
             "Not found",
             details="The requested resource was not found.",
         )
+
+
+class RequestExceedsCreditLimitError(JuaError):
+    """Error raised when API requests fail as the request exceeds the credit limit"""
+
+    def __init__(self, message: str):
+        """Initialize with optional status code.
+
+        Args:
+            message: The error message
+        """
+        super().__init__(
+            message,
+            details=(
+                "Set the maximum number of credits consumed in a request with: \n"
+                "  `client = JuaClient(request_credit_limit=X)`"
+            ),
+        )

@@ -18,7 +18,7 @@ _LONGITUDE = np.arange(-10, 10, 0.1)
 
 @pytest.fixture
 def mock_dataset():
-    time = [_TIME]
+    init_time = [_TIME]
     prediction_timedeltas = _TIMEDELTAS
 
     latitude = _LATITUDE
@@ -26,16 +26,19 @@ def mock_dataset():
 
     return xr.Dataset(
         coords={
-            "time": time,
+            "init_time": init_time,
             "prediction_timedelta": prediction_timedeltas,
             "latitude": latitude,
             "longitude": longitude,
         },
         data_vars={
             str(var): (
-                ("time", "prediction_timedelta", "latitude", "longitude"),
+                ("init_time", "prediction_timedelta", "latitude", "longitude"),
                 np.random.rand(
-                    len(time), len(prediction_timedeltas), len(latitude), len(longitude)
+                    len(init_time),
+                    len(prediction_timedeltas),
+                    len(latitude),
+                    len(longitude),
                 ),
             )
             for var in Variables
@@ -63,9 +66,9 @@ def test_to_celcius(mock_dataset: xr.Dataset):
 def test_to_absolute_time(mock_dataset: xr.Dataset):
     with_absolute_time = mock_dataset.to_absolute_time()
 
-    assert hasattr(with_absolute_time, "absolute_time")
+    assert hasattr(with_absolute_time, "time")
     assert "prediction_timedelta" not in with_absolute_time.dims
-    absolute_time = with_absolute_time.absolute_time.values.flatten()
+    absolute_time = with_absolute_time.time.values.flatten()
     reference = np.datetime64(_TIME) + _TIMEDELTAS
     assert np.equal(absolute_time, reference).all()
 
