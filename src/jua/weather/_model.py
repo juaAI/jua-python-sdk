@@ -1,5 +1,5 @@
 import warnings
-from datetime import datetime
+from datetime import UTC, datetime
 from typing import Literal
 
 from pydantic import validate_call
@@ -231,6 +231,57 @@ class Model:
             raw_data=raw_data,
             model=self._model,
         )
+
+    @validate_call
+    def is_ready(
+        self, forecasted_hours: int, init_time: datetime | str = "latest"
+    ) -> bool:
+        """Check if a forecast is ready up to a specific lead time.
+
+        This method is useful for checking if a forecast has been processed
+        up to a certain number of hours into the future. Forecasts may become
+        available incrementally, with longer lead times becoming available
+        as processing completes.
+
+        Args:
+            forecasted_hours: The number of forecast hours needed.
+            init_time: The initialization time of the forecast to check.
+                Use "latest" for the most recent forecast, or provide a specific
+                datetime or string in ISO format. Must be an exact match.
+
+        Returns:
+            True if the forecast is available for the specified hours, False otherwise.
+
+        Examples:
+            >>> # Check if 10-day forecast is ready for the latest available init_time
+            >>> is_ten_day_ready = model.is_ready(240)
+            >>>
+            >>> # Check if 10-day forecast is ready for a given init_time
+            >>> is_ten_day_ready = model.is_ready(240, datetime(2025, 10, 1, 0))
+            >>>
+        """
+        if init_time == "latest":
+            latest = self.get_latest_init_time(min_prediction_timedelta=0)
+            return latest.prediction_timedelta >= forecasted_hours
+        elif isinstance(init_time, str):
+            init_time = datetime.fromisoformat(init_time)
+
+        init_time = init_time.replace(tzinfo=UTC)  # type: ignore[call-arg]
+        api_result = self._query_engine.get_available_forecasts(
+            model=self._model,
+            since=init_time,
+            before=init_time,
+            limit=1,
+            offset=0,
+        )
+        forecasts = api_result.forecasts_per_model.get(self._model.value, [])
+        if forecasts is None or len(forecasts) == 0:
+            return False
+
+        if forecasts[0].max_prediction_timedelta is None:
+            return False
+
+        return forecasts[0].max_prediction_timedelta >= forecasted_hours
 
     @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_available_forecasts(
