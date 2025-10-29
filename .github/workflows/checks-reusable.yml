@@ -27,7 +27,15 @@ jobs:
       - name: Check commit messages (Push)
         if: github.event_name == 'push'
         run: |
-          cz check --rev-range ${{ github.event.before }}..${{ github.event.after }}
+          # For new branches, github.event.before is all zeros
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            # Find merge base with main and check from there
+            git fetch origin main
+            MERGE_BASE=$(git merge-base origin/main HEAD)
+            cz check --rev-range $MERGE_BASE..HEAD
+          else
+            cz check --rev-range ${{ github.event.before }}..${{ github.event.after }}
+          fi
 
   lint:
     name: Run Linting
