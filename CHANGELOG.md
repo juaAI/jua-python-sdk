@@ -1,3 +1,9 @@
+## v0.15.1 (2025-10-29)
+
+### Fix
+
+- make sdk compatible with updated api
+
 ## v0.15.0 (2025-10-24)
 
 ### Feat
