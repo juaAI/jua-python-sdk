@@ -1,3 +1,9 @@
+## v0.15.3 (2025-10-29)
+
+### Fix
+
+- use returned lat and lon instead of requested
+
 ## v0.15.2 (2025-10-29)
 
 ### Fix
