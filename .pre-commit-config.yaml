@@ -39,7 +39,5 @@ repos:
   - hooks:
       - id: commitizen
       - id: commitizen-branch
-        stages:
-          - pre-push
     repo: https://github.com/commitizen-tools/commitizen
     rev: v4.7.2
