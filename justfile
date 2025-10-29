@@ -2,7 +2,7 @@ default:
     just --list
 
 lint:
-    uv run pre-commit run --all
+    uv run pre-commit run --all-files
 
 build:
     uv build
