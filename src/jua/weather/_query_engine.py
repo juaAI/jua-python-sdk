@@ -320,7 +320,6 @@ class QueryEngine:
             An xarray dataset with "init_time", "prediction_timedelta", "latitude",
             "longitude" dimesions.
         """
-        print(df)
         # Parse times to correct units, enforce correct encoding
         df["init_time"] = df["init_time"].astype("datetime64[ns]")
         df["prediction_timedelta"] = pd.to_timedelta(
