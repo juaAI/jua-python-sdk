@@ -344,9 +344,17 @@ class QueryEngine:
             # Convert point objects to string for use as dimension
             df["points"] = df["point"].apply(lambda idx: str(points[idx]))
 
-            # Keep track of requested lat/lon for each point before dropping them
+            # Keep track of both actual and requested lat/lon for each point
             point_coords = (
-                df[["points", "requested_lat", "requested_lon"]]
+                df[
+                    [
+                        "points",
+                        "latitude",
+                        "longitude",
+                        "requested_lat",
+                        "requested_lon",
+                    ]
+                ]
                 .drop_duplicates()
                 .set_index("points")
             )
@@ -369,11 +377,13 @@ class QueryEngine:
             point_coords_aligned = point_coords.loc[ds.points.values]
             ds = ds.assign_coords(
                 {
-                    "latitude": (
+                    "latitude": ("points", point_coords_aligned["latitude"].values),
+                    "longitude": ("points", point_coords_aligned["longitude"].values),
+                    "requested_lat": (
                         "points",
                         point_coords_aligned["requested_lat"].values,
                     ),
-                    "longitude": (
+                    "requested_lon": (
                         "points",
                         point_coords_aligned["requested_lon"].values,
                     ),
