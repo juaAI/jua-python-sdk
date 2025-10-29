@@ -10,6 +10,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full git history for commitizen-branch
       - name: Setup Python, uv, Just, and Dependencies
         uses: ./.github/actions/setup
         with:
