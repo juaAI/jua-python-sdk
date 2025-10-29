@@ -1,6 +1,7 @@
 """Interface with the Query Engine"""
 
 from datetime import datetime
+from logging import getLogger
 from typing import Literal
 
 import pandas as pd
@@ -26,6 +27,9 @@ from jua.weather._types.query_response_types import (
     MetaQueryResult,
 )
 from jua.weather.models import Models
+from jua.weather.variables import Variables
+
+logger = getLogger(__name__)
 
 
 class QueryEngine:
@@ -184,7 +188,7 @@ class QueryEngine:
         self,
         model: Models,
         init_time: Literal["latest"] | datetime | list[datetime] | slice | None = None,
-        variables: list[str] | None = None,
+        variables: list[Variables] | list[str] | None = None,
         prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
@@ -333,14 +337,31 @@ class QueryEngine:
 
         # Set the correct index
         if points is not None:
-            returned_points = df[["latitude", "longitude"]].drop_duplicates().values
+            returned_points: list[tuple[float, float]] = (
+                df[["latitude", "longitude"]].drop_duplicates().values
+            )
 
-            point_mapping = {}
+            point_mapping: dict[tuple[float, float], LatLon] = {}
             if len(points) == len(returned_points):
-                point_mapping = {
-                    (lat, lon): point
-                    for (lat, lon), point in zip(returned_points, points)
-                }
+                # Match each returned point to its corresponding requested point
+                # based on actual coordinates (not order)
+                for ret_lat, ret_lon in returned_points:
+                    # Find the closest requested point
+                    min_dist = float("inf")
+                    best_match = None
+                    for req_point in points:
+                        dist = (ret_lat - req_point.lat) ** 2 + (
+                            ret_lon - req_point.lon
+                        ) ** 2
+                        if dist < min_dist:
+                            min_dist = dist
+                            best_match = req_point
+                    if best_match is None:
+                        logger.warning(
+                            f"No matching point found for {ret_lat}, {ret_lon}"
+                        )
+                    else:
+                        point_mapping[(ret_lat, ret_lon)] = best_match
             else:
                 point_mapping = {
                     (lat, lon): LatLon(lat=lat, lon=lon) for lat, lon in returned_points

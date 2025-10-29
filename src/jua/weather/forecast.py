@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+from typing import Literal
 
 import xarray as xr
 from pydantic import validate_call
@@ -11,6 +12,7 @@ from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
 from jua.weather import JuaDataset
 from jua.weather._api import WeatherAPI
 from jua.weather._model_meta import get_model_meta_info
+from jua.weather._query_engine import QueryEngine
 from jua.weather._types.api_payload_types import ForecastRequestPayload
 from jua.weather._types.api_response_types import ForecastMetadataResponse
 from jua.weather._types.forecast import ForecastData
@@ -66,6 +68,7 @@ class Forecast:
         self._model_name = model.value
         self._model_meta = get_model_meta_info(model)
         self._api = WeatherAPI(client)
+        self._query_engine = QueryEngine(client)
 
         self._FORECAST_ADAPTERS = {
             Models.EPT2: self._v3_data_adapter,
@@ -105,7 +108,7 @@ class Forecast:
     @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_forecast(
         self,
-        init_time: datetime | str = "latest",
+        init_time: datetime | Literal["latest"] = "latest",
         variables: list[Variables] | list[str] | None = None,
         prediction_timedelta: PredictionTimeDelta | None = None,
         latitude: SpatialSelection | None = None,
@@ -114,7 +117,7 @@ class Forecast:
         min_lead_time: int | None = None,
         max_lead_time: int | None = None,
         statistics: list[str] | list[Statistics] | None = None,
-        method: str | None = "nearest",
+        method: Literal["nearest", "bilinear"] = "nearest",
         print_progress: bool | None = None,
         lazy_load: bool = False,
     ) -> JuaDataset:
@@ -206,43 +209,24 @@ class Forecast:
         if self._model == Models.EPT2_E and not statistics:
             statistics = ["mean"]
 
-        if self._can_be_dispatched_to_api(
-            init_time=init_time,
-            latitude=latitude,
-            longitude=longitude,
-            points=points,
-        ):
-            # As _can_be_dispatched_to_api has passed, either points are not none
-            # or we can convert the latitude and longitude to points
-            points = points or self._convert_lat_lon_to_point(latitude, longitude)  # type: ignore
-            min_lead_time, max_lead_time = (
-                self._convert_prediction_timedelta_to_api_call(
-                    min_lead_time, max_lead_time, prediction_timedelta
-                )
-            )
-
-            data = self._dispatch_to_api(
+        if not lazy_load:
+            ds = self._query_engine.get_forecast(
+                model=self._model,
                 init_time=init_time,
-                points=points,
                 variables=variables,
-                min_lead_time=min_lead_time,
-                max_lead_time=max_lead_time,
-                statistics=statistics,
+                prediction_timedelta=prediction_timedelta,
+                latitude=latitude,
+                longitude=longitude,
+                points=points,
+                method=method,
+                stream=False,
+                print_progress=print_progress,
             )
-            raw_data = data.to_xarray()
-            if points is not None and raw_data is not None:
-                raw_data = raw_data.select_point(points=points)
-            dataset_name = f"{self._model_name}_{data.init_time.strftime('%Y%m%d%H')}"
             return JuaDataset(
                 settings=self._client.settings,
-                dataset_name=dataset_name,
-                raw_data=raw_data,
+                dataset_name=f"{self._model_name}_{init_time}",
+                raw_data=ds,
                 model=self._model,
-            )
-
-        if not lazy_load:
-            logger.warning(
-                "Query might produce a large amount of data and might take some time."
             )
 
         prediction_timedelta = self._get_prediction_timedelta_for_adapter(
@@ -322,13 +306,9 @@ class Forecast:
             >>> print(f"Most recent forecast: {init_times[0]}")
             >>> print(f"Total forecasts available: {len(init_times)}")
         """
-        if not self._model_meta.has_forecast_file_access:
-            logger.warning(
-                f"Model {self._model_name} only supports loading the latest forecast"
-            )
-            return []
-
-        return self._api.get_available_init_times(model_name=self._model_name)
+        forecast_info = self._query_engine.get_available_forecasts(model=self._model)
+        per_model_info = forecast_info.forecasts_per_model.get(self._model_name, [])
+        return [to_datetime(info.init_time) for info in per_model_info]
 
     @validate_call
     def is_ready(
@@ -494,77 +474,6 @@ class Forecast:
             method=method,
             lazy_load=lazy_load,
         )
-
-    def _can_be_dispatched_to_api(
-        self,
-        init_time: datetime | str,
-        prediction_timedelta: PredictionTimeDelta | None = None,
-        latitude: SpatialSelection | None = None,
-        longitude: SpatialSelection | None = None,
-        points: list[LatLon] | None = None,
-    ) -> bool:
-        """Determine if the request can be served via the API.
-
-        The API has certain limitations on what kinds of queries it can handle.
-        This method checks if the request falls within those limitations.
-
-        Constraints include:
-        - Forecast age (must be recent, less than 36 hours)
-        - Number of points (limited to _MAX_POINT_FOR_API)
-        - Query structure (slices not supported)
-        - Lead time structure (complex lead time slicing not supported)
-
-        Args:
-            init_time: Forecast initialization time
-            prediction_timedelta: Time range to include in the forecast
-            latitude: Latitude selection (point, list, or slice)
-            longitude: Longitude selection (point, list, or slice)
-            points: List of geographic points to get forecasts for
-            statistics: List of statistics to retrieve
-
-        Returns:
-            True if the request can be dispatched to the API, False otherwise
-
-        Raises:
-            ValueError: If no metadata is found for the model
-        """
-        if init_time == "latest":
-            metadata = self.get_metadata()
-            if metadata is None:
-                raise ValueError("No metadata found for model")
-            init_time = metadata.init_time
-
-        init_time_dt = to_datetime(init_time).replace(tzinfo=UTC)
-        if init_time_dt < self._MODEL_DATA_AVAILABILITY.get(
-            self._model, self._MIN_INIT_TIME_PAST_FOR_API
-        ):
-            return False
-
-        if points is None and (latitude is None or longitude is None):
-            return False
-
-        if isinstance(latitude, slice) or isinstance(longitude, slice):
-            return False
-
-        if latitude is not None and longitude is not None:
-            points = self._convert_lat_lon_to_point(latitude, longitude)
-
-        assert points is not None, (
-            "points are either provided or determined from latitude and longitude"
-        )
-
-        if not self._is_latest_init_time(init_time) and len(points) > 1:
-            return False
-
-        if len(points) > self._MAX_POINT_FOR_API:
-            return False
-
-        if prediction_timedelta is not None:
-            if isinstance(prediction_timedelta, slice):
-                if prediction_timedelta.step is not None:
-                    return False
-
-        return True
 
     def _convert_lat_lon_to_point(
         self,
