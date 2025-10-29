@@ -1,3 +1,14 @@
+## v0.15.2 (2025-10-29)
+
+### Fix
+
+- correctly match point indices
+
+### Refactor
+
+- remove debug print
+- remove unused code
+
 ## v0.15.1 (2025-10-29)
 
 ### Fix
