@@ -27,19 +27,12 @@ runs:
         python-version: ${{ inputs.python-version }}
 
     - name: Install uv
-      shell: bash # Use bash for consistency with the install script
-      run: |
-        curl -LsSf https://astral.sh/uv/install.sh | sh
-        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
-        echo "UV_BIN_PATH=$HOME/.cargo/bin" >> $GITHUB_ENV # Store for potential direct use
+      uses: astral-sh/setup-uv@v4
+      with:
+        enable-cache: true
 
     - name: Install Just
-      shell: bash # Use bash for consistency with the install script
-      run: |
-        mkdir -p "$HOME/.local/bin" # Ensure the directory exists
-        curl --proto '=https' --tlsv1.2 -sSf https://just.systems/install.sh | bash -s -- --to "$HOME/.local/bin"
-        echo "$HOME/.local/bin" >> $GITHUB_PATH
-        echo "JUST_BIN_PATH=$HOME/.local/bin" >> $GITHUB_ENV # Store for potential direct use
+      uses: extractions/setup-just@v2
 
     - name: Get uv cache directory
       id: uv-cache-dir # Give an ID to reference its output
