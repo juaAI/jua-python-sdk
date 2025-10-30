@@ -14,6 +14,9 @@ inputs:
     type: string
   python-dependency-group: # Allows specifying which dependency group to sync
     description: "Dependency group to install with uv sync (e.g., dev, main)"
+    required: false
+    default: "dev"
+    type: string
 
 runs:
   using: "composite"
