@@ -58,8 +58,8 @@ runs:
     - name: Install Python dependencies with uv
       shell: bash
       run: |
-        # Build the uv sync command with dependency groups
-        UV_SYNC_CMD="uv sync"
+        # Build the uv sync command arguments
+        UV_SYNC_ARGS=()
 
         # Add dependency groups if specified
         DEPENDENCY_GROUPS="${{ inputs.python-dependency-group }}"
@@ -68,7 +68,7 @@ runs:
           for group in "${GROUPS[@]}"; do
             group=$(echo "$group" | xargs)  # Trim whitespace
             if [ -n "$group" ]; then
-              UV_SYNC_CMD="$UV_SYNC_CMD --group $group"
+              UV_SYNC_ARGS+=(--group "$group")
             fi
           done
         fi
@@ -80,14 +80,15 @@ runs:
           for extra in "${EXTRAS[@]}"; do
             extra=$(echo "$extra" | xargs)  # Trim whitespace
             if [ -n "$extra" ]; then
-              UV_SYNC_CMD="$UV_SYNC_CMD --extra $extra"
+              UV_SYNC_ARGS+=(--extra "$extra")
             fi
           done
         fi
 
-        eval "$UV_SYNC_CMD"
+        # Execute uv sync with the built arguments
+        uv sync "${UV_SYNC_ARGS[@]}"
         # If you use a uv.lock file and want to ensure it's strictly followed:
-        # Add --frozen flag before evaluating the command
+        # Add --frozen flag: uv sync --frozen "${UV_SYNC_ARGS[@]}"
 # No explicit outputs needed from this composite action for basic setup.
 # If you needed to output something like the exact cache key used, you could define it:
 # outputs:
