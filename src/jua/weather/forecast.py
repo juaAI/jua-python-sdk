@@ -208,6 +208,11 @@ class Forecast:
             statistics = ["mean"]
 
         if not lazy_load:
+            if prediction_timedelta is None and (
+                min_lead_time is not None or max_lead_time is not None
+            ):
+                prediction_timedelta = slice(min_lead_time, max_lead_time)
+
             ds = self._query_engine.get_forecast(
                 model=self._model,
                 init_time=init_time,
