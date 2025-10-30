@@ -1,3 +1,10 @@
+## v0.15.6 (2025-10-30)
+
+### Fix
+
+- improve the progress logging to the console, flush the output and close the progress
+- set stream to false and log a warning when bilinear interpolation is used for point queries
+
 ## v0.15.5 (2025-10-30)
 
 ### Fix
