@@ -268,7 +268,7 @@ class QueryEngine:
                 "The requested data volume is too large for a single call. "
                 f"Estimated size is {est_requested_points} points, which exceeds the "
                 f"limit of {self._MAX_POINTS_PER_REQUEST}. The total rows equal "
-                "number_of_points × number_of_lead_times × number_of_init_times. "
+                "number_of_points x number_of_lead_times x number_of_init_times. "
                 "Please split your request into smaller chunks (e.g., fewer points, a "
                 "smaller init_time range, or fewer lead times)."
             )
@@ -280,7 +280,11 @@ class QueryEngine:
         if model == Models.EPT2_E:
             data["aggregation"] = ["avg"]
 
-        query_params = {"format": "arrow", "stream": str(stream).lower()}
+        query_params = {
+            "format": "arrow",
+            "stream": str(stream).lower(),
+            "request_credit_limit": 10000,
+        }
         if self._jua_client.request_credit_limit is not None:
             query_params["request_credit_limit"] = str(
                 self._jua_client.request_credit_limit

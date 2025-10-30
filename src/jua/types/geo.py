@@ -115,7 +115,7 @@ This type represents the various ways to specify latitude or longitude
 selections when retrieving weather data:
 
 - float: Single value (e.g., 51.5 for latitude)
-- slice: Range of values (e.g., slice(30, 60) for latitude 30°-60°)
+- slice: Range of values (e.g., slice(30, 60) for latitude 30 deg - 60 deg)
 - list[float]: List of specific values (e.g., [45.0, 50.0, 55.0])
 
 Examples:

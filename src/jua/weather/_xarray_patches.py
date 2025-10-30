@@ -504,7 +504,7 @@ class ToCelciusAccessor:
     def __call__(self) -> xr.DataArray:
         """Convert temperature from Kelvin to Celsius.
 
-        This method applies the K→°C conversion: T(°C) = T(K) - 273.15
+        This method applies the K --> C conversion: T(C) = T(K) - 273.15
         If there's a stat dimension, standard deviation values are not converted
         since they represent temperature differences, not absolute temperatures.
 

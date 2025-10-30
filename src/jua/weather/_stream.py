@@ -6,7 +6,6 @@ import pyarrow.ipc as pa_ipc
 import requests  # type: ignore[import-untyped]
 from rich.progress import (
     Progress,
-    SpinnerColumn,
     TaskID,
     TextColumn,
 )
@@ -50,11 +49,10 @@ def process_arrow_streaming_response(
     response.raw.decode_content = True
     if print_progress:
         with Progress(
-            SpinnerColumn(),
             TextColumn("Reading data...", justify="right"),
-            "•",
+            "|",
             TextColumn("[bold cyan]{task.fields[size]}"),
-            "•",
+            "|",
             TextColumn("[bold cyan]{task.fields[speed]}", justify="right"),
             transient=False,
         ) as progress:
