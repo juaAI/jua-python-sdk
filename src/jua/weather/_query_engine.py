@@ -254,6 +254,13 @@ class QueryEngine:
         if stream is None:
             stream = geo.type != "point"
 
+        if geo.type == "point" and method == "bilinear" and stream:
+            logger.warning(
+                "Cannot use streaming responses with bilinear interpolation. Setting "
+                "stream=False."
+            )
+            stream = False
+
         payload = ForecastQueryPayload(
             models=[model],
             init_time=build_init_time_arg(init_time),
@@ -293,7 +300,8 @@ class QueryEngine:
             extra_headers={"Accept": "*/*", "Accept-Encoding": "identity"},
             stream=stream,
         )
-        df = process_arrow_streaming_response(response, print_progress)
+        # We can only print progress for streaming responses
+        df = process_arrow_streaming_response(response, print_progress and stream)
         if df.empty:
             raise ValueError("No data available for the given parameters.")
 
