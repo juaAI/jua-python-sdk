@@ -1,0 +1,60 @@
+name: Run Examples After Approval
+
+on:
+  pull_request_review:
+    types: [submitted]
+
+jobs:
+  check-approval:
+    name: Check if PR is Approved
+    runs-on: ubuntu-latest
+    if: github.event.review.state == 'approved'
+    outputs:
+      approved: ${{ steps.check.outputs.approved }}
+    steps:
+      - name: Check approval status
+        id: check
+        run: |
+          echo "PR has been approved"
+          echo "approved=true" >> $GITHUB_OUTPUT
+
+  run-examples:
+    name: Run Example Scripts (${{ matrix.os }})
+    needs: check-approval
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Python, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.13"
+
+      - name: Run weather examples
+        env:
+          JUA_API_KEY_ID: ${{ secrets.JUA_API_KEY_ID }}
+          JUA_API_KEY_SECRET: ${{ secrets.JUA_API_KEY_SECRET }}
+          MPLBACKEND: Agg  # Use non-interactive matplotlib backend
+        run: |
+          for script in examples/weather/*.py; do
+            echo "Running $script..."
+            uv run python "$script" || { echo "Failed to run $script"; exit 1; }
+          done
+
+      - name: Run market aggregates examples
+        env:
+          JUA_API_KEY_ID: ${{ secrets.JUA_API_KEY_ID }}
+          JUA_API_KEY_SECRET: ${{ secrets.JUA_API_KEY_SECRET }}
+          MPLBACKEND: Agg  # Use non-interactive matplotlib backend
+        run: |
+          for script in examples/market_aggregates/*.py; do
+            echo "Running $script..."
+            uv run python "$script" || { echo "Failed to run $script"; exit 1; }
+          done
