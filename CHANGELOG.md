@@ -1,3 +1,9 @@
+## v0.15.4 (2025-10-30)
+
+### Fix
+
+- use max_prediction_timdelta in legacy function
+
 ## v0.15.3 (2025-10-29)
 
 ### Fix
