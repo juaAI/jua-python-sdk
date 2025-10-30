@@ -268,7 +268,7 @@ class QueryEngine:
                 "The requested data volume is too large for a single call. "
                 f"Estimated size is {est_requested_points} points, which exceeds the "
                 f"limit of {self._MAX_POINTS_PER_REQUEST}. The total rows equal "
-                "number_of_points × number_of_lead_times × number_of_init_times. "
+                "number_of_points x number_of_lead_times x number_of_init_times. "
                 "Please split your request into smaller chunks (e.g., fewer points, a "
                 "smaller init_time range, or fewer lead times)."
             )

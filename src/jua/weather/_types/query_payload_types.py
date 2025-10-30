@@ -40,7 +40,7 @@ class ForecastQueryPayload(BaseModel):
         """Estimate number of requested data rows for this payload.
 
         Calculation per model:
-          points_count × init_times_count × prediction_timedelta_count
+          points_count x init_times_count x prediction_timedelta_count
 
         Notes:
         - For point selection, points_count is the number of points provided.

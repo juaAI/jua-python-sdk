@@ -223,7 +223,7 @@ class Forecast:
                 points=points,
                 method=method,
                 stream=False,
-                print_progress=print_progress,
+                print_progress=False,
             )
             return JuaDataset(
                 settings=self._client.settings,
