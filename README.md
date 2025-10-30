@@ -88,11 +88,16 @@ from jua.weather import Models, Variables
 client = JuaClient()
 model = client.weather.get_model(Models.EPT1_5)
 zurich = LatLon(lat=47.3769, lon=8.5417)
+
+# Check if 10-day forecast is ready for the latest available init_time
+is_ten_day_ready = model.is_ready(forecasted_hours=240)
+
 # Get latest forecast
-forecast = model.get_forecasts(points=[zurich])
-temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
-temp_data.to_celcius().to_absolute_time().plot()
-plt.show()
+if is_ten_day_ready:
+    forecast = model.get_forecasts(points=[zurich], max_lead_time=240)
+    temp_data = forecast[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M]
+    temp_data.to_celcius().to_absolute_time().plot()
+    plt.show()
 ```
 
 <details>
