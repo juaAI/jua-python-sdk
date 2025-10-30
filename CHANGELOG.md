@@ -1,3 +1,9 @@
+## v0.16.0 (2025-10-30)
+
+### Feat
+
+- add model.is_ready method
+
 ## v0.15.6 (2025-10-30)
 
 ### Fix
