@@ -54,7 +54,6 @@ jobs:
         with:
           python-version: "3.13"
           python-dependency-group: "dev"
-          python-extras: "plotting"
 
       - name: Run weather examples
         env:
