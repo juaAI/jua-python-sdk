@@ -310,14 +310,17 @@ def build_prediction_timedelta(
         return to_minutes(prediction_timedelta)
 
     if isinstance(prediction_timedelta, slice):
-        if prediction_timedelta.start is None or prediction_timedelta.stop is None:
-            raise ValueError(
-                "prediction_timedelta slice must have both start and stop values"
-            )
-
-        start = to_minutes(prediction_timedelta.start)
-        stop = to_minutes(prediction_timedelta.stop)
-        if stop < start:
+        start = (
+            to_minutes(prediction_timedelta.start)
+            if prediction_timedelta.start is not None
+            else 0
+        )
+        stop = (
+            to_minutes(prediction_timedelta.stop)
+            if prediction_timedelta.stop is not None
+            else None
+        )
+        if stop is not None and stop < start:
             raise ValueError(
                 "prediction_timedelta slice stop must be greater than or equal to start"
             )
