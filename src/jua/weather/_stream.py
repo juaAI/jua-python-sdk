@@ -110,6 +110,10 @@ def _read_stream(
             raise RuntimeError(
                 f"Streaming failed: {stream_err}; fallback failed: {fallback_err}"
             )
+    finally:
+        if progress:
+            progress.refresh()
+            progress.stop()
 
     return table.to_pandas()
 
@@ -145,9 +149,11 @@ class _RawProgressWrapper:
         return True
 
     def flush(self):
-        return
+        self._progress.refresh()
 
     def close(self):
+        self._progress.refresh()
+        self._progress.stop()
         if not self.closed:
             close_fn = getattr(self._raw, "close", None)
             if callable(close_fn):
