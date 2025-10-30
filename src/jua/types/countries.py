@@ -13,7 +13,7 @@ class Countries(Enum):
         >>> country = Countries.GERMANY
         >>> print(country.value)  # "Germany"
         >>> # Special characters normalized:
-        >>> print(Countries.ALAND_ISLANDS.value)  # "Åland Islands"
+        >>> print(Countries.ALAND_ISLANDS.value)  # "Aland Islands"
     """
 
     AFGHANISTAN = "Afghanistan"
@@ -62,10 +62,10 @@ class Countries(Enum):
     COSTA_RICA = "Costa Rica"
     CROATIA = "Croatia"
     CUBA = "Cuba"
-    CURACAO = "Curaçao"
+    CURACAO = "Curacao"
     CYPRUS = "Cyprus"
     CZECHIA = "Czechia"
-    COTE_DIVOIRE = "Côte d'Ivoire"
+    COTE_DIVOIRE = "Cote d'Ivoire"
     DENMARK = "Denmark"
     DJIBOUTI = "Djibouti"
     DOMINICA = "Dominica"
@@ -176,7 +176,7 @@ class Countries(Enum):
     ROMANIA = "Romania"
     RUSSIAN_FEDERATION = "Russian Federation"
     RWANDA = "Rwanda"
-    REUNION = "Réunion"
+    REUNION = "Reunion"
     SAINT_LUCIA = "Saint Lucia"
     SAINT_PIERRE_AND_MIQUELON = "Saint Pierre and Miquelon"
     SAINT_VINCENT_AND_THE_GRENADINES = "Saint Vincent and the Grenadines"
@@ -228,4 +228,4 @@ class Countries(Enum):
     YEMEN = "Yemen"
     ZAMBIA = "Zambia"
     ZIMBABWE = "Zimbabwe"
-    ALAND_ISLANDS = "Åland Islands"
+    ALAND_ISLANDS = "Aland Islands"

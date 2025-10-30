@@ -13,9 +13,7 @@ from jua.weather import JuaDataset
 from jua.weather._api import WeatherAPI
 from jua.weather._model_meta import get_model_meta_info
 from jua.weather._query_engine import QueryEngine
-from jua.weather._types.api_payload_types import ForecastRequestPayload
 from jua.weather._types.api_response_types import ForecastMetadataResponse
-from jua.weather._types.forecast import ForecastData
 from jua.weather.conversions import timedelta_to_hours, to_datetime
 from jua.weather.models import Models
 from jua.weather.statistics import Statistics
@@ -210,6 +208,11 @@ class Forecast:
             statistics = ["mean"]
 
         if not lazy_load:
+            if prediction_timedelta is None and (
+                min_lead_time is not None or max_lead_time is not None
+            ):
+                prediction_timedelta = slice(min_lead_time, max_lead_time)
+
             ds = self._query_engine.get_forecast(
                 model=self._model,
                 init_time=init_time,
@@ -220,7 +223,7 @@ class Forecast:
                 points=points,
                 method=method,
                 stream=False,
-                print_progress=print_progress,
+                print_progress=False,
             )
             return JuaDataset(
                 settings=self._client.settings,
@@ -361,63 +364,6 @@ class Forecast:
             rename_variable(v.name) if isinstance(v, Variables) else rename_variable(v)
             for v in variables
         ]
-
-    def _dispatch_to_api(
-        self,
-        init_time: datetime | str = "latest",
-        points: list[LatLon] | None = None,
-        min_lead_time: int = 0,
-        max_lead_time: int = 0,
-        variables: list[str] | list[Variables] | None = None,
-        statistics: list[str] | list[Statistics] | None = None,
-    ) -> ForecastData:
-        """Send a forecast request to the API.
-
-        This internal method handles direct API communication for point forecasts,
-        handling both latest and historical forecasts.
-
-        Args:
-            init_time: Forecast initialization time
-            points: List of geographic points to get forecasts for
-            min_lead_time: Minimum lead time in hours
-            max_lead_time: Maximum lead time in hours
-            variables: List of weather variables to retrieve
-            statistics: List of statistics to retrieve
-
-        Returns:
-            Forecast data response from the API
-        """
-        if variables is not None:
-            variables = self._rename_variables_for_api(variables)
-
-        if statistics is not None:
-            statistics = [
-                s.key if (isinstance(s, Statistics)) else s for s in statistics
-            ]
-
-        if init_time == "latest":
-            return self._api.get_latest_forecast(
-                model_name=self._model_name,
-                payload=ForecastRequestPayload(
-                    points=points,
-                    min_lead_time=min_lead_time,
-                    max_lead_time=max_lead_time,
-                    variables=variables,
-                    ensemble_stats=statistics,
-                ),
-            )
-
-        return self._api.get_forecast(
-            init_time=init_time,
-            model_name=self._model_name,
-            payload=ForecastRequestPayload(
-                points=points,
-                min_lead_time=min_lead_time,
-                max_lead_time=max_lead_time,
-                variables=variables,
-                ensemble_stats=statistics,
-            ),
-        )
 
     def _dispatch_to_data_adapter(
         self,

@@ -28,7 +28,7 @@ class Variable:
 
         Args:
             name: Standardized variable name.
-            unit: Unit of measurement (e.g., "K" for Kelvin, "m s⁻¹" for wind speed).
+            unit: Unit of measurement (e.g., "K" for Kelvin, "m/s" for wind speed).
             emcwf_code: Optional. The code used for this variable in ECMWF data.
             name_ept2: Optional. The name used for this variable in EPT2 data.
         """
@@ -130,55 +130,55 @@ class Variables(Enum):
         "air_pressure_at_mean_sea_level", "Pa", "msl", "air_pressure_at_mean_sea_level"
     )
     WIND_SPEED_AT_HEIGHT_LEVEL_10M = Variable(
-        "wind_speed_at_height_level_10m", "m s⁻¹", "10si", "wind_speed_10m"
+        "wind_speed_at_height_level_10m", "m/s", "10si", "wind_speed_10m"
     )
     WIND_DIRECTION_AT_HEIGHT_LEVEL_10M = Variable(
-        "wind_direction_at_height_level_10m", "°", "10wdir", "wind_direction_10m"
+        "wind_direction_at_height_level_10m", "deg", "10wdir", "wind_direction_10m"
     )
     WIND_SPEED_AT_HEIGHT_LEVEL_100M = Variable(
-        "wind_speed_at_height_level_100m", "m s⁻¹", "100si", "wind_speed_100m"
+        "wind_speed_at_height_level_100m", "m/s", "100si", "wind_speed_100m"
     )
     WIND_DIRECTION_AT_HEIGHT_LEVEL_100M = Variable(
-        "wind_direction_at_height_level_100m", "°", "100wdir", "wind_direction_100m"
+        "wind_direction_at_height_level_100m", "deg", "100wdir", "wind_direction_100m"
     )
     GEOPOTENTIAL_AT_PRESSURE_LEVEL_50000PA = Variable(
         "geopotential_at_pressure_level_50000Pa",
-        "m² s⁻²",
+        "m^2/s^2",
         "z_500",
         "geopotential_500hpa",
     )
 
     SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
-        "surface_downwelling_shortwave_flux_sum_1h", "J m⁻²", "ssrd", None
+        "surface_downwelling_shortwave_flux_sum_1h", "J / m^2", "ssrd", None
     )
 
     SURFACE_DIRECT_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
-        "surface_direct_downwelling_shortwave_flux_sum_1h", "J m⁻²", "fdir", None
+        "surface_direct_downwelling_shortwave_flux_sum_1h", "J / m^2", "fdir", None
     )
 
     SURFACE_NET_DOWNWARD_SHORTWAVE_FLUX_SUM_1H = Variable(
-        "surface_net_downward_shortwave_flux_sum_1h", "J m⁻²", "ssr", None
+        "surface_net_downward_shortwave_flux_sum_1h", "J / m^2", "ssr", None
     )
 
     SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_6H = Variable(
-        "surface_downwelling_shortwave_flux_sum_6h", "J m⁻²", "ssrd_6hr", None
+        "surface_downwelling_shortwave_flux_sum_6h", "J / m^2", "ssrd_6hr", None
     )
 
     # Additional variables from EPT2 that don't have a direct EPT1_5 equivalent
     EASTWARD_WIND_AT_HEIGHT_LEVEL_10M = Variable(
-        "eastward_wind_at_height_level_10m", "m s⁻¹", None, "eastward_wind_10m"
+        "eastward_wind_at_height_level_10m", "m/s", None, "eastward_wind_10m"
     )
     NORTHWARD_WIND_AT_HEIGHT_LEVEL_10M = Variable(
-        "northward_wind_at_height_level_10m", "m s⁻¹", None, "northward_wind_10m"
+        "northward_wind_at_height_level_10m", "m/s", None, "northward_wind_10m"
     )
     EASTWARD_WIND_AT_HEIGHT_LEVEL_100M = Variable(
-        "eastward_wind_at_height_level_100m", "m s⁻¹", None, "eastward_wind_100m"
+        "eastward_wind_at_height_level_100m", "m/s", None, "eastward_wind_100m"
     )
     NORTHWARD_WIND_AT_HEIGHT_LEVEL_100M = Variable(
-        "northward_wind_at_height_level_100m", "m s⁻¹", None, "northward_wind_100m"
+        "northward_wind_at_height_level_100m", "m/s", None, "northward_wind_100m"
     )
     PRECIPITATION_AMOUNT_SUM_1H = Variable(
-        "precipitation_amount_sum_1h", "mm m⁻2", "tp", "precipitation_amount"
+        "precipitation_amount_sum_1h", "mm / m^2", "tp", "precipitation_amount"
     )
 
     CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE = Variable(

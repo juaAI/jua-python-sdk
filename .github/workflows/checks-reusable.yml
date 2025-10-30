@@ -4,6 +4,39 @@ on:
   workflow_call:
 
 jobs:
+  check-commits:
+    name: Check Commit Messages
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # Fetch full git history
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install commitizen
+        run: |
+          python -m pip install --upgrade pip
+          pip install commitizen
+      - name: Check commit messages (PR)
+        if: github.event_name == 'pull_request'
+        run: |
+          cz check --rev-range ${{ github.event.pull_request.base.sha }}..${{ github.event.pull_request.head.sha }}
+      - name: Check commit messages (Push)
+        if: github.event_name == 'push'
+        run: |
+          # For new branches, github.event.before is all zeros
+          if [ "${{ github.event.before }}" = "0000000000000000000000000000000000000000" ]; then
+            # Find merge base with main and check from there
+            git fetch origin main
+            MERGE_BASE=$(git merge-base origin/main HEAD)
+            cz check --rev-range $MERGE_BASE..HEAD
+          else
+            cz check --rev-range ${{ github.event.before }}..${{ github.event.after }}
+          fi
+
   lint:
     name: Run Linting
     runs-on: ubuntu-latest
@@ -18,26 +51,26 @@ jobs:
         run: just lint
 
   test:
-    name: Run Tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: Run Tests (Python 3.13, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.11", "3.12", "3.13"] # Your test matrix
+        os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      - name: Setup Python ${{ matrix.python-version }}, uv, Just, and Dependencies
+      - name: Setup Python, uv, Just, and Dependencies
         uses: ./.github/actions/setup
         with:
-          python-version: ${{ matrix.python-version }}
+          python-version: "3.13"
       - name: Run tests with Just and generate report
         run: just test-ci
       - name: Publish Test Report
         uses: dorny/test-reporter@v1
         if: always() # Use always() for robust reporting
         with:
-          name: Pytest Results (Python ${{ matrix.python-version }})
+          name: Pytest Results (Python 3.13, ${{ matrix.os }})
           path: "**/pytest-report.xml"
           reporter: java-junit
           fail-on-error: "true"

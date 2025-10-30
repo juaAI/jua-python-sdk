@@ -254,6 +254,13 @@ class QueryEngine:
         if stream is None:
             stream = geo.type != "point"
 
+        if geo.type == "point" and method == "bilinear" and stream:
+            logger.warning(
+                "Cannot use streaming responses with bilinear interpolation. Setting "
+                "stream=False."
+            )
+            stream = False
+
         payload = ForecastQueryPayload(
             models=[model],
             init_time=build_init_time_arg(init_time),
@@ -268,7 +275,7 @@ class QueryEngine:
                 "The requested data volume is too large for a single call. "
                 f"Estimated size is {est_requested_points} points, which exceeds the "
                 f"limit of {self._MAX_POINTS_PER_REQUEST}. The total rows equal "
-                "number_of_points × number_of_lead_times × number_of_init_times. "
+                "number_of_points x number_of_lead_times x number_of_init_times. "
                 "Please split your request into smaller chunks (e.g., fewer points, a "
                 "smaller init_time range, or fewer lead times)."
             )
@@ -293,7 +300,8 @@ class QueryEngine:
             extra_headers={"Accept": "*/*", "Accept-Encoding": "identity"},
             stream=stream,
         )
-        df = process_arrow_streaming_response(response, print_progress)
+        # We can only print progress for streaming responses
+        df = process_arrow_streaming_response(response, print_progress and stream)
         if df.empty:
             raise ValueError("No data available for the given parameters.")
 
@@ -322,8 +330,8 @@ class QueryEngine:
         """
         # Parse times to correct units, enforce correct encoding
         df["init_time"] = df["init_time"].astype("datetime64[ns]")
-        df["prediction_timedelta"] = df["prediction_timedelta"].astype(
-            "timedelta64[ns]"
+        df["prediction_timedelta"] = pd.to_timedelta(
+            df["prediction_timedelta"], unit="m"
         )
 
         # Remove unused metadata columns
@@ -337,69 +345,56 @@ class QueryEngine:
 
         # Set the correct index
         if points is not None:
-            returned_points: list[tuple[float, float]] = (
-                df[["latitude", "longitude"]].drop_duplicates().values
-            )
+            # Map point indices to requested lat/lon and point objects
+            df["requested_lat"] = df["point"].apply(lambda idx: points[idx].lat)
+            df["requested_lon"] = df["point"].apply(lambda idx: points[idx].lon)
 
-            point_mapping: dict[tuple[float, float], LatLon] = {}
-            if len(points) == len(returned_points):
-                # Match each returned point to its corresponding requested point
-                # based on actual coordinates (not order)
-                for ret_lat, ret_lon in returned_points:
-                    # Find the closest requested point
-                    min_dist = float("inf")
-                    best_match = None
-                    for req_point in points:
-                        dist = (ret_lat - req_point.lat) ** 2 + (
-                            ret_lon - req_point.lon
-                        ) ** 2
-                        if dist < min_dist:
-                            min_dist = dist
-                            best_match = req_point
-                    if best_match is None:
-                        logger.warning(
-                            f"No matching point found for {ret_lat}, {ret_lon}"
-                        )
-                    else:
-                        point_mapping[(ret_lat, ret_lon)] = best_match
-            else:
-                point_mapping = {
-                    (lat, lon): LatLon(lat=lat, lon=lon) for lat, lon in returned_points
-                }
+            # Convert point objects to string for use as dimension
+            df["points"] = df["point"].apply(lambda idx: str(points[idx]))
 
-            df["points"] = df.apply(
-                lambda row: str(point_mapping[(row["latitude"], row["longitude"])]),
-                axis=1,
-            )
-            df["requested_lat"] = df.apply(
-                lambda row: point_mapping[(row["latitude"], row["longitude"])].lat,
-                axis=1,
-            )
-            df["requested_lon"] = df.apply(
-                lambda row: point_mapping[(row["latitude"], row["longitude"])].lon,
-                axis=1,
-            )
-
-            # Keep track of lat/lon for each point_id before dropping them
+            # Keep track of both actual and requested lat/lon for each point
             point_coords = (
-                df[["points", "requested_lat", "requested_lon"]]
+                df[
+                    [
+                        "points",
+                        "latitude",
+                        "longitude",
+                        "requested_lat",
+                        "requested_lon",
+                    ]
+                ]
                 .drop_duplicates()
                 .set_index("points")
             )
 
-            cols_to_drop = ["latitude", "longitude", "requested_lat", "requested_lon"]
+            cols_to_drop = [
+                "point",
+                "latitude",
+                "longitude",
+                "requested_lat",
+                "requested_lon",
+            ]
             df.drop(cols_to_drop, inplace=True, axis=1)
             df.set_index(
                 ["points", "init_time", "prediction_timedelta"],
                 inplace=True,
             )
-            # Remove duplicates, if there are any (remove once duplicates are handeled)
-            df = df.loc[~df.index.duplicated()]
+
             ds = xr.Dataset.from_dataframe(df)
+            # Align point_coords with the xarray dataset's points dimension order
+            point_coords_aligned = point_coords.loc[ds.points.values]
             ds = ds.assign_coords(
                 {
-                    "latitude": ("points", point_coords["requested_lat"].values),
-                    "longitude": ("points", point_coords["requested_lon"].values),
+                    "latitude": ("points", point_coords_aligned["latitude"].values),
+                    "longitude": ("points", point_coords_aligned["longitude"].values),
+                    "requested_lat": (
+                        "points",
+                        point_coords_aligned["requested_lat"].values,
+                    ),
+                    "requested_lon": (
+                        "points",
+                        point_coords_aligned["requested_lon"].values,
+                    ),
                 }
             )
         else:

@@ -1,3 +1,41 @@
+## v0.15.6 (2025-10-30)
+
+### Fix
+
+- improve the progress logging to the console, flush the output and close the progress
+- set stream to false and log a warning when bilinear interpolation is used for point queries
+
+## v0.15.5 (2025-10-30)
+
+### Fix
+
+- typo and unit
+- no need to print progress when not streaming
+- replacing all utf8 characters causing issues sometimes
+
+## v0.15.4 (2025-10-30)
+
+### Fix
+
+- use max_prediction_timdelta in legacy function
+
+## v0.15.3 (2025-10-29)
+
+### Fix
+
+- use returned lat and lon instead of requested
+
+## v0.15.2 (2025-10-29)
+
+### Fix
+
+- correctly match point indices
+
+### Refactor
+
+- remove debug print
+- remove unused code
+
 ## v0.15.1 (2025-10-29)
 
 ### Fix
