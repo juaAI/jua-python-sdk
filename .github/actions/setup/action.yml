@@ -52,7 +52,7 @@ runs:
 
     - name: Install Python dependencies with uv
       shell: bash
-      run: uv sync --group ${{ inputs.python-dependency-group }}
+      run: uv sync --all-extras --group ${{ inputs.python-dependency-group }}
       # If you use a uv.lock file and want to ensure it's strictly followed:
       # run: uv sync --frozen --group ${{ inputs.python-dependency-group }}
 # No explicit outputs needed from this composite action for basic setup.
