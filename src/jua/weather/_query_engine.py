@@ -280,11 +280,7 @@ class QueryEngine:
         if model == Models.EPT2_E:
             data["aggregation"] = ["avg"]
 
-        query_params = {
-            "format": "arrow",
-            "stream": str(stream).lower(),
-            "request_credit_limit": 10000,
-        }
+        query_params = {"format": "arrow", "stream": str(stream).lower()}
         if self._jua_client.request_credit_limit is not None:
             query_params["request_credit_limit"] = str(
                 self._jua_client.request_credit_limit

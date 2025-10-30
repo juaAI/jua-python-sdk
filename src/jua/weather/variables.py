@@ -28,7 +28,7 @@ class Variable:
 
         Args:
             name: Standardized variable name.
-            unit: Unit of measurement (e.g., "K" for Kelvin, "m/2" for wind speed).
+            unit: Unit of measurement (e.g., "K" for Kelvin, "m/s" for wind speed).
             emcwf_code: Optional. The code used for this variable in ECMWF data.
             name_ept2: Optional. The name used for this variable in EPT2 data.
         """
