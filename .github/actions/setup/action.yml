@@ -86,9 +86,20 @@ runs:
         fi
 
         # Execute uv sync with the built arguments
-        uv sync "${UV_SYNC_ARGS[@]}"
+        echo "Running uv sync with ${#UV_SYNC_ARGS[@]} additional arguments"
+        if [ ${#UV_SYNC_ARGS[@]} -gt 0 ]; then
+          echo "Arguments: ${UV_SYNC_ARGS[*]}"
+        fi
+
+        if [ ${#UV_SYNC_ARGS[@]} -eq 0 ]; then
+          echo "Executing: uv sync"
+          uv sync
+        else
+          echo "Executing: uv sync ${UV_SYNC_ARGS[*]}"
+          uv sync "${UV_SYNC_ARGS[@]}"
+        fi
         # If you use a uv.lock file and want to ensure it's strictly followed:
-        # Add --frozen flag: uv sync --frozen "${UV_SYNC_ARGS[@]}"
+        # Add --frozen flag before uv sync
 # No explicit outputs needed from this composite action for basic setup.
 # If you needed to output something like the exact cache key used, you could define it:
 # outputs:
