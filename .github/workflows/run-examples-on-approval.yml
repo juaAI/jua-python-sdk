@@ -75,6 +75,7 @@ jobs:
           JUA_API_KEY_ID: ${{ secrets.JUA_API_KEY_ID }}
           JUA_API_KEY_SECRET: ${{ secrets.JUA_API_KEY_SECRET }}
           MPLBACKEND: Agg  # Use non-interactive matplotlib backend
+        shell: bash
         run: |
           for script in examples/weather/*.py; do
             echo "Running $script..."
@@ -86,6 +87,7 @@ jobs:
           JUA_API_KEY_ID: ${{ secrets.JUA_API_KEY_ID }}
           JUA_API_KEY_SECRET: ${{ secrets.JUA_API_KEY_SECRET }}
           MPLBACKEND: Agg  # Use non-interactive matplotlib backend
+        shell: bash
         run: |
           for script in examples/market_aggregates/*.py; do
             echo "Running $script..."
