@@ -12,10 +12,15 @@ inputs:
     required: false
     default: "uv-deps"
     type: string
-  python-dependency-group: # Allows specifying which dependency group to sync
-    description: "Dependency group to install with uv sync (e.g., dev, main)"
+  python-dependency-group: # Allows specifying which dependency groups to sync (comma-separated list)
+    description: "Dependency groups to install with uv sync (e.g., dev, main). Multiple groups can be specified as a comma-separated list."
     required: false
     default: "dev"
+    type: string
+  python-extras: # Allows specifying which optional dependencies to install
+    description: "Optional dependencies to install (e.g., plotting, docs). Multiple extras can be specified as a comma-separated list."
+    required: false
+    default: ""
     type: string
 
 runs:
@@ -52,9 +57,37 @@ runs:
 
     - name: Install Python dependencies with uv
       shell: bash
-      run: uv sync --group ${{ inputs.python-dependency-group }}
-      # If you use a uv.lock file and want to ensure it's strictly followed:
-      # run: uv sync --frozen --group ${{ inputs.python-dependency-group }}
+      run: |
+        # Build the uv sync command with dependency groups
+        UV_SYNC_CMD="uv sync"
+
+        # Add dependency groups if specified
+        DEPENDENCY_GROUPS="${{ inputs.python-dependency-group }}"
+        if [ -n "$DEPENDENCY_GROUPS" ]; then
+          IFS=',' read -ra GROUPS <<< "$DEPENDENCY_GROUPS"
+          for group in "${GROUPS[@]}"; do
+            group=$(echo "$group" | xargs)  # Trim whitespace
+            if [ -n "$group" ]; then
+              UV_SYNC_CMD="$UV_SYNC_CMD --group $group"
+            fi
+          done
+        fi
+
+        # Add optional dependencies (extras) if specified
+        PYTHON_EXTRAS="${{ inputs.python-extras }}"
+        if [ -n "$PYTHON_EXTRAS" ]; then
+          IFS=',' read -ra EXTRAS <<< "$PYTHON_EXTRAS"
+          for extra in "${EXTRAS[@]}"; do
+            extra=$(echo "$extra" | xargs)  # Trim whitespace
+            if [ -n "$extra" ]; then
+              UV_SYNC_CMD="$UV_SYNC_CMD --extra $extra"
+            fi
+          done
+        fi
+
+        eval "$UV_SYNC_CMD"
+        # If you use a uv.lock file and want to ensure it's strictly followed:
+        # Add --frozen flag before evaluating the command
 # No explicit outputs needed from this composite action for basic setup.
 # If you needed to output something like the exact cache key used, you could define it:
 # outputs:

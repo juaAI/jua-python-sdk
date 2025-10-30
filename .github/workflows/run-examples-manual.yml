@@ -53,6 +53,8 @@ jobs:
         uses: ./.github/actions/setup
         with:
           python-version: "3.13"
+          python-dependency-group: "dev"
+          python-extras: "plotting"
 
       - name: Run weather examples
         env:
