@@ -1,3 +1,11 @@
+## v0.15.5 (2025-10-30)
+
+### Fix
+
+- typo and unit
+- no need to print progress when not streaming
+- replacing all utf8 characters causing issues sometimes
+
 ## v0.15.4 (2025-10-30)
 
 ### Fix
