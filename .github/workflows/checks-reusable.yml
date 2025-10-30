@@ -51,11 +51,12 @@ jobs:
         run: just lint
 
   test:
-    name: Run Tests (Python ${{ matrix.python-version }})
-    runs-on: ubuntu-latest
+    name: Run Tests (Python ${{ matrix.python-version }}, ${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - name: Checkout code
@@ -70,7 +71,7 @@ jobs:
         uses: dorny/test-reporter@v1
         if: always() # Use always() for robust reporting
         with:
-          name: Pytest Results (Python ${{ matrix.python-version }})
+          name: Pytest Results (Python ${{ matrix.python-version }}, ${{ matrix.os }})
           path: "**/pytest-report.xml"
           reporter: java-junit
           fail-on-error: "true"
