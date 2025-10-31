@@ -126,3 +126,7 @@ exclude = [
 
 [tool.pytest.ini_options]
 pythonpath = ["tests"]
+addopts = "-m 'not functional'"
+markers = [
+    "functional: marks tests as functional (deselect with '-m \"not functional\"')",
+]

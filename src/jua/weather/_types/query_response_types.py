@@ -174,7 +174,9 @@ class ModelMetadata(BaseModel):
         ...,
         description="List of available weather variables for this model.",
     )
-    grid: GridInfo = Field(..., description="Spatial grid information for this model")
+    grid: GridInfo | None = Field(
+        ..., description="Spatial grid information for this model"
+    )
 
     def __repr__(self) -> str:
         vars = [v.name.upper() for v in self.variables]
@@ -187,7 +189,11 @@ class ModelMetadata(BaseModel):
         var_str = "  variables:\n"
         for v in self.variables:
             var_str += 4 * " " + v.name.upper() + "\n"
-        grid_str = f"  grid: {self.grid}"
+
+        grid_str = ""
+        if self.grid:
+            grid_str = f"  grid: {self.grid}"
+
         return f"ModelMetadata:\n{model_str}{var_str}{grid_str}"
 
     @field_validator("variables", mode="before")

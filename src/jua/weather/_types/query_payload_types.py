@@ -34,6 +34,7 @@ class ForecastQueryPayload(BaseModel):
     geo: GeoFilter
     prediction_timedelta: int | list[int] | PredictionTimedeltaSlice | None
     timedelta_unit: Literal["h", "m", "d"] = "m"
+    aggregation: list[str] | None = None
     variables: list[str] | None = None
 
     def num_requested_points(self) -> int:

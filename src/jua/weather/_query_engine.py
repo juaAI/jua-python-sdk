@@ -27,6 +27,7 @@ from jua.weather._types.query_response_types import (
     MetaQueryResult,
 )
 from jua.weather.models import Models
+from jua.weather.statistics import Statistics
 from jua.weather.variables import Variables
 
 logger = getLogger(__name__)
@@ -193,6 +194,7 @@ class QueryEngine:
         latitude: SpatialSelection | None = None,
         longitude: SpatialSelection | None = None,
         points: list[LatLon] | LatLon | None = None,
+        statistics: list[str] | list[Statistics] | None = None,
         method: Literal["nearest", "bilinear"] = "nearest",
         stream: bool | None = None,
         print_progress: bool | None = None,
@@ -225,6 +227,8 @@ class QueryEngine:
             points: Specific geographic points to get forecasts for. Can be a single
                 LatLon object or a list of LatLon objects.
 
+            statistics: For ensemble models, the statistics to return.
+
             method: Interpolation method for selecting points:
                 - "nearest": Use nearest grid point (default)
                 - "bilinear": Bilinear interpolation to the selected point
@@ -243,12 +247,15 @@ class QueryEngine:
         Raises:
             ValueError: If the location parameters are invalid.
         """
+        if isinstance(points, LatLon):
+            points = [points]
+
         geo = build_geo_filter(latitude, longitude, points, method)
         model_meta = get_model_meta_info(model)
         if not model_meta.has_grid_access and geo.type != "point":
             raise ValueError(
-                f"There is no access to full slices with {model} - use the "
-                "existing model.forecast.get_forecast(...) method"
+                f"There is no access to grid slices with {model}. You can only make "
+                "point queries."
             )
 
         if stream is None:
@@ -261,12 +268,28 @@ class QueryEngine:
             )
             stream = False
 
+        stats: list[Statistics] = []
+        if statistics is not None:
+            for s in statistics:
+                if isinstance(s, str):
+                    stats.append(Statistics(s))
+                elif isinstance(s, Statistics):
+                    stats.append(s)
+                else:
+                    raise ValueError(
+                        f"`statistics` must be a list of statistics; found {s}"
+                    )
+        if model == Models.EPT2_E and len(stats) == 0:
+            stats = [Statistics.MEAN]
+        aggregation = [s.agg for s in stats] if stats else None
+
         payload = ForecastQueryPayload(
             models=[model],
             init_time=build_init_time_arg(init_time),
             geo=geo,
             prediction_timedelta=build_prediction_timedelta(prediction_timedelta),
             variables=variables,
+            aggregation=aggregation,
         )
 
         est_requested_points = payload.num_requested_points()
@@ -284,9 +307,6 @@ class QueryEngine:
             print_progress = self._jua_client.settings.print_progress
 
         data = remove_none_from_dict(payload.model_dump())
-        if model == Models.EPT2_E:
-            data["aggregation"] = ["avg"]
-
         query_params = {"format": "arrow", "stream": str(stream).lower()}
         if self._jua_client.request_credit_limit is not None:
             query_params["request_credit_limit"] = str(
@@ -313,20 +333,61 @@ class QueryEngine:
             else:
                 points = [LatLon(lat=lat, lon=lon) for lat, lon in geo.value]  # type: ignore
 
-        return self._transform_dataframe(df, points=points)  # type: ignore
+        return self._transform_dataframe(
+            df,
+            points=points,
+            statistics=stats,
+        )
 
     def _transform_dataframe(
-        self, df: pd.DataFrame, points: list[LatLon] | None = None
+        self,
+        df: pd.DataFrame,
+        points: list[LatLon] | None = None,
+        statistics: list[Statistics] | None = None,
     ) -> xr.Dataset:
-        """Transform a raw DataFrame into an xr.Dataset
+        """Transform a raw DataFrame from the query engine into an xr.Dataset.
+
+        This method converts tabular forecast data into a structured xarray Dataset with
+        appropriate dimensions, coordinates, and data types. It handles both grid-based
+        and point-based queries, and restructures ensemble statistics when requested.
 
         Args:
             df: DataFrame to convert. Must have `init_time`, `model`,
-            `prediction_timedelta`, `latitude` and `longitude` columns.
+                `prediction_timedelta`, `latitude` and `longitude` columns. For ensemble
+                models with statistics, columns are named as `{stat}__{variable}`.
+            points: The points requested, if a point request was made. When provided,
+                creates a "points" dimension and adds both requested and actual grid
+                coordinates as metadata.
+            statistics: The statistics requested for ensemble models. When provided,
+                variables with stat prefixes are combined into a single variable with
+                a "stat" dimension.
 
         Returns:
-            An xarray dataset with "init_time", "prediction_timedelta", "latitude",
-            "longitude" dimesions.
+            An xarray Dataset with the following structure:
+
+            **Grid queries** (points is None):
+                - Dimensions: `init_time`, `prediction_timedelta`, `latitude`,
+                    `longitude`
+                - Variables: Weather variables as float32
+
+            **Point queries** (points is provided):
+                - Dimensions: `points`, `init_time`, `prediction_timedelta`
+                - Coordinates:
+                    - `latitude`: Actual grid latitude for each point
+                    - `longitude`: Actual grid longitude for each point
+                    - `requested_lat`: Originally requested latitude
+                    - `requested_lon`: Originally requested longitude
+                - Variables: Weather variables as float32
+
+            **With statistics** (statistics is not None or empty):
+                - Adds a `stat` dimension to all variables
+                - Variables like `mean__temperature` and `max__temperature` are combined
+                  into a single `temperature` variable with shape (..., stat)
+                - The `stat` coordinate contains statistic keys (e.g., "mean", "max")
+
+        Note:
+            - All data variables are converted to float32 for memory efficiency
+            - Init time encoding is set to nanoseconds since epoch
         """
         # Parse times to correct units, enforce correct encoding
         df["init_time"] = df["init_time"].astype("datetime64[ns]")
@@ -406,13 +467,6 @@ class QueryEngine:
             df = df.loc[~df.index.duplicated()]
             ds = xr.Dataset.from_dataframe(df)
 
-        # Rename aggregated data variables
-        rename_dict = {
-            var: var.replace("avg__", "") for var in ds.data_vars if "avg__" in var
-        }
-        if rename_dict:
-            ds = ds.rename(rename_dict)
-
         # Set the dtype for all data_vars to float32
         for var in ds.data_vars:
             ds[var] = ds[var].astype("float32")
@@ -422,4 +476,34 @@ class QueryEngine:
             "dtype": "int64",
             "units": "nanoseconds since 1970-01-01T00:00:00",
         }
+
+        # obtain statistics from the DataVars if they were requested
+        if statistics == [Statistics.MEAN]:
+            rename_dict = {
+                var: var.replace("avg__", "") for var in ds.data_vars if "avg__" in var
+            }
+            if rename_dict:
+                ds = ds.rename(rename_dict)
+        elif statistics:
+            base_stat = statistics[0]
+            vars = [  # get var names using the first statistic
+                v.split("__")[1]
+                for v in ds.data_vars
+                if v.startswith(f"{base_stat.agg}__")
+            ]
+            for var in vars:
+                # collect variable data
+                arrays = []
+                for stat in statistics:
+                    da_stat = ds[f"{stat.agg}__{var}"]
+                    da_stat["stat"] = stat.key
+                    arrays.append(da_stat)
+
+                # drop stat DataArrays from the Dataset
+                for stat in statistics:
+                    ds = ds.drop_vars(f"{stat.agg}__{var}")
+
+                # add the new DataArray with a combined statistics
+                ds[var] = xr.concat(arrays, dim="stat")
+
         return ds

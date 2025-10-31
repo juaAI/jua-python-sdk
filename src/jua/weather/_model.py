@@ -8,6 +8,7 @@ from jua.client import JuaClient
 from jua.logging import get_logger
 from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
 from jua.weather import JuaDataset
+from jua.weather._model_meta import get_model_meta_info
 from jua.weather._query_engine import QueryEngine
 from jua.weather._types.pagination import Pagination
 from jua.weather._types.query_response_types import (
@@ -18,6 +19,7 @@ from jua.weather._types.query_response_types import (
 from jua.weather.forecast import Forecast
 from jua.weather.hindcast import Hindcast
 from jua.weather.models import Models as ModelEnum
+from jua.weather.statistics import Statistics
 from jua.weather.variables import Variables
 
 logger = get_logger(__name__)
@@ -103,6 +105,7 @@ class Model:
         points: list[LatLon] | LatLon | None = None,
         min_lead_time: int | None = None,
         max_lead_time: int | None = None,
+        statistics: list[str] | list[Statistics] | None = None,
         method: Literal["nearest", "bilinear"] = "nearest",
         stream: bool | None = None,
         print_progress: bool | None = None,
@@ -154,6 +157,8 @@ class Model:
             max_lead_time: Maximum lead time in hours
                 (alternative to prediction_timedelta).
 
+            statistics: For ensemble models, the statistics to return.
+
             method: Interpolation method for selecting points:
                 - "nearest": Use nearest grid point (default).
                 - "bilinear": Bilinear interpolation to the selected point.
@@ -198,6 +203,9 @@ class Model:
             ...     max_lead_time=24,
             ... )
         """
+        if statistics:
+            self._check_model_has_stats()
+
         if variables is None:
             variables = [Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M.name]
         else:
@@ -221,6 +229,7 @@ class Model:
             latitude=latitude,
             longitude=longitude,
             points=points,
+            statistics=statistics,
             method=method,
             stream=stream,
             print_progress=print_progress,
@@ -260,6 +269,8 @@ class Model:
             >>> is_ten_day_ready = model.is_ready(240, datetime(2025, 10, 1, 0))
             >>>
         """
+        self._check_model_has_grid_access()
+
         if init_time == "latest":
             latest = self.get_latest_init_time(min_prediction_timedelta=0)
             return latest.prediction_timedelta >= forecasted_hours
@@ -349,6 +360,7 @@ class Model:
             ...     result = result.next()
             ...     all_forecasts.extend(result.forecasts)
         """
+        self._check_model_has_grid_access()
 
         def fetch_page(offset: int) -> AvailableForecasts:
             """Internal helper to fetch a specific page of results."""
@@ -515,3 +527,13 @@ class Model:
             The model name.
         """
         return self.name
+
+    def _check_model_has_grid_access(self) -> None:
+        meta = get_model_meta_info(self._model)
+        if not meta.has_grid_access:
+            raise ValueError(f"This method is not available for {self._model}.")
+
+    def _check_model_has_stats(self) -> None:
+        meta = get_model_meta_info(self._model)
+        if not meta.has_statistics:
+            raise ValueError(f"No statistics are available for {self._model}.")

@@ -3,24 +3,50 @@ name: Run Examples After Approval
 on:
   pull_request_review:
     types: [submitted]
+  pull_request:
+    types: [synchronize]
 
 jobs:
   check-approval:
     name: Check if PR is Approved
     runs-on: ubuntu-latest
-    if: github.event.review.state == 'approved'
     outputs:
       approved: ${{ steps.check.outputs.approved }}
     steps:
-      - name: Check approval status
+      - name: Check if PR has been approved
         id: check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
         run: |
-          echo "PR has been approved"
-          echo "approved=true" >> $GITHUB_OUTPUT
+          # Check if this was triggered by an approval review
+          if [ "${{ github.event_name }}" = "pull_request_review" ] && [ "${{ github.event.review.state }}" = "approved" ]; then
+            echo "PR has just been approved"
+            echo "approved=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+
+          # For pull_request events, check if PR has any approvals
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            APPROVALS=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              /repos/${{ github.repository }}/pulls/${PR_NUMBER}/reviews \
+              --jq '[.[] | select(.state == "APPROVED")] | length')
+
+            if [ "$APPROVALS" -gt 0 ]; then
+              echo "PR has $APPROVALS approval(s)"
+              echo "approved=true" >> $GITHUB_OUTPUT
+            else
+              echo "PR is not yet approved"
+              echo "approved=false" >> $GITHUB_OUTPUT
+            fi
+          fi
 
   test-full-matrix:
     name: Run Tests (Python ${{ matrix.python-version }}, ${{ matrix.os }})
     needs: check-approval
+    if: needs.check-approval.outputs.approved == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -50,9 +76,46 @@ jobs:
           reporter: java-junit
           fail-on-error: "true"
 
+  run-functional-tests:
+    name: Run Functional Tests (${{ matrix.os }})
+    needs: check-approval
+    if: needs.check-approval.outputs.approved == 'true'
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Python, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.13"
+          python-dependency-group: "dev"
+
+      - name: Run functional tests
+        env:
+          JUA_API_KEY_ID: ${{ secrets.JUA_API_KEY_ID }}
+          JUA_API_KEY_SECRET: ${{ secrets.JUA_API_KEY_SECRET }}
+        run: just test-functional-ci
+
+      - name: Publish Functional Test Report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Functional Test Results (Python 3.13, ${{ matrix.os }})
+          path: "**/pytest-functional-report.xml"
+          reporter: java-junit
+          fail-on-error: "true"
+
   run-examples:
     name: Run Example Scripts (${{ matrix.os }})
     needs: check-approval
+    if: needs.check-approval.outputs.approved == 'true'
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
