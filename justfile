@@ -13,6 +13,12 @@ test:
 test-ci:
     uv run pytest --junitxml=pytest-report.xml
 
+test-functional:
+    uv run pytest tests/functional -v -m functional
+
+test-functional-ci:
+    uv run pytest tests/functional --junitxml=pytest-functional-report.xml -v -m functional
+
 check-commit: lint test
 
 push-to-pypi:
