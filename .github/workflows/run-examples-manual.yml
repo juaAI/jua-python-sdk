@@ -38,6 +38,40 @@ jobs:
           reporter: java-junit
           fail-on-error: "true"
 
+  run-functional-tests:
+    name: Run Functional Tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.head.sha }}
+
+      - name: Setup Python, uv, Just, and Dependencies
+        uses: ./.github/actions/setup
+        with:
+          python-version: "3.13"
+          python-dependency-group: "dev"
+
+      - name: Run functional tests
+        env:
+          JUA_API_KEY_ID: ${{ secrets.JUA_API_KEY_ID }}
+          JUA_API_KEY_SECRET: ${{ secrets.JUA_API_KEY_SECRET }}
+        run: just test-functional-ci
+
+      - name: Publish Functional Test Report
+        uses: dorny/test-reporter@v1
+        if: always()
+        with:
+          name: Functional Test Results (Python 3.13, ${{ matrix.os }})
+          path: "**/pytest-functional-report.xml"
+          reporter: java-junit
+          fail-on-error: "true"
+
   run-examples:
     name: Run Example Scripts (${{ matrix.os }})
     runs-on: ${{ matrix.os }}
