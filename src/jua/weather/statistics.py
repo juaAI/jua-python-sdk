@@ -17,6 +17,7 @@ class Statistic:
 
     key: str
     name: str
+    aggregation: str
 
     @property
     def display_name(self) -> str:
@@ -62,12 +63,18 @@ class Statistics(Enum):
     specifying which statistic to use with weather data functions.
     """
 
-    MEAN = Statistic(key="mean", name="mean")
-    STD = Statistic(key="std", name="standard deviation")
-    QUANTILE_5 = Statistic(key="q5", name="5th_quantile")
-    QUANTILE_25 = Statistic(key="q25", name="25th_quantile")
-    QUANTILE_75 = Statistic(key="q75", name="75th_quantile")
-    QUANTILE_95 = Statistic(key="q95", name="95th_quantile")
+    MEAN = Statistic(key="mean", name="mean", aggregation="avg")
+    STD = Statistic(key="std", name="standard deviation", aggregation="std")
+    QUANTILE_5 = Statistic(key="q5", name="5th_quantile", aggregation="quantile_(0.05)")
+    QUANTILE_25 = Statistic(
+        key="q25", name="25th_quantile", aggregation="quantile_(0.25)"
+    )
+    QUANTILE_75 = Statistic(
+        key="q75", name="75th_quantile", aggregation="quantile_(0.75)"
+    )
+    QUANTILE_95 = Statistic(
+        key="q95", name="95th_quantile", aggregation="quantile_(0.95)"
+    )
 
     @property
     def display_name(self) -> str:
@@ -77,6 +84,15 @@ class Statistics(Enum):
             The display name of the statistic.
         """
         return self.value.display_name
+
+    @property
+    def agg(self) -> str:
+        """Return the name of the aggregation for the statistic.
+
+        Returns:
+            The name of the aggregation for the statistic.
+        """
+        return self.value.aggregation
 
     @property
     def key(self) -> str:
