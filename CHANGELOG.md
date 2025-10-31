@@ -1,3 +1,13 @@
+## v0.17.0 (2025-10-31)
+
+### Feat
+
+- implement statistics in get_forecasts
+
+### Fix
+
+- better error messages when users make malformed queries, and improvements to docstrings
+
 ## v0.16.0 (2025-10-30)
 
 ### Feat
