@@ -14,7 +14,8 @@ class Models(str, Enum):
         >>> from jua.weather.models import Models
         >>> # Request forecast from a specific model
         >>> model = client.weather.get_model(Models.EPT1_5)
-        >>> model.forecast.get_latest()
+        >>> geneva = LatLon(lat=46.2044, lon=6.1432, label="Geneva")
+        >>> model.get_forecasts(points=[geneva])  # get the latest forcast for Geneva
     """
 
     # With Grid Access

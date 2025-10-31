@@ -8,6 +8,7 @@ from jua.client import JuaClient
 from jua.logging import get_logger
 from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
 from jua.weather import JuaDataset
+from jua.weather._model_meta import get_model_meta_info
 from jua.weather._query_engine import QueryEngine
 from jua.weather._types.pagination import Pagination
 from jua.weather._types.query_response_types import (
@@ -260,6 +261,8 @@ class Model:
             >>> is_ten_day_ready = model.is_ready(240, datetime(2025, 10, 1, 0))
             >>>
         """
+        self._check_model_has_grid_access()
+
         if init_time == "latest":
             latest = self.get_latest_init_time(min_prediction_timedelta=0)
             return latest.prediction_timedelta >= forecasted_hours
@@ -349,6 +352,7 @@ class Model:
             ...     result = result.next()
             ...     all_forecasts.extend(result.forecasts)
         """
+        self._check_model_has_grid_access()
 
         def fetch_page(offset: int) -> AvailableForecasts:
             """Internal helper to fetch a specific page of results."""
@@ -515,3 +519,8 @@ class Model:
             The model name.
         """
         return self.name
+
+    def _check_model_has_grid_access(self) -> None:
+        meta = get_model_meta_info(self._model)
+        if not meta.has_grid_access:
+            raise ValueError(f"This method is not available for {self._model}.")

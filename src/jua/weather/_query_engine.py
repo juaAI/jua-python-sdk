@@ -247,8 +247,8 @@ class QueryEngine:
         model_meta = get_model_meta_info(model)
         if not model_meta.has_grid_access and geo.type != "point":
             raise ValueError(
-                f"There is no access to full slices with {model} - use the "
-                "existing model.forecast.get_forecast(...) method"
+                f"There is no access to grid slices with {model}. You can only make "
+                "point queries."
             )
 
         if stream is None:
