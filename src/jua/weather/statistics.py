@@ -111,3 +111,24 @@ class Statistics(Enum):
             The name of the statistic.
         """
         return self.value.name
+
+    @classmethod
+    def from_key(cls, key: str) -> "Statistics":
+        """Get a Statistics enum member from its key.
+
+        Args:
+            key: The key of the statistic (e.g., "mean", "std", "q5").
+
+        Returns:
+            The corresponding Statistics enum member.
+
+        Raises:
+            ValueError: If the key does not correspond to any Statistics member.
+        """
+        for stat in cls:
+            if stat.key == key:
+                return stat
+        raise ValueError(
+            f"No statistic found with key '{key}'. "
+            f"Available keys: {', '.join(s.key for s in cls)}"
+        )
