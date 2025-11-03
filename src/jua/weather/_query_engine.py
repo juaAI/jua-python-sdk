@@ -272,17 +272,15 @@ class QueryEngine:
         if statistics is not None:
             for s in statistics:
                 if isinstance(s, str):
-                    stats.append(Statistics(s))
+                    stats.append(Statistics.from_key(s))
                 elif isinstance(s, Statistics):
                     stats.append(s)
                 else:
                     raise ValueError(
                         f"`statistics` must be a list of statistics; found {s}"
                     )
-        if model == Models.EPT2_E and len(stats) == 0:
-            stats = [Statistics.MEAN]
-        aggregation = [s.agg for s in stats] if stats else None
 
+        aggregation = [s.agg for s in stats] if stats else None
         payload = ForecastQueryPayload(
             models=[model],
             init_time=build_init_time_arg(init_time),
@@ -478,7 +476,11 @@ class QueryEngine:
         }
 
         # obtain statistics from the DataVars if they were requested
-        if statistics == [Statistics.MEAN]:
+        if (
+            statistics is None
+            or len(statistics) == 0
+            or statistics == [Statistics.MEAN]
+        ):
             rename_dict = {
                 var: var.replace("avg__", "") for var in ds.data_vars if "avg__" in var
             }
