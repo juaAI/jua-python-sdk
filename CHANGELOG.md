@@ -1,3 +1,9 @@
+## v0.17.1 (2025-11-03)
+
+### Fix
+
+- makes small fixes to statistics access
+
 ## v0.17.0 (2025-10-31)
 
 ### Feat
