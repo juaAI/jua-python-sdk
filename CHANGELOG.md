@@ -1,3 +1,14 @@
+## v0.18.0 (2025-11-05)
+
+### Feat
+
+- allow to query if a model is a third party model
+- add additional fields to meta response
+
+### Fix
+
+- naming convention
+
 ## v0.17.1 (2025-11-03)
 
 ### Fix
