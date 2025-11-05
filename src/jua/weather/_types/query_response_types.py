@@ -208,6 +208,10 @@ class ModelMetadata(BaseModel):
         default=False,
         description="Whether this model is an ensemble model",
     )
+    is_third_party_model: bool = Field(
+        default=False,
+        description="Whether this model is a third party model or hosted by Jua",
+    )
     variables: list[Variables] = Field(
         ...,
         description="List of available weather variables for this model.",
