@@ -208,9 +208,10 @@ class ModelMetadata(BaseModel):
         default=False,
         description="Whether this model is an ensemble model",
     )
-    is_third_party_model: bool = Field(
+    is_limited_model: bool = Field(
         default=False,
-        description="Whether this model is a third party model or hosted by Jua",
+        description="Limited models only allow access to point forecasts and cannot "
+        "provide access to historical data.",
     )
     variables: list[Variables] = Field(
         ...,
