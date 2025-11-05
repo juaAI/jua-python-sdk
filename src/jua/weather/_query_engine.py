@@ -182,7 +182,7 @@ class QueryEngine:
         }
 
         response = self._api.get("forecast/meta", params=params)
-        return MetaQueryResult(**response.json())
+        return MetaQueryResult.model_validate(response.json())
 
     @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_forecast(
