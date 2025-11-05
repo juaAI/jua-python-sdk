@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, time
 from typing import Callable
 
 from pydantic import BaseModel, Field, field_validator
@@ -162,6 +162,36 @@ class GridInfo(BaseModel):
     )
 
 
+class RunDefinition(BaseModel):
+    lead_time_set: list[int] = Field(
+        default_factory=list,
+        description="List of available lead times for this run in minutes",
+    )
+    dissemination_time: time | None = Field(
+        default=None,
+        description="The time of day at which this run is fully disseminated",
+    )
+
+
+class GridBounds(BaseModel):
+    min_lat: float = Field(
+        ...,
+        description="The minimum latitude of the grid",
+    )
+    max_lat: float = Field(
+        ...,
+        description="The maximum latitude of the grid",
+    )
+    min_lon: float = Field(
+        ...,
+        description="The minimum longitude of the grid",
+    )
+    max_lon: float = Field(
+        ...,
+        description="The maximum longitude of the grid",
+    )
+
+
 class ModelMetadata(BaseModel):
     """Metadata for a single forecast model.
 
@@ -169,23 +199,36 @@ class ModelMetadata(BaseModel):
     about each available weather variable including display names, units, and more.
     """
 
-    model: str = Field(..., description="Model identifier")
+    name: str = Field(..., description="Model identifier")
+    grid: str | None = Field(
+        default=None,
+        description="A human-readable description of the grid for this model",
+    )
+    is_ensemble_model: bool = Field(
+        default=False,
+        description="Whether this model is an ensemble model",
+    )
     variables: list[Variables] = Field(
         ...,
         description="List of available weather variables for this model.",
     )
-    grid: GridInfo | None = Field(
-        ..., description="Spatial grid information for this model"
+    daily_runs: dict[time, RunDefinition] = Field(
+        default_factory=dict,
+        description="Mapping of daily runs to their dissemination times "
+        "and available lead times",
+    )
+    grid_bounds: GridBounds | None = Field(
+        default=None,
+        description="The bounds of the grid for this model in latitude and longitude.\n"
+        "Information might not be available for third party models.",
     )
 
     def __repr__(self) -> str:
         vars = [v.name.upper() for v in self.variables]
-        return (
-            f"<ModelMetadata(model={self.model}, variables={vars}, grid={self.grid})>"
-        )
+        return f"<ModelMetadata(model={self.name}, variables={vars}, grid={self.grid})>"
 
     def __str__(self) -> str:
-        model_str = f"  model: {self.model}\n"
+        model_str = f"  model: {self.name}\n"
         var_str = "  variables:\n"
         for v in self.variables:
             var_str += 4 * " " + v.name.upper() + "\n"
