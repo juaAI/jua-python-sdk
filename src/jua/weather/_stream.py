@@ -10,6 +10,11 @@ from rich.progress import (
     TextColumn,
 )
 
+from jua.errors.api_errors import (
+    ConnectionBrokenError,
+    RequestFailedError,
+)
+
 HTTP_OK = 200
 BYTES_IN_KB = 1024
 BYTES_IN_MB = 1024 * 1024
@@ -86,7 +91,8 @@ def _read_stream(
         The received table as a pandas DataFrame
 
     Raises:
-        RuntimeError if the stream fails to be read.
+        ConnectionBrokenError if the stream fails to be read with a `connection broken`
+        RequestFailedError:
     """
     try:
         raw = response.raw
@@ -107,9 +113,20 @@ def _read_stream(
                         progress.update(task, size=_format_bytes(len(buf)))
             table = pa_ipc.open_stream(pa.BufferReader(bytes(buf))).read_all()
         except Exception as fallback_err:
-            raise RuntimeError(
-                f"Streaming failed: {stream_err}; fallback failed: {fallback_err}"
-            )
+            if "connection broken" in str(stream_err).lower():
+                raise ConnectionBrokenError(
+                    "This likely happened because the request timed out. If this issue "
+                    "persists, try making smaller requests and saving partial results."
+                    "\n\nSee https://docs.jua.ai/python-sdk/weather/large-requests for "
+                    "more information"
+                )
+
+            raise RequestFailedError(
+                details=(
+                    f"Failed to read data with error {stream_err}; fallback failed: "
+                    f"{fallback_err}"
+                )
+            ) from fallback_err
     finally:
         if progress:
             progress.refresh()
@@ -153,7 +170,6 @@ class _RawProgressWrapper:
 
     def close(self):
         self._progress.refresh()
-        self._progress.stop()
         if not self.closed:
             close_fn = getattr(self._raw, "close", None)
             if callable(close_fn):

@@ -69,3 +69,27 @@ class RequestExceedsCreditLimitError(JuaError):
                 "  `client = JuaClient(request_credit_limit=X)`"
             ),
         )
+
+
+class RequestFailedError(JuaError):
+    """Error raised when streaming responses cannot be read."""
+
+    def __init__(self, details: str | None = None):
+        """Initialize with optional details."""
+
+        super().__init__(
+            "Unable to read the response from the API.",
+            details=details if details else "",
+        )
+
+
+class ConnectionBrokenError(JuaError):
+    """Error raised when streaming responses cannot be read."""
+
+    def __init__(self, details: str | None = None):
+        """Initialize with optional details."""
+
+        super().__init__(
+            "Unable to read the response from the API.",
+            details=details if details else "",
+        )
