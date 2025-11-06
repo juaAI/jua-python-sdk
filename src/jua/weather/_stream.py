@@ -92,7 +92,7 @@ def _read_stream(
 
     Raises:
         ConnectionBrokenError if the stream fails to be read with a `connection broken`
-        RequestFailedError:
+        RequestFailedError: if the stream fails for any other reason
     """
     try:
         raw = response.raw
