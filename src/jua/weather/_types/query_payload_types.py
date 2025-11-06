@@ -28,6 +28,22 @@ class PredictionTimedeltaSlice(BaseModel):
     end: int
 
 
+class ForecastIndexQueryPayload(BaseModel):
+    """Payload for the forecast index endpoint.
+
+    Returns coordinate information without loading actual forecast data.
+    More efficient than ForecastQueryPayload when you only need metadata.
+    """
+
+    model: Models
+    latitude: tuple[float, float]
+    longitude: tuple[float, float]
+    init_time: str | list[str] | TimeSlice
+    prediction_timedelta: int | list[int] | PredictionTimedeltaSlice | None = None
+    timedelta_unit: Literal["h", "m", "d"] = "m"
+    variables: list[str] | None = None
+
+
 class ForecastQueryPayload(BaseModel):
     models: list[Models]
     init_time: str | list[str] | TimeSlice
