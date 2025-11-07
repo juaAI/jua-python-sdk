@@ -29,6 +29,7 @@ class Models(str, Enum):
     AIFS = "aifs"
     AURORA = "aurora"
     ECMWF_IFS_SINGLE = "ecmwf_ifs_single"
+    NOAA_GFS_SINGLE = "noaa_gfs_single"
 
     # Without Grid Access
     ECMWF_AIFS_ENSEMBLE = "ecmwf_aifs025_ensemble"
