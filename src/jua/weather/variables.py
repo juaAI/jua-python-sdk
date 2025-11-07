@@ -114,6 +114,9 @@ class Variables(Enum):
     AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M = Variable(
         "air_temperature_at_height_level_2m", "K", "2t", "air_temperature_2m"
     )
+    SURFACE_TEMPERATURE = Variable(
+        "surface_temperature", "K", "skt", None
+    )
     DEW_POINT_TEMPERATURE_AT_HEIGHT_LEVEL_2M = Variable(
         "dew_point_temperature_at_height_level_2m",
         "K",
@@ -129,6 +132,7 @@ class Variables(Enum):
     AIR_PRESSURE_AT_MEAN_SEA_LEVEL = Variable(
         "air_pressure_at_mean_sea_level", "Pa", "msl", "air_pressure_at_mean_sea_level"
     )
+    SURFACE_AIR_PRESSURE = Variable("surface_air_pressure", "Pa", "sp", None)
     WIND_SPEED_AT_HEIGHT_LEVEL_10M = Variable(
         "wind_speed_at_height_level_10m", "m/s", "10si", "wind_speed_10m"
     )
