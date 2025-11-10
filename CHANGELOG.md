@@ -1,3 +1,22 @@
+## v0.19.0 (2025-11-10)
+
+### Feat
+
+- add noaa_gfs_single model
+- adds the core code for lazy-loading using the new api
+
+### Fix
+
+- fix lazy loading xarray creation
+
+### Refactor
+
+- clear the lazy loaded cache on close
+- linting, comments and cleaning code
+- clean unused var
+- clean lazy-loading indexing
+- clean code and improve lazy-loading logic and tests
+
 ## v0.18.0 (2025-11-05)
 
 ### Feat
