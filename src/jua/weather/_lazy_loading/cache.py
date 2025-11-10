@@ -150,6 +150,12 @@ class ForecastCache:
         # Lock for thread safety
         self._lock = RLock()
 
+    def clear(self) -> None:
+        """Clear all cached data and indexes."""
+        with self._lock:
+            self._bbox_cache.clear()
+            self._chunk_to_bbox.clear()
+
     def _positional_to_indices(self, key_any: Any, size: int) -> np.ndarray:
         """Expand a positional indexer (ints/slices/arrays) into integer indices.
 

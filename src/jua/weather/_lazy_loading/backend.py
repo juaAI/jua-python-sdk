@@ -176,6 +176,11 @@ class JuaQueryEngineBackend(BackendEntrypoint):
         if drop_variables is not None:
             ds = ds.drop_vars(list(drop_variables))
 
+        # Ensure closing the dataset frees the shared cache memory
+        def _close_hook() -> None:
+            shared_cache.clear()
+
+        ds.set_close(_close_hook)
         return ds
 
     def guess_can_open(self, filename_or_obj: Any) -> bool:
