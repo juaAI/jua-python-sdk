@@ -141,7 +141,7 @@ class ForecastCache:
             int(td / np.timedelta64(1, "h")) for td in self._prediction_timedeltas
         ]
 
-        # Cache stores merged bboxes: bbox_id -> BBoxCache with metadata and data arrays
+        # Cache stores merged bboxes: bbox_id -> BBoxCache
         self._bbox_cache: dict[str, BBoxCache] = {}
 
         # Spatial index: (init_idx, lat_chunk, lon_chunk) -> bbox_id
@@ -156,19 +156,16 @@ class ForecastCache:
         Assumes xarray has already resolved any label-based indexing into
         positional indexers using registered xindexes on the dataset coords.
         """
-        # Single integer
         if isinstance(key_any, (int, np.integer)):
             idx = int(key_any)
             if idx < 0:
                 idx += size
             return np.array([idx], dtype=int)
 
-        # Slice -> expand using normalized bounds
         if isinstance(key_any, slice):
             start, stop, step = key_any.indices(size)
             return np.arange(start, stop, step, dtype=int)
 
-        # Array-like of integer positions
         arr = np.asarray(key_any)
         if arr.dtype.kind != "i":
             raise TypeError(
@@ -198,7 +195,6 @@ class ForecastCache:
             List of (init_time_idx, lat_chunk, lon_chunk) tuples where
             chunk indices are the start positions of grid_chunk-sized chunks
         """
-        # Handle empty selections
         if len(lat_indices) == 0 or len(lon_indices) == 0:
             return []
 
@@ -367,22 +363,18 @@ class ForecastCache:
                         & (df["longitude"] >= bbox.lon_min)
                         & (df["longitude"] <= bbox.lon_max)
                     ]
-
-                    # Handle empty data
                     if len(df_bbox) == 0:
                         logger.warning(f"No data returned for {bbox.extent()}")
                         continue
 
-                    # Transform ONCE for this entire merged bbox
+                    # Parse bbox data, reverse coordinate order if needed
                     ds = self._qe.transform_dataframe(df_bbox).isel(init_time=0)
-
-                    # Reverse coordinate order if needed
                     if not self._increasing_lats:
                         ds = ds.isel(latitude=slice(None, None, -1))
                     if not self._increasing_lons:
                         ds = ds.isel(longitude=slice(None, None, -1))
 
-                    # Check if returned coordinate order matches expected order
+                    # Check that returned coordinate order matches expected order
                     returned_lats = ds.latitude.values
                     returned_lons = ds.longitude.values
                     expected_lats = self._latitudes[
@@ -394,14 +386,14 @@ class ForecastCache:
                     if not np.allclose(returned_lats, expected_lats):
                         raise ValueError(
                             "Failed to fetch lazy-loaded data: latitudes don't match:\n"
-                            f"  expected: {expected_lats}"
-                            f"  returned: {returned_lats}"
+                            f"  expected: {expected_lats}\n"
+                            f"  returned: {returned_lats}\n"
                         )
                     if not np.allclose(returned_lons, expected_lons):
                         raise ValueError(
                             "Failed to fetch lazy-loaded data: latitudes don't match:\n"
-                            f"  expected: {expected_lons}"
-                            f"  returned: {returned_lons}"
+                            f"  expected: {expected_lons}\n"
+                            f"  returned: {returned_lons}\n"
                         )
 
                     # Extract all variables at once
@@ -416,12 +408,8 @@ class ForecastCache:
 
                         fetched_data = np.asarray(ds[var_name].data)
 
-                        # Transpose to (lat, lon, pred_td) if needed
-                        if fetched_data.ndim == 3:
-                            # (pred_td, lat, lon) -> (lat, lon, pred_td)
-                            fetched_data = np.transpose(fetched_data, (1, 2, 0))
-
-                        # Store dynamically-sized array (no padding needed!)
+                        # (pred_td, lat, lon) -> (lat, lon, pred_td)
+                        fetched_data = np.transpose(fetched_data, (1, 2, 0))
                         cache.variables[var_name] = fetched_data.astype(np.float32)
 
                     # Cache the bbox data

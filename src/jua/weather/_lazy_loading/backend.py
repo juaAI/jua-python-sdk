@@ -36,14 +36,10 @@ class JuaQueryEngineArray(BackendArray):
         """
         self._cache = cache
         self._variable = variable
-
-        # Get shape from cache
         self.shape = cache.shape
+        self.dtype = cache.get_dtype()
 
-        # Until first load, assume float64
-        self.dtype = np.dtype("float64")
-
-    def __getitem__(self, key: indexing.ExplicitIndexer) -> np.typing.ArrayLike:  # type: ignore[name-defined]
+    def __getitem__(self, key: indexing.ExplicitIndexer) -> np.typing.ArrayLike:
         return indexing.explicit_indexing_adapter(
             key,
             self.shape,
@@ -51,19 +47,15 @@ class JuaQueryEngineArray(BackendArray):
             self._raw_indexing_method,
         )
 
-    def _raw_indexing_method(self, key: tuple) -> np.typing.ArrayLike:  # type: ignore[name-defined]
+    def _raw_indexing_method(self, key: tuple) -> np.typing.ArrayLike:
         """Get data from the shared cache."""
-        # Pass the key to the cache so it knows what subset to load
         arr = self._cache.get_variable(self._variable, key)
-        # Update dtype after first load
-        self.dtype = arr.dtype
 
         # Squeeze dimensions where integer indexing was used
         squeeze_axes = []
         for i, k in enumerate(key):
             if isinstance(k, (int, np.integer)):
                 squeeze_axes.append(i)
-
         if squeeze_axes:
             arr = np.squeeze(arr, axis=tuple(squeeze_axes))
 
@@ -81,7 +73,6 @@ class JuaQueryEngineBackend(BackendEntrypoint):
         query_engine = QueryEngine(client)
         ds = xr.open_dataset(
             Models.EPT2,
-            engine="jua_query_engine",
             query_engine=query_engine,
             variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M.name],
             init_time=slice("2025-01-01", "2025-01-02"),
@@ -125,19 +116,13 @@ class JuaQueryEngineBackend(BackendEntrypoint):
         if query_engine is None:
             query_engine = QueryEngine(JuaClient())
 
-        # Model from filename
+        # Parse the args
         model = filename_or_obj
-
-        # Variables normalization
         if variables is None or len(variables) == 0:
             variables = [Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M.name]
-        else:
-            variables = [
-                v.name if isinstance(v, Variables) else str(v)  # type: ignore[attr-defined]
-                for v in variables
-            ]
+        variables = [v.name if isinstance(v, Variables) else str(v) for v in variables]
 
-        # Use the more efficient index endpoint
+        # Get and parse the forecast index
         index_result = query_engine.get_forecast_index(
             model=model,
             init_time=init_time,
@@ -146,12 +131,10 @@ class JuaQueryEngineBackend(BackendEntrypoint):
             latitude=latitude,
             longitude=longitude,
         )
-
         init_times = np.array(index_result["init_time"], dtype="datetime64[ns]")
         prediction_timedeltas = np.array(index_result["prediction_timedelta"])
         latitudes = np.array(index_result["latitude"], dtype="float32")
         longitudes = np.array(index_result["longitude"], dtype="float32")
-
         dims = ("init_time", "prediction_timedelta", "latitude", "longitude")
         coords = {
             "init_time": init_times,
@@ -190,15 +173,9 @@ class JuaQueryEngineBackend(BackendEntrypoint):
             data_vars[var_name] = (dims, data)
 
         ds = xr.Dataset(data_vars=data_vars, coords=coords)
-
         if drop_variables is not None:
             ds = ds.drop_vars(list(drop_variables))
 
-        # No open files but provide a close hook for API symmetry
-        def _noop_close() -> None:
-            return None
-
-        ds.set_close(_noop_close)
         return ds
 
     def guess_can_open(self, filename_or_obj: Any) -> bool:
