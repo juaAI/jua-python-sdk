@@ -259,7 +259,7 @@ class Model:
                 settings=self._client.settings,
                 dataset_name=self._model,
                 raw_data=xr.open_dataset(
-                    model=self._model,
+                    self._model,
                     query_engine=self._query_engine,
                     init_time=init_time,
                     prediction_timedelta=prediction_timedelta,
