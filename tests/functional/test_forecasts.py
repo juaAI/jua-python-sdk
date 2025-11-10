@@ -74,6 +74,30 @@ def test_get_metadata(client: JuaClient, model: Models):
         pytest.fail(f"Failed to retrieve metadata for {model.value}: {e}")
 
 
+@pytest.mark.parametrize("model", [Models.EPT2_RR, Models.EPT2_HRRR])
+def test_is_ready(client: JuaClient, model: Models):
+    """Test retrieving the metadata for all models.
+
+    Args:
+        client: JuaClient instance
+        model: Weather model to test
+    """
+    try:
+        model_instance = client.weather.get_model(model)
+        full_48_ready = model_instance.is_ready(
+            forecasted_hours=48, init_time=datetime(2025, 11, 5, 0)
+        )
+        if not full_48_ready:
+            raise ValueError("All 48 hours should be ready")
+        no_49th_hour = model_instance.is_ready(
+            forecasted_hours=49, init_time=datetime(2025, 11, 5, 0)
+        )
+        if no_49th_hour:
+            raise ValueError("Models should not have 49 hours ready")
+    except Exception as e:
+        pytest.fail(f"Failed to retrieve metadata for {model.value}: {e}")
+
+
 @pytest.mark.parametrize("model", ALL_MODELS)
 def test_latest_forecast(client: JuaClient, model: Models):
     """Test retrieving the latest forecast across all models.

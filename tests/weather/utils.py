@@ -235,8 +235,8 @@ class MockQueryEngine:
         init_time: Literal["latest"] | datetime | list[datetime] | slice | None = None,
         variables: list[Variables] | list[str] | None = None,
         prediction_timedelta: PredictionTimeDelta | None = None,
-        latitude: SpatialSelection | None = None,
-        longitude: SpatialSelection | None = None,
+        latitude: slice | None = None,
+        longitude: slice | None = None,
     ):
         """Mock get_forecast_index that returns coordinate metadata.
 
@@ -251,6 +251,11 @@ class MockQueryEngine:
         )
         filtered_lats = self._filter_latitudes(latitude)
         filtered_lons = self._filter_longitudes(longitude)
+
+        if latitude.start > latitude.stop:
+            filtered_lats = filtered_lats[::-1]
+        if longitude.start > longitude.stop:
+            filtered_lons = filtered_lons[::-1]
 
         # Filter variables
         vars = [v.name if isinstance(v, Variables) else v for v in variables]

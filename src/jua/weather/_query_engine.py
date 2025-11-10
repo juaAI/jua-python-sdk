@@ -189,11 +189,11 @@ class QueryEngine:
     def get_forecast_index(
         self,
         model: Models,
-        init_time: Literal["latest"] | datetime | list[datetime] | slice | None = None,
-        variables: list[Variables] | list[str] | None = None,
+        init_time: Literal["latest"] | datetime | list[datetime] | slice,
+        variables: list[Variables] | list[str],
         prediction_timedelta: PredictionTimeDelta | None = None,
-        latitude: SpatialSelection | None = None,
-        longitude: SpatialSelection | None = None,
+        latitude: slice | None = None,
+        longitude: slice | None = None,
     ) -> dict[str, list]:
         """Get the index (coordinates) for a forecast query without loading data.
 
@@ -223,49 +223,19 @@ class QueryEngine:
         if longitude is None:
             raise ValueError("longitude is required for forecast index")
 
-        # Extract min/max from latitude
-        if isinstance(latitude, slice):
-            lat_min, lat_max = (
-                min(latitude.start, latitude.stop),
-                max(latitude.start, latitude.stop),
-            )
-        elif isinstance(latitude, (list, tuple)) and len(latitude) == 2:
-            lat_min, lat_max = min(latitude), max(latitude)
-        else:
-            raise ValueError(
-                "latitude must be a slice or tuple of (min, max) for forecast index. "
-                f"Got: {type(latitude)}"
-            )
-
-        # Extract min/max from longitude
-        if isinstance(longitude, slice):
-            lon_min, lon_max = (
-                min(longitude.start, longitude.stop),
-                max(longitude.start, longitude.stop),
-            )
-        elif isinstance(longitude, (list, tuple)) and len(longitude) == 2:
-            lon_min, lon_max = min(longitude), max(longitude)
-        else:
-            raise ValueError(
-                "longitude must be a slice or tuple of (min, max) for forecast index. "
-                f"Got: {type(longitude)}"
-            )
-
         # Build the payload using the proper type
         init_time_value = build_init_time_arg(init_time)
         prediction_timedelta_value = build_prediction_timedelta(prediction_timedelta)
 
         # Normalize variables
-        variable_names = None
-        if variables:
-            variable_names = [
-                v.name if isinstance(v, Variables) else str(v) for v in variables
-            ]
+        variable_names = [
+            v.name if isinstance(v, Variables) else str(v) for v in variables
+        ]
 
         payload = ForecastIndexQueryPayload(
             model=model,
-            latitude=(lat_min, lat_max),
-            longitude=(lon_min, lon_max),
+            latitude=(latitude.start, latitude.stop),
+            longitude=(longitude.start, longitude.stop),
             init_time=init_time_value,
             prediction_timedelta=prediction_timedelta_value,
             variables=variable_names,

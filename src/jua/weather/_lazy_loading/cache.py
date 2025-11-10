@@ -21,14 +21,13 @@ logger = logging.getLogger(__name__)
 
 
 @dataclass
-class BBoxCache:
-    """Cached data for a merged bounding box region.
+class MergedBBox:
+    """A merged bounding box region.
 
     Stores weather data for a contiguous geographic region using integer
     indices for efficient lookups. Float coordinates are kept for info only.
 
     Attributes:
-        init_idx: Index of the initialization time in the global init_times array
         lat_min: Minimum latitude value (for info/logging purposes)
         lat_max: Maximum latitude value (for info/logging purposes)
         lon_min: Minimum longitude value (for info/logging purposes)
@@ -37,11 +36,9 @@ class BBoxCache:
         lat_idx_end: End index (exclusive) in the global latitude array
         lon_idx_start: Start index in the global longitude array
         lon_idx_end: End index (exclusive) in the global longitude array
-        variables: Dictionary mapping variable names to data arrays with
-            shape (lat, lon, pred_td)
+        chunks: The chunks contained in this merged bounding box
     """
 
-    init_idx: int
     lat_min: float
     lat_max: float
     lon_min: float
@@ -50,7 +47,41 @@ class BBoxCache:
     lat_idx_end: int
     lon_idx_start: int
     lon_idx_end: int
+    chunks: list[tuple[int, int]]
+
+    def extent(self) -> tuple[tuple[float, float], tuple[float, float]]:
+        return ((self.lat_min, self.lon_min), (self.lat_max, self.lon_max))
+
+    def id(self) -> str:
+        return (
+            f"{self.lat_idx_start}_{self.lat_idx_end}_"
+            f"{self.lon_idx_start}_{self.lon_idx_end}"
+        )
+
+
+@dataclass
+class BBoxCache:
+    """Cached data for a merged bounding box region.
+
+    Stores weather data for a contiguous geographic region using integer
+    indices for efficient lookups. Float coordinates are kept for info only.
+
+    Attributes:
+        init_idx: Index of the initialization time in the global init_times array
+        bbox: The merged bounding box contained in this cache
+        variables: Dictionary mapping variable names to data arrays with
+            shape (lat, lon, pred_td)
+    """
+
+    init_idx: int
+    bbox: MergedBBox
     variables: dict[str, np.ndarray]
+
+    def extent(self) -> tuple[tuple[float, float], tuple[float, float]]:
+        return self.bbox.extent()
+
+    def id(self) -> str:
+        return f"{self.init_idx}_{self.bbox.id()}"
 
 
 class ForecastCache:
@@ -72,6 +103,8 @@ class ForecastCache:
         prediction_timedeltas: Sequence[np.timedelta64] | Sequence[Any],
         latitudes: Sequence[float],
         longitudes: Sequence[float],
+        increasing_lats: bool = False,
+        increasing_lons: bool = True,
         original_kwargs: dict[str, Any],
         grid_chunk: int = 8,
     ) -> None:
@@ -85,9 +118,11 @@ class ForecastCache:
             prediction_timedeltas: Full array of available prediction timedeltas
             latitudes: Full array of available latitudes
             longitudes: Full array of available longitudes
+            increasing_lats: Whether the latitudes are sorted in increasing order
+            increasing_lons: Whether the longitudes are sorted in increasing order
             original_kwargs: Original query parameters
             grid_chunk: Number of grid points per chunk dimension (default: 8).
-                       E.g., grid_chunk=8 means 8×8 grid points per chunk.
+                E.g., grid_chunk=8 means 8x8 grid points per chunk.
         """
         self._qe = query_engine
         self._model = model
@@ -96,6 +131,8 @@ class ForecastCache:
         self._prediction_timedeltas = np.array(prediction_timedeltas)
         self._latitudes = np.array(latitudes)
         self._longitudes = np.array(longitudes)
+        self._increasing_lats = increasing_lats
+        self._increasing_lons = increasing_lons
         self._kwargs = dict(original_kwargs)
         self._grid_chunk = grid_chunk
 
@@ -157,19 +194,27 @@ class ForecastCache:
             # Determine start/stop using searchsorted; inclusive of stop
             start_val = key_any.start
             stop_val = key_any.stop
-            # None means full range
-            left = (
-                0
-                if start_val is None
-                else int(np.searchsorted(coord_values, start_val, side="left"))
-            )
-            right = (
-                coord_values.size
-                if stop_val is None
-                else int(np.searchsorted(coord_values, stop_val, side="right"))
-            )
             step = 1 if key_any.step is None else int(key_any.step)
-            return np.arange(left, right, step, dtype=int)
+            # Handle None bounds as open interval
+            if start_val is None and stop_val is None:
+                return np.arange(0, coord_values.size, step, dtype=int)
+            # Compute inclusive mask regardless of coordinate order
+            if start_val is None:
+                lower = -np.inf
+            else:
+                lower = start_val
+            if stop_val is None:
+                upper = np.inf
+            else:
+                upper = stop_val
+            # Ensure lower <= upper for comparison
+            lo = min(lower, upper)
+            hi = max(lower, upper)
+            mask = (coord_values >= lo) & (coord_values <= hi)
+            idxs = np.nonzero(mask)[0]
+            if idxs.size == 0:
+                return idxs.astype(int)
+            return idxs[::step].astype(int)
 
         # Array-like of labels/positions
         arr = np.asarray(key_any)
@@ -224,118 +269,104 @@ class ForecastCache:
 
         return grid_cells
 
-    def _merge_adjacent_chunks(
+    def _merge_chunks_into_caches(
         self, spatial_chunks: set[tuple[int, int]]
-    ) -> list[tuple[float, float, float, float]]:
-        """Merge adjacent spatial chunks into larger bounding boxes.
-
-        Uses connected components to group chunks that are horizontally
-        or vertically adjacent, then creates one bounding box per group.
+    ) -> list[MergedBBox]:
+        """Merge chunks into larger MergedBBox.
 
         Args:
-            spatial_chunks: Set of (lat_chunk, lon_chunk) tuples
+            spatial_chunks: Set of (lat_chunk, lon_chunk) tuples where each
+                value is the start index (multiple of grid_chunk) in the
+                latitude/longitude arrays.
 
         Returns:
-            List of (lat_min, lat_max, lon_min, lon_max) tuples
+            List of MergedBBox capturing bounds, index ranges and chunk members.
         """
         if not spatial_chunks:
             return []
 
-        # Build adjacency graph using connected components
-        # Two chunks are adjacent if they differ by exactly grid_chunk in one dimension
-        # and match in the other dimension
-        chunk_to_component: dict[tuple[int, int], tuple[int, int]] = {}
+        g = self._grid_chunk
 
-        def find_component(chunk: tuple[int, int]) -> tuple[int, int] | None:
-            """Find the component ID for a chunk, using path compression."""
-            if chunk not in chunk_to_component:
-                return None
-            root = chunk
-            while chunk_to_component[root] != root:
-                root = chunk_to_component[root]
-            # Path compression
-            while chunk_to_component[chunk] != root:
-                next_chunk = chunk_to_component[chunk]
-                chunk_to_component[chunk] = root
-                chunk = next_chunk
-            return root
+        # Normalize to unit grid indices so each chunk is size 1x1 in this space
+        normalized_cells = {(lat // g, lon // g) for (lat, lon) in spatial_chunks}
 
-        def union_components(chunk1: tuple[int, int], chunk2: tuple[int, int]) -> None:
-            """Union two chunks into the same component."""
-            root1 = find_component(chunk1)
-            root2 = find_component(chunk2)
-            if root1 is None and root2 is None:
-                # Both are new, create new component
-                chunk_to_component[chunk1] = chunk1
-                chunk_to_component[chunk2] = chunk1
-            elif root1 is None and root2 is not None:
-                # chunk1 is new, add to chunk2's component
-                chunk_to_component[chunk1] = root2
-            elif root2 is None and root1 is not None:
-                # chunk2 is new, add to chunk1's component
-                chunk_to_component[chunk2] = root1
-            elif root1 is not None and root2 is not None and root1 != root2:
-                # Merge components
-                chunk_to_component[root2] = root1
+        # Row -> set of columns for O(1) membership/removal
+        rows: dict[int, set[int]] = {}
+        for r, c in normalized_cells:
+            rows.setdefault(r, set()).add(c)
 
-        # Process all chunks and build connected components
-        sorted_chunks = sorted(spatial_chunks)
-        for chunk in sorted_chunks:
-            lat_chunk, lon_chunk = chunk
-            if chunk not in chunk_to_component:
-                chunk_to_component[chunk] = chunk
+        def row_has_run(row_idx: int, c_start: int, c_end: int) -> bool:
+            cols = rows.get(row_idx)
+            if not cols:
+                return False
+            for c in range(c_start, c_end + 1):
+                if c not in cols:
+                    return False
+            return True
 
-            # Check for adjacent chunks (4-connected: up, down, left, right)
-            neighbors = [
-                (lat_chunk - self._grid_chunk, lon_chunk),  # up
-                (lat_chunk + self._grid_chunk, lon_chunk),  # down
-                (lat_chunk, lon_chunk - self._grid_chunk),  # left
-                (lat_chunk, lon_chunk + self._grid_chunk),  # right
-            ]
+        groups: list[MergedBBox] = []
 
-            for neighbor in neighbors:
-                if neighbor in spatial_chunks:
-                    union_components(chunk, neighbor)
+        while rows:
+            r0 = min(rows)
+            c0 = min(rows[r0])
 
-        # Group chunks by their component
-        components: dict[tuple[int, int], list[tuple[int, int]]] = {}
-        for chunk in spatial_chunks:
-            root = find_component(chunk)
-            if root is not None:
-                if root not in components:
-                    components[root] = []
-                components[root].append(chunk)
+            # Expand to the right on the top row
+            c1 = c0
+            while (c1 + 1) in rows[r0]:
+                c1 += 1
 
-        # Create merged bounding boxes for each component
-        merged_bboxes = []
-        for component_chunks in components.values():
-            # Find the extent of all chunks in this component
-            lat_chunks = [lat for lat, lon in component_chunks]
-            lon_chunks = [lon for lat, lon in component_chunks]
+            # Expand downward while subsequent rows contain the full run
+            r1 = r0
+            while row_has_run(r1 + 1, c0, c1):
+                r1 += 1
 
-            min_lat_chunk = min(lat_chunks)
-            max_lat_chunk = max(lat_chunks)
-            min_lon_chunk = min(lon_chunks)
-            max_lon_chunk = max(lon_chunks)
+            # Convert rectangle back to original index space
+            lat_idx_start = r0 * g
+            lat_idx_end = min((r1 + 1) * g, len(self._latitudes))
+            lon_idx_start = c0 * g
+            lon_idx_end = min((c1 + 1) * g, len(self._longitudes))
 
-            # Convert chunk indices to actual lat/lon coordinates
-            lat_start = min_lat_chunk
-            lat_end = min(max_lat_chunk + self._grid_chunk, len(self._latitudes))
-            lon_start = min_lon_chunk
-            lon_end = min(max_lon_chunk + self._grid_chunk, len(self._longitudes))
+            chunk_lats = self._latitudes[lat_idx_start:lat_idx_end]
+            chunk_lons = self._longitudes[lon_idx_start:lon_idx_end]
 
-            chunk_lats = self._latitudes[lat_start:lat_end]
-            chunk_lons = self._longitudes[lon_start:lon_end]
-
-            # Expand bbox slightly to deal with floating point errors
             if len(chunk_lats) > 0 and len(chunk_lons) > 0:
-                lat_min = round(chunk_lats[0], 3) - 0.001
-                lat_max = round(chunk_lats[-1], 3) + 0.001
-                lon_min = round(chunk_lons[0], 3) - 0.001
-                lon_max = round(chunk_lons[-1], 3) + 0.001
-                merged_bboxes.append((lat_min, lat_max, lon_min, lon_max))
+                # Use min/max to be robust to coordinate order (ascending/descending)
+                lat_min = round(float(np.min(chunk_lats)), 3) - 0.001
+                lat_max = round(float(np.max(chunk_lats)), 3) + 0.001
+                lon_min = round(float(np.min(chunk_lons)), 3) - 0.001
+                lon_max = round(float(np.max(chunk_lons)), 3) + 0.001
 
-        return merged_bboxes
+                # Record original-space chunk members
+                members: list[tuple[int, int]] = []
+                for rr in range(r0, r1 + 1):
+                    for cc in range(c0, c1 + 1):
+                        members.append((rr * g, cc * g))
+
+                groups.append(
+                    MergedBBox(
+                        lat_min=lat_min,
+                        lat_max=lat_max,
+                        lon_min=lon_min,
+                        lon_max=lon_max,
+                        lat_idx_start=lat_idx_start,
+                        lat_idx_end=lat_idx_end,
+                        lon_idx_start=lon_idx_start,
+                        lon_idx_end=lon_idx_end,
+                        chunks=members,
+                    )
+                )
+
+            # Remove covered cells from the map
+            for r in range(r0, r1 + 1):
+                cols = rows.get(r)
+                if not cols:
+                    continue
+                for c in range(c0, c1 + 1):
+                    cols.discard(c)
+                if not cols:
+                    rows.pop(r)
+
+        return groups
 
     def _fetch_all_chunks(
         self,
@@ -355,11 +386,10 @@ class ForecastCache:
             (lat_chunk, lon_chunk) for _, lat_chunk, lon_chunk in missing_chunks
         )
 
-        # Merge adjacent chunks into larger bounding boxes
-        merged_bbox_coords = self._merge_adjacent_chunks(unique_spatial_chunks)
+        # Merge adjacent chunks into larger rectangular groups
+        merged_bboxes = self._merge_chunks_into_caches(unique_spatial_chunks)
         bounding_boxes = [
-            ((lat_min, lon_min), (lat_max, lon_max))
-            for lat_min, lat_max, lon_min, lon_max in merged_bbox_coords
+            ((g.lat_min, g.lon_min), (g.lat_max, g.lon_max)) for g in merged_bboxes
         ]
 
         # Determine which init_times to fetch based on requested chunks
@@ -381,152 +411,82 @@ class ForecastCache:
             print_progress=False,
         )
 
-        # Group missing chunks by their merged bbox and init_time
-        # This allows us to process each merged bbox only once
-        chunk_to_bbox_coords = {}
-        spatial_chunks = list(unique_spatial_chunks)
-        for init_idx in unique_init_indices:
-            for lat_chunk, lon_chunk in spatial_chunks:
-                # Find which merged bbox this chunk belongs to
-                for lat_min, lat_max, lon_min, lon_max in merged_bbox_coords:
-                    # Check if this chunk's coordinates fall within this merged bbox
-                    lat_end = min(lat_chunk + self._grid_chunk, len(self._latitudes))
-                    lon_end = min(lon_chunk + self._grid_chunk, len(self._longitudes))
-
-                    chunk_lats = self._latitudes[lat_chunk:lat_end]
-                    chunk_lons = self._longitudes[lon_chunk:lon_end]
-
-                    if len(chunk_lats) > 0 and len(chunk_lons) > 0:
-                        # Check if chunk is within bbox (with small tolerance)
-                        if (
-                            chunk_lats[0] >= lat_min
-                            and chunk_lats[-1] <= lat_max
-                            and chunk_lons[0] >= lon_min
-                            and chunk_lons[-1] <= lon_max
-                        ):
-                            chunk_to_bbox_coords[(init_idx, lat_chunk, lon_chunk)] = (
-                                lat_min,
-                                lat_max,
-                                lon_min,
-                                lon_max,
-                            )
-                            break
-
-        # Group chunks by (init_idx, bbox_coords)
-        bbox_to_chunks: dict[
-            tuple[int, tuple[float, float, float, float]], list[tuple[int, int]]
-        ] = {}
-        for (
-            init_idx,
-            lat_chunk,
-            lon_chunk,
-        ), bbox_coords in chunk_to_bbox_coords.items():
-            key = (init_idx, bbox_coords)
-            if key not in bbox_to_chunks:
-                bbox_to_chunks[key] = []
-            bbox_to_chunks[key].append((lat_chunk, lon_chunk))
-
-        # Process and cache data for each merged bbox (once per bbox!)
+        # Process and cache data for each merged bbox group (once per group!)
         with self._lock:
-            for (init_idx, bbox_coords), chunks_in_bbox in bbox_to_chunks.items():
-                lat_min, lat_max, lon_min, lon_max = bbox_coords
+            for init_idx in unique_init_indices:
+                for bbox in merged_bboxes:
+                    df_bbox = df[
+                        (df["init_time"] == self._init_times[init_idx])
+                        & (df["latitude"] >= bbox.lat_min)
+                        & (df["latitude"] <= bbox.lat_max)
+                        & (df["longitude"] >= bbox.lon_min)
+                        & (df["longitude"] <= bbox.lon_max)
+                    ]
 
-                # Filter dataframe for the entire merged bbox
-                df_bbox = df[
-                    (df["init_time"] == self._init_times[init_idx])
-                    & (df["latitude"] >= lat_min)
-                    & (df["latitude"] <= lat_max)
-                    & (df["longitude"] >= lon_min)
-                    & (df["longitude"] <= lon_max)
-                ]
-
-                # Handle empty data
-                if len(df_bbox) == 0:
-                    logger.warning(
-                        f"No data returned for bbox "
-                        f"({lat_min}, {lat_max}, {lon_min}, {lon_max})"
-                    )
-                    continue
-
-                # Transform ONCE for this entire merged bbox
-                ds = self._qe.transform_dataframe(df_bbox).isel(init_time=0)
-
-                # Compute index ranges from chunks in this bbox
-                lat_chunks = [lat_chunk for lat_chunk, _ in chunks_in_bbox]
-                lon_chunks = [lon_chunk for _, lon_chunk in chunks_in_bbox]
-
-                lat_idx_start = min(lat_chunks)
-                lat_idx_end = min(
-                    max(lat_chunks) + self._grid_chunk, len(self._latitudes)
-                )
-                lon_idx_start = min(lon_chunks)
-                lon_idx_end = min(
-                    max(lon_chunks) + self._grid_chunk, len(self._longitudes)
-                )
-
-                # Check if returned coordinate order matches expected order
-                returned_lats = ds.latitude.values
-                returned_lons = ds.longitude.values
-                expected_lats = self._latitudes[lat_idx_start:lat_idx_end]
-                expected_lons = self._longitudes[lon_idx_start:lon_idx_end]
-                if not np.allclose(returned_lats, expected_lats):
-                    raise ValueError(
-                        "Failed to fetch lazy-loaded data: latitudes did not match:\n"
-                        f"  expected: {expected_lats}"
-                        f"  returned: {returned_lats}"
-                    )
-                if not np.allclose(returned_lons, expected_lons):
-                    raise ValueError(
-                        "Failed to fetch lazy-loaded data: latitudes did not match:\n"
-                        f"  expected: {expected_lons}"
-                        f"  returned: {returned_lons}"
-                    )
-
-                # Create bbox_id
-                bbox_id = (
-                    f"{init_idx}_{lat_min:.3f}_{lat_max:.3f}_"
-                    f"{lon_min:.3f}_{lon_max:.3f}"
-                )
-
-                # Create BBoxCache instance
-                bbox_cache = BBoxCache(
-                    init_idx=init_idx,
-                    lat_min=lat_min,
-                    lat_max=lat_max,
-                    lon_min=lon_min,
-                    lon_max=lon_max,
-                    lat_idx_start=lat_idx_start,
-                    lat_idx_end=lat_idx_end,
-                    lon_idx_start=lon_idx_start,
-                    lon_idx_end=lon_idx_end,
-                    variables={},
-                )
-
-                # Extract all variables at once
-                for var_name in self._variables:
-                    if var_name not in ds.data_vars:
-                        logger.warning(
-                            f"Variable {var_name} not found. "
-                            f"Available: {list(ds.data_vars)}"
-                        )
+                    # Handle empty data
+                    if len(df_bbox) == 0:
+                        logger.warning(f"No data returned for {bbox.extent()}")
                         continue
 
-                    fetched_data = np.asarray(ds[var_name].data)
+                    # Transform ONCE for this entire merged bbox
+                    ds = self._qe.transform_dataframe(df_bbox).isel(init_time=0)
 
-                    # Transpose to (lat, lon, pred_td) if needed
-                    if fetched_data.ndim == 3:
-                        # (pred_td, lat, lon) -> (lat, lon, pred_td)
-                        fetched_data = np.transpose(fetched_data, (1, 2, 0))
+                    # Reverse coordinate order if needed
+                    if not self._increasing_lats:
+                        ds = ds.isel(latitude=slice(None, None, -1))
+                    if not self._increasing_lons:
+                        ds = ds.isel(longitude=slice(None, None, -1))
 
-                    # Store dynamically-sized array (no padding needed!)
-                    bbox_cache.variables[var_name] = fetched_data.astype(np.float32)
+                    # Check if returned coordinate order matches expected order
+                    returned_lats = ds.latitude.values
+                    returned_lons = ds.longitude.values
+                    expected_lats = self._latitudes[
+                        bbox.lat_idx_start : bbox.lat_idx_end
+                    ]
+                    expected_lons = self._longitudes[
+                        bbox.lon_idx_start : bbox.lon_idx_end
+                    ]
+                    if not np.allclose(returned_lats, expected_lats):
+                        raise ValueError(
+                            "Failed to fetch lazy-loaded data: latitudes don't match:\n"
+                            f"  expected: {expected_lats}"
+                            f"  returned: {returned_lats}"
+                        )
+                    if not np.allclose(returned_lons, expected_lons):
+                        raise ValueError(
+                            "Failed to fetch lazy-loaded data: latitudes don't match:\n"
+                            f"  expected: {expected_lons}"
+                            f"  returned: {returned_lons}"
+                        )
 
-                # Cache the bbox data
-                self._bbox_cache[bbox_id] = bbox_cache
+                    # Extract all variables at once
+                    cache = BBoxCache(init_idx=init_idx, bbox=bbox, variables={})
+                    for var_name in self._variables:
+                        if var_name not in ds.data_vars:
+                            logger.warning(
+                                f"Variable {var_name} not found. "
+                                f"Available: {list(ds.data_vars)}"
+                            )
+                            continue
 
-                # Update spatial index for all chunks covered by this bbox
-                for lat_chunk, lon_chunk in chunks_in_bbox:
-                    self._chunk_to_bbox[(init_idx, lat_chunk, lon_chunk)] = bbox_id
+                        fetched_data = np.asarray(ds[var_name].data)
+
+                        # Transpose to (lat, lon, pred_td) if needed
+                        if fetched_data.ndim == 3:
+                            # (pred_td, lat, lon) -> (lat, lon, pred_td)
+                            fetched_data = np.transpose(fetched_data, (1, 2, 0))
+
+                        # Store dynamically-sized array (no padding needed!)
+                        cache.variables[var_name] = fetched_data.astype(np.float32)
+
+                    # Cache the bbox data
+                    self._bbox_cache[cache.id()] = cache
+
+                    # Update spatial index for all chunks covered by this bbox
+                    for lat_chunk, lon_chunk in cache.bbox.chunks:
+                        self._chunk_to_bbox[(init_idx, lat_chunk, lon_chunk)] = (
+                            cache.id()
+                        )
 
     def get_variable(self, variable_name: str, key: tuple) -> np.ndarray:
         """Get the numpy array for a specific variable and index key.
@@ -653,12 +613,16 @@ class ForecastCache:
                         continue
 
                     # Calculate position within bbox
-                    lat_idx_in_bbox = lat_idx - bbox_data.lat_idx_start
-                    lon_idx_in_bbox = lon_idx - bbox_data.lon_idx_start
+                    lat_idx_in_bbox = lat_idx - bbox_data.bbox.lat_idx_start
+                    lon_idx_in_bbox = lon_idx - bbox_data.bbox.lon_idx_start
 
                     # Verify indices are within bbox bounds
-                    bbox_lat_size = bbox_data.lat_idx_end - bbox_data.lat_idx_start
-                    bbox_lon_size = bbox_data.lon_idx_end - bbox_data.lon_idx_start
+                    bbox_lat_size = (
+                        bbox_data.bbox.lat_idx_end - bbox_data.bbox.lat_idx_start
+                    )
+                    bbox_lon_size = (
+                        bbox_data.bbox.lon_idx_end - bbox_data.bbox.lon_idx_start
+                    )
 
                     if not (
                         0 <= lat_idx_in_bbox < bbox_lat_size

@@ -1,4 +1,5 @@
-from typing import Any, Iterable
+from datetime import datetime
+from typing import Any, Iterable, Literal
 
 import numpy as np
 import xarray as xr
@@ -6,7 +7,7 @@ from xarray.backends import BackendArray, BackendEntrypoint
 from xarray.core import indexing
 
 from jua import JuaClient
-from jua.types.geo import PredictionTimeDelta, SpatialSelection
+from jua.types.geo import PredictionTimeDelta
 from jua.weather._lazy_loading.cache import ForecastCache
 from jua.weather._query_engine import QueryEngine
 from jua.weather.models import Models
@@ -112,10 +113,12 @@ class JuaQueryEngineBackend(BackendEntrypoint):
         *,
         query_engine: QueryEngine | None = None,
         variables: list[Variables] | list[str] | None = None,
-        init_time: Any | None = None,
+        init_time: Literal["latest"] | datetime | list[datetime] | slice = "latest",
         prediction_timedelta: PredictionTimeDelta | None = None,
-        latitude: SpatialSelection | None = None,
-        longitude: SpatialSelection | None = None,
+        min_lead_time: int | None = None,
+        max_lead_time: int | None = None,
+        latitude: slice | None = None,
+        longitude: slice | None = None,
         grid_chunk: int = 8,
         drop_variables: Iterable[str] | None = None,
     ) -> xr.Dataset:
@@ -165,6 +168,8 @@ class JuaQueryEngineBackend(BackendEntrypoint):
             prediction_timedeltas=prediction_timedeltas,
             latitudes=latitudes,
             longitudes=longitudes,
+            increasing_lats=latitudes[1] > latitudes[0],
+            increasing_lons=longitudes[1] > longitudes[0],
             original_kwargs=dict(
                 init_time=init_time,
                 prediction_timedelta=prediction_timedelta,

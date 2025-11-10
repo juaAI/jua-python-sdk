@@ -905,6 +905,8 @@ class TestCaching:
             prediction_timedeltas=pred_td_array,
             latitudes=test_lats,
             longitudes=test_lons,
+            increasing_lats=test_lats[1] > test_lats[0],
+            increasing_lons=test_lons[1] > test_lons[0],
             original_kwargs={},
         )
 

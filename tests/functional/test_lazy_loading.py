@@ -24,13 +24,13 @@ pytestmark = pytest.mark.functional
 @pytest.fixture
 def client() -> JuaClient:
     """Create a JuaClient instance for testing."""
-    return JuaClient(request_credit_limit=100_000_000)
+    return JuaClient(request_credit_limit=1_000_000_000)
 
 
 @pytest.fixture
 def query_engine() -> QueryEngine:
     """Create a JuaClient instance for testing."""
-    return QueryEngine(JuaClient(request_credit_limit=100_000_000))
+    return QueryEngine(JuaClient(request_credit_limit=1_000_000_000))
 
 
 @pytest.mark.parametrize(
