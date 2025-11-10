@@ -137,9 +137,6 @@ class ForecastCache:
         self._grid_chunk = grid_chunk
 
         # Parsed params for API queries
-        self._init_times_list = [
-            pd.Timestamp(t).to_pydatetime() for t in self._init_times
-        ]
         self._pred_td_hours = [
             int(td / np.timedelta64(1, "h")) for td in self._prediction_timedeltas
         ]
