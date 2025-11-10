@@ -153,86 +153,36 @@ class ForecastCache:
         # Lock for thread safety
         self._lock = RLock()
 
-    def _labels_to_indices(self, key_any: Any, coord_values: np.ndarray) -> np.ndarray:
-        """Map label/positional keys from xarray into integer indices.
+    def _positional_to_indices(self, key_any: Any, size: int) -> np.ndarray:
+        """Expand a positional indexer (ints/slices/arrays) into integer indices.
 
-        Supports ints (including negative), positional slices, label scalars,
-        label slices (using searchsorted), and arrays/lists of labels or
-        positions. Falls back to nearest index for unmatched scalar labels.
+        Assumes xarray has already resolved any label-based indexing into
+        positional indexers using registered xindexes on the dataset coords.
         """
-        # Integer/slice indices
+        # Single integer
         if isinstance(key_any, (int, np.integer)):
             idx = int(key_any)
             if idx < 0:
-                idx = coord_values.size + idx
+                idx += size
             return np.array([idx], dtype=int)
 
+        # Slice -> expand using normalized bounds
         if isinstance(key_any, slice):
-            # If both bounds are positional (ints) or None, treat as positional
-            positional = (
-                key_any.start is None or isinstance(key_any.start, (int, np.integer))
-            ) and (key_any.stop is None or isinstance(key_any.stop, (int, np.integer)))
-            if positional:
-                start = 0 if key_any.start is None else int(key_any.start)
-                stop = coord_values.size if key_any.stop is None else int(key_any.stop)
-                step = 1 if key_any.step is None else int(key_any.step)
-                return np.arange(start, stop, step, dtype=int)
+            start, stop, step = key_any.indices(size)
+            return np.arange(start, stop, step, dtype=int)
 
-        # Label-based handling
-        # Single scalar label
-        if not isinstance(key_any, (slice, list, tuple, np.ndarray)):
-            # Find exact match or nearest index
-            matches = np.where(coord_values == key_any)[0]
-            if matches.size == 0:
-                # Fallback to nearest
-                idx = int(np.argmin(np.abs(coord_values - key_any)))
-                return np.array([idx], dtype=int)
-            return matches.astype(int)
-
-        # Slice of labels
-        if isinstance(key_any, slice):
-            # Determine start/stop using searchsorted; inclusive of stop
-            start_val = key_any.start
-            stop_val = key_any.stop
-            step = 1 if key_any.step is None else int(key_any.step)
-            # Handle None bounds as open interval
-            if start_val is None and stop_val is None:
-                return np.arange(0, coord_values.size, step, dtype=int)
-            # Compute inclusive mask regardless of coordinate order
-            if start_val is None:
-                lower = -np.inf
-            else:
-                lower = start_val
-            if stop_val is None:
-                upper = np.inf
-            else:
-                upper = stop_val
-            # Ensure lower <= upper for comparison
-            lo = min(lower, upper)
-            hi = max(lower, upper)
-            mask = (coord_values >= lo) & (coord_values <= hi)
-            idxs = np.nonzero(mask)[0]
-            if idxs.size == 0:
-                return idxs.astype(int)
-            return idxs[::step].astype(int)
-
-        # Array-like of labels/positions
+        # Array-like of integer positions
         arr = np.asarray(key_any)
-        if arr.dtype.kind in {"i"}:
-            # Positional indices
-            arr = arr.astype(int)
-            arr[arr < 0] += coord_values.size
-            return arr
+        if arr.dtype.kind != "i":
+            raise TypeError(
+                "Indexers must be positional (ints/slices/arrays of ints). "
+                "Label-based selection should be handled by xarray before "
+                "reaching the backend."
+            )
 
-        # Map each label to nearest/exact index
-        indices: list[int] = []
-        for v in arr:
-            matches = np.where(coord_values == v)[0]
-            if matches.size:
-                indices.append(int(matches[0]))
-            else:
-                indices.append(int(np.argmin(np.abs(coord_values - v))))
-        return np.array(indices, dtype=int)
+        arr = arr.astype(int)
+        arr[arr < 0] += size
+        return arr
 
     def _get_required_grid_cells(
         self,
@@ -331,10 +281,8 @@ class ForecastCache:
 
             if len(chunk_lats) > 0 and len(chunk_lons) > 0:
                 # Use min/max to be robust to coordinate order (ascending/descending)
-                lat_min = round(float(np.min(chunk_lats)), 3) - 0.001
-                lat_max = round(float(np.max(chunk_lats)), 3) + 0.001
-                lon_min = round(float(np.min(chunk_lons)), 3) - 0.001
-                lon_max = round(float(np.max(chunk_lons)), 3) + 0.001
+                lat_min, lat_max = _get_padded_extent(chunk_lats)
+                lon_min, lon_max = _get_padded_extent(chunk_lons)
 
                 # Record original-space chunk members
                 members: list[tuple[int, int]] = []
@@ -504,13 +452,15 @@ class ForecastCache:
         # Extract indices from key
         init_time_key, pred_td_key, lat_key, lon_key = key
 
-        # Compute indices for each dimension using appropriate coordinate arrays
-        init_time_indices = self._labels_to_indices(init_time_key, self._init_times)
-        pred_td_indices = self._labels_to_indices(
-            pred_td_key, self._prediction_timedeltas
+        # Compute indices for each dimension; keys are positional at this point
+        init_time_indices = self._positional_to_indices(
+            init_time_key, self._init_times.size
         )
-        lat_indices = self._labels_to_indices(lat_key, self._latitudes)
-        lon_indices = self._labels_to_indices(lon_key, self._longitudes)
+        pred_td_indices = self._positional_to_indices(
+            pred_td_key, self._prediction_timedeltas.size
+        )
+        lat_indices = self._positional_to_indices(lat_key, self._latitudes.size)
+        lon_indices = self._positional_to_indices(lon_key, self._longitudes.size)
 
         # Get required grid cells
         grid_cells = self._get_required_grid_cells(
@@ -656,14 +606,20 @@ class ForecastCache:
             self._longitudes.size,
         )
 
-    def get_dtype(self, variable_name: str) -> np.dtype:
+    def get_dtype(self) -> np.dtype:
         """Get the dtype of a specific variable.
 
         Args:
             variable_name: Name of the variable
 
         Returns:
-            Numpy dtype (defaults to float32 for weather data)
+            Numpy dtype
         """
-        # Default to float32 for weather data
         return np.dtype("float32")
+
+
+def _get_padded_extent(values: np.ndarray, n: int = 3) -> tuple[float, float]:
+    return (
+        round(float(np.min(values)), n) - (10**-n),
+        round(float(np.max(values)), n) + (10**-n),
+    )
