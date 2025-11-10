@@ -64,6 +64,9 @@ major_version_zero = true
 [project.scripts]
 jua = "jua.scripts.jua:main"
 
+[project.entry-points."xarray.backends"]
+jua_query_engine = "jua.weather._lazy_loading.backend:JuaQueryEngineBackend"
+
 [project.optional-dependencies]
 plotting = [
     "matplotlib>=3.8.0",

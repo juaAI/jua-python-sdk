@@ -16,6 +16,7 @@ from jua.weather._model_meta import get_model_meta_info
 from jua.weather._stream import process_arrow_streaming_response
 from jua.weather._types.forecast import ForecastData
 from jua.weather._types.query_payload_types import (
+    ForecastIndexQueryPayload,
     ForecastQueryPayload,
     build_geo_filter,
     build_init_time_arg,
@@ -185,6 +186,84 @@ class QueryEngine:
         return MetaQueryResult.model_validate(response.json())
 
     @validate_call(config=dict(arbitrary_types_allowed=True))
+    def get_forecast_index(
+        self,
+        model: Models,
+        init_time: Literal["latest"] | datetime | list[datetime] | slice,
+        variables: list[Variables] | list[str],
+        prediction_timedelta: PredictionTimeDelta | None = None,
+        latitude: slice | None = None,
+        longitude: slice | None = None,
+    ) -> dict[str, list]:
+        """Get the index (coordinates) for a forecast query without loading data.
+
+        This is more efficient than loading actual data when you only need to know
+        what coordinates are available for a query.
+
+        Args:
+            model: The model to query
+            init_time: Filter by forecast initialization time
+            variables: List of weather variables
+            prediction_timedelta: Filter by forecast lead time
+            latitude: Latitude selection
+            longitude: Longitude selection
+
+        Returns:
+            Dictionary with keys: init_time, prediction_timedelta, latitude,
+            longitude, variables. Each containing a list of available coordinate
+            values.
+
+        Raises:
+            ValueError: If latitude/longitude are not ranges/slices
+                (index endpoint requires ranges)
+        """
+        # Convert latitude/longitude to ranges
+        if latitude is None:
+            raise ValueError("latitude is required for forecast index")
+        if longitude is None:
+            raise ValueError("longitude is required for forecast index")
+
+        # Build the payload using the proper type
+        init_time_value = build_init_time_arg(init_time)
+        prediction_timedelta_value = build_prediction_timedelta(prediction_timedelta)
+
+        # Normalize variables
+        variable_names = [
+            v.name if isinstance(v, Variables) else str(v) for v in variables
+        ]
+
+        payload = ForecastIndexQueryPayload(
+            model=model,
+            latitude=(latitude.start, latitude.stop),
+            longitude=(longitude.start, longitude.stop),
+            init_time=init_time_value,
+            prediction_timedelta=prediction_timedelta_value,
+            variables=variable_names,
+        )
+
+        query_params = {}
+        if self._jua_client.request_credit_limit is not None:
+            query_params["request_credit_limit"] = str(
+                self._jua_client.request_credit_limit
+            )
+
+        response = self._api.post(
+            "forecast/index",
+            data=payload.model_dump(exclude_none=True),
+            query_params=query_params,
+        )
+
+        result = response.json()
+
+        # Convert prediction_timedelta from minutes to hours
+        if "prediction_timedelta" in result:
+            result["prediction_timedelta"] = pd.to_timedelta(
+                result["prediction_timedelta"], unit="m"
+            )
+
+        return result
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
     def get_forecast(
         self,
         model: Models,
@@ -258,16 +337,6 @@ class QueryEngine:
                 "point queries."
             )
 
-        if stream is None:
-            stream = geo.type != "point"
-
-        if geo.type == "point" and method == "bilinear" and stream:
-            logger.warning(
-                "Cannot use streaming responses with bilinear interpolation. Setting "
-                "stream=False."
-            )
-            stream = False
-
         stats: list[Statistics] = []
         if statistics is not None:
             for s in statistics:
@@ -281,14 +350,44 @@ class QueryEngine:
                     )
 
         aggregation = [s.agg for s in stats] if stats else None
-        payload = ForecastQueryPayload(
-            models=[model],
-            init_time=build_init_time_arg(init_time),
-            geo=geo,
-            prediction_timedelta=build_prediction_timedelta(prediction_timedelta),
-            variables=variables,
-            aggregation=aggregation,
+        df = self.load_raw_forecast(
+            payload=ForecastQueryPayload(
+                models=[model],
+                init_time=build_init_time_arg(init_time),
+                geo=geo,
+                prediction_timedelta=build_prediction_timedelta(prediction_timedelta),
+                variables=variables,
+                aggregation=aggregation,
+            ),
+            stream=geo.type != "point" if stream is None else stream,
+            print_progress=print_progress,
         )
+
+        if geo.type == "point":
+            if isinstance(points, list):
+                points = points
+            else:
+                points = [LatLon(lat=lat, lon=lon) for lat, lon in geo.value]  # type: ignore
+
+        return self.transform_dataframe(
+            df,
+            points=points,  # type: ignore
+            statistics=stats,
+        )
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def load_raw_forecast(
+        self,
+        payload: ForecastQueryPayload,
+        stream: bool = False,
+        print_progress: bool | None = None,
+    ) -> pd.DataFrame:
+        if payload.geo.type == "point" and payload.geo.method == "bilinear" and stream:
+            logger.warning(
+                "Cannot use streaming responses with bilinear interpolation. Setting "
+                "stream=False."
+            )
+            stream = False
 
         est_requested_points = payload.num_requested_points()
         if est_requested_points > self._MAX_POINTS_PER_REQUEST:
@@ -323,22 +422,26 @@ class QueryEngine:
         if df.empty:
             raise ValueError("No data available for the given parameters.")
 
-        if geo.type == "point":
-            if isinstance(points, list):
-                points = points
-            elif isinstance(points, LatLon):
-                points = [points]
-            else:
-                points = [LatLon(lat=lat, lon=lon) for lat, lon in geo.value]  # type: ignore
-
-        return self._transform_dataframe(
-            df,
-            points=points,
-            statistics=stats,
+        # Parse times to correct units, enforce correct encoding
+        df["init_time"] = df["init_time"].astype("datetime64[ns]")
+        df["prediction_timedelta"] = pd.to_timedelta(
+            df["prediction_timedelta"], unit="m"
         )
 
-    def _transform_dataframe(
-        self,
+        # Remove unused metadata columns
+        num_models = len(df["model"].unique())
+        if not num_models == 1:
+            raise ValueError(f"Unexpected number of models returned: {num_models}")
+        cols_to_drop = ["model"]
+        if "time" in df.columns:
+            cols_to_drop.append("time")
+        df.drop(columns=cols_to_drop, inplace=True)
+        return df
+
+    @classmethod
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def transform_dataframe(
+        cls,
         df: pd.DataFrame,
         points: list[LatLon] | None = None,
         statistics: list[Statistics] | None = None,
@@ -387,21 +490,6 @@ class QueryEngine:
             - All data variables are converted to float32 for memory efficiency
             - Init time encoding is set to nanoseconds since epoch
         """
-        # Parse times to correct units, enforce correct encoding
-        df["init_time"] = df["init_time"].astype("datetime64[ns]")
-        df["prediction_timedelta"] = pd.to_timedelta(
-            df["prediction_timedelta"], unit="m"
-        )
-
-        # Remove unused metadata columns
-        num_models = len(df["model"].unique())
-        if not num_models == 1:
-            raise ValueError(f"Unexpected number of models returned: {num_models}")
-        cols_to_drop = ["model"]
-        if "time" in df.columns:
-            cols_to_drop.append("time")
-        df.drop(columns=cols_to_drop, inplace=True)
-
         # Set the correct index
         if points is not None:
             # Map point indices to requested lat/lon and point objects

@@ -2,6 +2,7 @@ import warnings
 from datetime import UTC, datetime
 from typing import Literal
 
+import xarray as xr
 from pydantic import validate_call
 
 from jua.client import JuaClient
@@ -109,6 +110,7 @@ class Model:
         method: Literal["nearest", "bilinear"] = "nearest",
         stream: bool | None = None,
         print_progress: bool | None = None,
+        lazy_load: bool = False,
     ) -> JuaDataset:
         """Retrieve forecasts for this model.
 
@@ -171,6 +173,16 @@ class Model:
             print_progress: Whether to display a progress bar during data loading.
                 If None, uses the client's default setting.
 
+            lazy_load: Warning - Experimental feature. Requests using lazy-loading may
+                incur higher credit costs than the same request made directly.
+                - Does not load data into memory until necessary. The JuaDataset
+                    returned contains an xarray Dataset with lazy-loaded data.
+                - Only available when loading slices of latitudes/longitudes. Point
+                    forecasts cannot use lazy loading.
+                - The JuaClient used to load data must have a `request_credit_limit`
+                    high enough to load the entire created Dataset at once, even though
+                    no credits are charged until data is actually loaded.
+
         Returns:
             JuaDataset containing the forecast data matching your selection criteria.
 
@@ -220,6 +232,42 @@ class Model:
                 prediction_timedelta = slice(min_lead_time, 60 * 24)  # type: ignore
             elif max_lead_time is not None:
                 prediction_timedelta = slice(0, max_lead_time)
+
+        if lazy_load:
+            if statistics:
+                raise ValueError(f"Cannot `lazy_load` with stats: {statistics}.")
+            if points is not None:
+                raise ValueError("Cannot `lazy_load` points: load the data directly.")
+            if not isinstance(latitude, slice):
+                raise ValueError(
+                    f"Can only `lazy_load` when latitude is a slice, not {latitude}."
+                )
+            if not isinstance(longitude, slice):
+                raise ValueError(
+                    f"Can only `lazy_load` when longitude is a slice, not {longitude}."
+                )
+
+            if prediction_timedelta is None and (
+                min_lead_time is not None or max_lead_time is not None
+            ):
+                prediction_timedelta = slice(
+                    0 if min_lead_time is None else min_lead_time,
+                    24 * 120 if max_lead_time is None else max_lead_time,
+                )
+
+            return JuaDataset(
+                settings=self._client.settings,
+                dataset_name=self._model,
+                raw_data=xr.open_dataset(
+                    self._model,
+                    query_engine=self._query_engine,
+                    init_time=init_time,
+                    prediction_timedelta=prediction_timedelta,
+                    latitude=latitude,
+                    longitude=longitude,
+                ),
+                model=self._model,
+            )
 
         raw_data = self._query_engine.get_forecast(
             model=self._model,

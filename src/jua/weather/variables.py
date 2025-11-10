@@ -148,6 +148,18 @@ class Variables(Enum):
         "geopotential_500hpa",
     )
 
+    SURFACE_AIR_PRESSURE = Variable(
+        "surface_air_pressure",
+        "Pa",
+        None,
+        None,
+    )
+    SURFACE_TEMPERATURE = Variable(
+        "surface_temperature",
+        "K",
+        None,
+        None,
+    )
     SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
         "surface_downwelling_shortwave_flux_sum_1h", "J / m^2", "ssrd", None
     )
