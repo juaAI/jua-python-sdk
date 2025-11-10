@@ -68,8 +68,8 @@ def test_get_metadata(client: JuaClient, model: Models):
         model: Weather model to test
     """
     try:
-        model = client.weather.get_model(model)
-        _ = model.get_metadata()
+        model_instance = client.weather.get_model(model)
+        _ = model_instance.get_metadata()
     except Exception as e:
         pytest.fail(f"Failed to retrieve metadata for {model.value}: {e}")
 
