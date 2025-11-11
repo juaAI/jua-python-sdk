@@ -260,6 +260,7 @@ class Model:
                 dataset_name=self._model,
                 raw_data=xr.open_dataset(
                     self._model,
+                    variables=variables,
                     query_engine=self._query_engine,
                     init_time=init_time,
                     prediction_timedelta=prediction_timedelta,
