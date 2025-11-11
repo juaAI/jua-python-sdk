@@ -1,3 +1,9 @@
+## v0.19.1 (2025-11-11)
+
+### Fix
+
+- fixes the passing of variables to xr when lazy-loading and adds a test for it
+
 ## v0.19.0 (2025-11-10)
 
 ### Feat
