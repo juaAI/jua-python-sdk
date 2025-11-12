@@ -1,3 +1,9 @@
+## v0.19.2 (2025-11-12)
+
+### Fix
+
+- improve error message for broken connections when pulling data
+
 ## v0.19.1 (2025-11-11)
 
 ### Fix
