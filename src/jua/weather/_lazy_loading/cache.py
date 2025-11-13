@@ -107,6 +107,7 @@ class ForecastCache:
         increasing_lons: bool = True,
         original_kwargs: dict[str, Any],
         grid_chunk: int = 8,
+        max_init_times_per_query: int = 128,
     ) -> None:
         """Initialize the forecast cache.
 
@@ -123,6 +124,8 @@ class ForecastCache:
             original_kwargs: Original query parameters
             grid_chunk: Number of grid points per chunk dimension (default: 8).
                 E.g., grid_chunk=8 means 8x8 grid points per chunk.
+            max_init_times_per_query: Maximum number of init times to fetch per
+                query. If more init times are needed, they will be fetched in batches.
         """
         self._qe = query_engine
         self._model = model
@@ -135,6 +138,7 @@ class ForecastCache:
         self._increasing_lons = increasing_lons
         self._kwargs = dict(original_kwargs)
         self._grid_chunk = grid_chunk
+        self._max_init_times_per_query = max_init_times_per_query
 
         # Parsed params for API queries
         self._pred_td_hours = [
@@ -319,15 +323,25 @@ class ForecastCache:
         self,
         missing_chunks: list[tuple[int, int, int]],
     ) -> None:
-        """Fetch all missing chunks in a single API call with multiple bounding boxes.
+        """Fetch all missing chunks in batches if needed.
 
         This method populates the cache with all variables for the requested chunks.
+        If there are more than max_init_times_per_query init times, they are fetched
+        in batches.
 
         Args:
             missing_chunks: List of (init_idx, lat_chunk, lon_chunk) tuples
         """
         if not missing_chunks:
             return
+
+        # Number of points that will be fetched for each init_time
+        num_lead_times = len(self._prediction_timedeltas)
+        num_points_per_chunk = self._grid_chunk**2
+        expected_points_per_it = (
+            num_lead_times * len(missing_chunks) * num_points_per_chunk
+        )
+        stream = expected_points_per_it > 2_000_000
 
         unique_spatial_chunks = set(
             (lat_chunk, lon_chunk) for _, lat_chunk, lon_chunk in missing_chunks
@@ -341,91 +355,102 @@ class ForecastCache:
 
         # Determine which init_times to fetch based on requested chunks
         unique_init_indices = sorted(set(init_idx for init_idx, _, _ in missing_chunks))
-        init_times_dt = [
-            pd.Timestamp(self._init_times[idx]).to_pydatetime()
-            for idx in unique_init_indices
-        ]
 
-        df = self._qe.load_raw_forecast(
-            payload=ForecastQueryPayload(
-                models=[self._model],
-                init_time=build_init_time_arg(init_times_dt),
-                geo=GeoFilter(type="bounding_box", value=bounding_boxes),
-                prediction_timedelta=build_prediction_timedelta(self._pred_td_hours),
-                variables=self._variables,
-            ),
-            stream=True,
-            print_progress=False,
-        )
+        # Batch init times if needed
+        max_batch_size = self._max_init_times_per_query
+        for batch_start in range(0, len(unique_init_indices), max_batch_size):
+            batch_end = min(batch_start + max_batch_size, len(unique_init_indices))
+            batch_init_indices = unique_init_indices[batch_start:batch_end]
 
-        # Process and cache data for each merged bbox group (once per group!)
-        with self._lock:
-            for init_idx in unique_init_indices:
-                for bbox in merged_bboxes:
-                    df_bbox = df[
-                        (df["init_time"] == self._init_times[init_idx])
-                        & (df["latitude"] >= bbox.lat_min)
-                        & (df["latitude"] <= bbox.lat_max)
-                        & (df["longitude"] >= bbox.lon_min)
-                        & (df["longitude"] <= bbox.lon_max)
-                    ]
-                    if len(df_bbox) == 0:
-                        logger.warning(f"No data returned for {bbox.extent()}")
-                        continue
+            init_times_dt = [
+                pd.Timestamp(self._init_times[idx]).to_pydatetime()
+                for idx in batch_init_indices
+            ]
 
-                    # Parse bbox data, reverse coordinate order if needed
-                    ds = self._qe.transform_dataframe(df_bbox).isel(init_time=0)
-                    if not self._increasing_lats:
-                        ds = ds.isel(latitude=slice(None, None, -1))
-                    if not self._increasing_lons:
-                        ds = ds.isel(longitude=slice(None, None, -1))
+            df = self._qe.load_raw_forecast(
+                payload=ForecastQueryPayload(
+                    models=[self._model],
+                    init_time=build_init_time_arg(init_times_dt),
+                    geo=GeoFilter(type="bounding_box", value=bounding_boxes),
+                    prediction_timedelta=build_prediction_timedelta(
+                        self._pred_td_hours
+                    ),
+                    variables=self._variables,
+                ),
+                stream=stream,
+                print_progress=False,
+            )
 
-                    # Check that returned coordinate order matches expected order
-                    returned_lats = ds.latitude.values
-                    returned_lons = ds.longitude.values
-                    expected_lats = self._latitudes[
-                        bbox.lat_idx_start : bbox.lat_idx_end
-                    ]
-                    expected_lons = self._longitudes[
-                        bbox.lon_idx_start : bbox.lon_idx_end
-                    ]
-                    if not np.allclose(returned_lats, expected_lats):
-                        raise ValueError(
-                            "Failed to fetch lazy-loaded data: latitudes don't match:\n"
-                            f"  expected: {expected_lats}\n"
-                            f"  returned: {returned_lats}\n"
-                        )
-                    if not np.allclose(returned_lons, expected_lons):
-                        raise ValueError(
-                            "Failed to fetch lazy-loaded data: latitudes don't match:\n"
-                            f"  expected: {expected_lons}\n"
-                            f"  returned: {returned_lons}\n"
-                        )
-
-                    # Extract all variables at once
-                    cache = BBoxCache(init_idx=init_idx, bbox=bbox, variables={})
-                    for var_name in self._variables:
-                        if var_name not in ds.data_vars:
-                            logger.warning(
-                                f"Variable {var_name} not found. "
-                                f"Available: {list(ds.data_vars)}"
-                            )
+            # Process and cache data for each merged bbox group (once per group!)
+            with self._lock:
+                for init_idx in batch_init_indices:
+                    for bbox in merged_bboxes:
+                        df_bbox = df[
+                            (df["init_time"] == self._init_times[init_idx])
+                            & (df["latitude"] >= bbox.lat_min)
+                            & (df["latitude"] <= bbox.lat_max)
+                            & (df["longitude"] >= bbox.lon_min)
+                            & (df["longitude"] <= bbox.lon_max)
+                        ]
+                        if len(df_bbox) == 0:
+                            logger.warning(f"No data returned for {bbox.extent()}")
                             continue
 
-                        fetched_data = np.asarray(ds[var_name].data)
+                        # Parse bbox data, reverse coordinate order if needed
+                        ds = self._qe.transform_dataframe(df_bbox).isel(init_time=0)
+                        if not self._increasing_lats:
+                            ds = ds.isel(latitude=slice(None, None, -1))
+                        if not self._increasing_lons:
+                            ds = ds.isel(longitude=slice(None, None, -1))
 
-                        # (pred_td, lat, lon) -> (lat, lon, pred_td)
-                        fetched_data = np.transpose(fetched_data, (1, 2, 0))
-                        cache.variables[var_name] = fetched_data.astype(np.float32)
+                        # Check that returned coordinate order matches expected order
+                        returned_lats = ds.latitude.values
+                        returned_lons = ds.longitude.values
+                        expected_lats = self._latitudes[
+                            bbox.lat_idx_start : bbox.lat_idx_end
+                        ]
+                        expected_lons = self._longitudes[
+                            bbox.lon_idx_start : bbox.lon_idx_end
+                        ]
+                        if not np.allclose(returned_lats, expected_lats):
+                            raise ValueError(
+                                "Failed to fetch lazy-loaded data as the latitudes "
+                                " don't match:\n"
+                                f"  expected: {expected_lats}\n"
+                                f"  returned: {returned_lats}\n"
+                            )
+                        if not np.allclose(returned_lons, expected_lons):
+                            raise ValueError(
+                                "Failed to fetch lazy-loaded data as the longitudes "
+                                " don't match:\n"
+                                f"  expected: {expected_lons}\n"
+                                f"  returned: {returned_lons}\n"
+                            )
 
-                    # Cache the bbox data
-                    self._bbox_cache[cache.id()] = cache
+                        # Extract all variables at once
+                        cache = BBoxCache(init_idx=init_idx, bbox=bbox, variables={})
+                        for var_name in self._variables:
+                            if var_name not in ds.data_vars:
+                                logger.warning(
+                                    f"Variable {var_name} not found. "
+                                    f"Available: {list(ds.data_vars)}"
+                                )
+                                continue
 
-                    # Update spatial index for all chunks covered by this bbox
-                    for lat_chunk, lon_chunk in cache.bbox.chunks:
-                        self._chunk_to_bbox[(init_idx, lat_chunk, lon_chunk)] = (
-                            cache.id()
-                        )
+                            fetched_data = np.asarray(ds[var_name].data)
+
+                            # (pred_td, lat, lon) -> (lat, lon, pred_td)
+                            fetched_data = np.transpose(fetched_data, (1, 2, 0))
+                            cache.variables[var_name] = fetched_data.astype(np.float32)
+
+                        # Cache the bbox data
+                        self._bbox_cache[cache.id()] = cache
+
+                        # Update spatial index for all chunks covered by this bbox
+                        for lat_chunk, lon_chunk in cache.bbox.chunks:
+                            self._chunk_to_bbox[(init_idx, lat_chunk, lon_chunk)] = (
+                                cache.id()
+                            )
 
     def get_variable(self, variable_name: str, key: tuple) -> np.ndarray:
         """Get the numpy array for a specific variable and index key.
