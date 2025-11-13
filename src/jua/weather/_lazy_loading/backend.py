@@ -13,8 +13,6 @@ from jua.weather._query_engine import QueryEngine
 from jua.weather.models import Models
 from jua.weather.variables import Variables
 
-DEFAULT_INIT_TIME_CHUNK_SIZE = 64
-
 
 class JuaQueryEngineArray(BackendArray):
     """Lazy array that pulls a single variable from a shared cache on demand.
@@ -177,9 +175,6 @@ class JuaQueryEngineBackend(BackendEntrypoint):
         ds = xr.Dataset(data_vars=data_vars, coords=coords)
         if drop_variables is not None:
             ds = ds.drop_vars(list(drop_variables))
-
-        # Set default chunking on init_time dimension
-        ds = ds.chunk({"init_time": DEFAULT_INIT_TIME_CHUNK_SIZE})
 
         # Ensure closing the dataset frees the shared cache memory
         def _close_hook() -> None:
