@@ -1,3 +1,13 @@
+## v0.19.3 (2025-11-13)
+
+### Fix
+
+- adds a default chunk size for the init_time dimension when lazy loading, and a max number of init_times to pull in a single query
+
+### Refactor
+
+- remove default chunk size
+
 ## v0.19.2 (2025-11-12)
 
 ### Fix
