@@ -1,3 +1,14 @@
+## v0.20.0 (2025-11-24)
+
+### Feat
+
+- add ept2 reasoning model
+
+### Fix
+
+- set date for ept2 reasoning test
+- correct test date for ept2 reasoning
+
 ## v0.19.3 (2025-11-13)
 
 ### Fix
