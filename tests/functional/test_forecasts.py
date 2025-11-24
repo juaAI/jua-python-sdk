@@ -28,11 +28,29 @@ ROTTERDAM = LatLon(lat=51.9225, lon=4.47917, label="Rotterdam")
 LONDON = LatLon(lat=51.5074, lon=-0.1278, label="London")
 MANCHESTER = LatLon(lat=53.4808, lon=-2.2426, label="Manchester")
 
-# Specific forecast date
-SPECIFIC_FORECAST_DATE = datetime(2025, 10, 20, 0, 0, 0)
+# Default reference date for testing specific forecasts
+DEFAULT_FORECAST_DATE = datetime(2025, 10, 20, 0, 0, 0)
+
+# Model-specific reference dates for models that don't have data from the default date
+# (e.g., newer models that were released after the default date)
+MODEL_SPECIFIC_FORECAST_DATES = {
+    Models.EPT2_REASONING: datetime(2025, 11, 23, 0, 0, 0),
+}
 
 ALL_MODELS = list(Models)
 INTERNAL_MODELS = [m for m in Models if get_model_meta_info(m).has_grid_access]
+
+
+def get_forecast_date(model: Models) -> datetime:
+    """Get the appropriate forecast date for testing a specific model.
+
+    Args:
+        model: The weather model being tested
+
+    Returns:
+        The reference datetime to use for testing specific forecasts
+    """
+    return MODEL_SPECIFIC_FORECAST_DATES.get(model, DEFAULT_FORECAST_DATE)
 
 
 def get_test_cities(model: Models) -> tuple[LatLon, LatLon]:
@@ -256,12 +274,15 @@ def test_latest_forecast_with_stats(client: JuaClient, model: Models):
 
 @pytest.mark.parametrize("model", INTERNAL_MODELS)
 def test_specific_forecast(client: JuaClient, model: Models):
-    """Test retrieving the 2025-09-29 forecast across all models.
+    """Test retrieving a specific historical forecast across all models.
 
     Uses region-appropriate cities based on the model:
     - UK models: London
     - Netherlands models: Rotterdam
     - Other models: Geneva
+
+    The reference date is configurable per model to accommodate models
+    with different data availability periods (e.g., newer models).
 
     Args:
         client: JuaClient instance
@@ -271,12 +292,15 @@ def test_specific_forecast(client: JuaClient, model: Models):
         # Get appropriate test city for this model
         _, city2 = get_test_cities(model)
 
+        # Get model-specific forecast date
+        forecast_date = get_forecast_date(model)
+
         # Get the model instance
         model_instance = client.weather.get_model(model)
 
         # Get specific forecast for the second city
         forecast = model_instance.get_forecasts(
-            init_time=SPECIFIC_FORECAST_DATE,
+            init_time=forecast_date,
             points=city2,
             max_lead_time=48,
         )
@@ -299,12 +323,13 @@ def test_specific_forecast(client: JuaClient, model: Models):
 
         print(
             f"✓ {model.value}: Successfully retrieved "
-            f"{SPECIFIC_FORECAST_DATE.date()} forecast for {city2.label}"
+            f"{forecast_date.date()} forecast for {city2.label}"
         )
 
     except Exception as e:
         _, city2 = get_test_cities(model)
+        forecast_date = get_forecast_date(model)
         pytest.fail(
-            f"Failed to retrieve {SPECIFIC_FORECAST_DATE.date()} forecast "
+            f"Failed to retrieve {forecast_date.date()} forecast "
             f"for {model.value} at {city2.label}: {str(e)}"
         )

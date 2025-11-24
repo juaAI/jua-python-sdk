@@ -147,6 +147,12 @@ _MODEL_META_INFO[Models.EPT2_RR] = ModelMetaInfo(
     forecasts_per_day=24,
     temporal_resolution=TemporalResolution(base=1),
 )
+_MODEL_META_INFO[Models.EPT2_REASONING] = ModelMetaInfo(
+    has_grid_access=True,
+    forecast_name_mapping="ept-2-reasoning",
+    full_forecasted_hours=480,
+    temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
+)
 _MODEL_META_INFO[Models.AIFS] = ModelMetaInfo(
     has_grid_access=True,
     forecast_name_mapping="aifs",

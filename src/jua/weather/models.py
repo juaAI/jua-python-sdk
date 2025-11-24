@@ -26,6 +26,7 @@ class Models(str, Enum):
     EPT2_EARLY = "ept2_early"
     EPT2_HRRR = "ept2_hrrr"
     EPT2_RR = "ept2_rr"
+    EPT2_REASONING = "ept2_reasoning"
     AIFS = "aifs"
     AURORA = "aurora"
     ECMWF_IFS_SINGLE = "ecmwf_ifs_single"
