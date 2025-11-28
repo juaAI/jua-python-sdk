@@ -423,7 +423,8 @@ class QueryEngine:
             raise ValueError("No data available for the given parameters.")
 
         # Parse times to correct units, enforce correct encoding
-        df["init_time"] = df["init_time"].astype("datetime64[ns]")
+        init_time = pd.to_datetime(df["init_time"], utc=True).dt.tz_localize(None)
+        df["init_time"] = init_time
         df["prediction_timedelta"] = pd.to_timedelta(
             df["prediction_timedelta"], unit="m"
         )

@@ -2,6 +2,7 @@ from datetime import datetime
 from typing import Any, Iterable, Literal
 
 import numpy as np
+import pandas as pd
 import xarray as xr
 from xarray.backends import BackendArray, BackendEntrypoint
 from xarray.core import indexing
@@ -131,7 +132,11 @@ class JuaQueryEngineBackend(BackendEntrypoint):
             latitude=latitude,
             longitude=longitude,
         )
-        init_times = np.array(index_result["init_time"], dtype="datetime64[ns]")
+        init_times = (
+            pd.to_datetime(index_result["init_time"], utc=True)
+            .tz_localize(None)
+            .to_numpy()
+        )
         prediction_timedeltas = np.array(index_result["prediction_timedelta"])
         latitudes = np.array(index_result["latitude"], dtype="float32")
         longitudes = np.array(index_result["longitude"], dtype="float32")
