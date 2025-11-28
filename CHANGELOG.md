@@ -1,3 +1,9 @@
+## v0.20.1 (2025-11-28)
+
+### Fix
+
+- handle timezone aware strings
+
 ## v0.20.0 (2025-11-24)
 
 ### Feat
