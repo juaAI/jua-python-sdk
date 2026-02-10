@@ -35,6 +35,7 @@ DEFAULT_FORECAST_DATE = datetime(2025, 10, 20, 0, 0, 0)
 # (e.g., newer models that were released after the default date)
 MODEL_SPECIFIC_FORECAST_DATES = {
     Models.EPT2_REASONING: datetime(2025, 11, 23, 0, 0, 0),
+    Models.ICON_EU: datetime(2026, 2, 9, 0, 0, 0),
 }
 
 ALL_MODELS = list(Models)

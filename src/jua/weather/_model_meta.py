@@ -193,6 +193,17 @@ _MODEL_META_INFO[Models.NOAA_GFS_SINGLE] = ModelMetaInfo(
         ),
     ),
 )
+_MODEL_META_INFO[Models.ICON_EU] = ModelMetaInfo(
+    has_grid_access=True,
+    full_forecasted_hours=120,
+    num_lats=2880,
+    num_lons=5760,
+    forecasts_per_day=8,
+    temporal_resolution=TemporalResolution(
+        base=3,
+        special=((1, 0, 78),),
+    ),
+)
 _MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
     forecast_name_mapping="ecmwf_aifs025_ensemble",
     full_forecasted_hours=360,

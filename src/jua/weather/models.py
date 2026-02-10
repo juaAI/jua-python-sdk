@@ -30,6 +30,7 @@ class Models(str, Enum):
     AIFS = "aifs"
     AURORA = "aurora"
     ECMWF_IFS_SINGLE = "ecmwf_ifs_single"
+    ICON_EU = "icon_eu"
     NOAA_GFS_SINGLE = "noaa_gfs_single"
 
     # Without Grid Access
@@ -40,7 +41,6 @@ class Models(str, Enum):
     GFS_GLOBAL_SINGLE = "gfs_global_single"
     GFS_GRAPHCAST = "gfs_graphcast025"
     ICON_D2 = "icon_d2"
-    ICON_EU = "icon_eu"
     KNMI_HARMONIE_AROME_EUROPE = "knmi_harmonie_arome_europe"
     KNMI_HARMONIE_AROME_NETHERLANDS = "knmi_harmonie_arome_netherlands"
     METEOFRANCE_AROME_FRANCE_HD = "meteofrance_arome_france_hd"
