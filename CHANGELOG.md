@@ -1,3 +1,13 @@
+## v0.20.2 (2026-02-10)
+
+### Fix
+
+- **ICON-EU-test-was-failing-because-the-data-is-available-only-since-2026.02.06**: Fix ICON EU date for testing
+
+### Refactor
+
+- **ICON_EU-is-hosted-by-Jua**: Update metadata for ICON_EU
+
 ## v0.20.1 (2025-11-28)
 
 ### Fix
