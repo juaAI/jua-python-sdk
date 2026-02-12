@@ -52,6 +52,7 @@ class ForecastQueryPayload(BaseModel):
     timedelta_unit: Literal["h", "m", "d"] = "m"
     aggregation: list[str] | None = None
     variables: list[str] | None = None
+    group_by: list[str] | None = None
 
     def num_requested_points(self) -> int:
         """Estimate number of requested data rows for this payload.
