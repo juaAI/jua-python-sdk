@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    client = JuaClient()
+    client = JuaClient(request_credit_limit=100)
     model = client.weather.get_model(Models.EPT2_RR)
 
     # Let' access the full, global dataset
