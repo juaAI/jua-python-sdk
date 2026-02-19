@@ -382,12 +382,18 @@ class QueryEngine:
         stream: bool = False,
         print_progress: bool | None = None,
     ) -> pd.DataFrame:
-        if payload.geo.type == "point" and payload.geo.method == "bilinear" and stream:
-            logger.warning(
-                "Cannot use streaming responses with bilinear interpolation. Setting "
-                "stream=False."
-            )
-            stream = False
+        group_by = payload.group_by or [
+            "model",
+            "init_time",
+            "prediction_timedelta",
+            "latitude",
+            "longitude",
+        ]
+        if payload.geo.type == "point":
+            group_by.append("point")
+
+        if all(get_model_meta_info(model).has_grid_access for model in payload.models):
+            payload.group_by = group_by
 
         est_requested_points = payload.num_requested_points()
         if est_requested_points > self._MAX_POINTS_PER_REQUEST:
