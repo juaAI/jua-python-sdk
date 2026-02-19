@@ -31,6 +31,7 @@ class Models(str, Enum):
     AURORA = "aurora"
     ECMWF_IFS_SINGLE = "ecmwf_ifs_single"
     ICON_EU = "icon_eu"
+    ICON_GLOBAL = "icon_global"
     NOAA_GFS_SINGLE = "noaa_gfs_single"
 
     # Without Grid Access

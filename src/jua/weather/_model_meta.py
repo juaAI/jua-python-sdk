@@ -204,6 +204,17 @@ _MODEL_META_INFO[Models.ICON_EU] = ModelMetaInfo(
         special=((1, 0, 78),),
     ),
 )
+_MODEL_META_INFO[Models.ICON_GLOBAL] = ModelMetaInfo(
+    has_grid_access=True,
+    full_forecasted_hours=180,
+    num_lats=1440,
+    num_lons=2880,
+    forecasts_per_day=4,
+    temporal_resolution=TemporalResolution(
+        base=3,
+        special=((1, 0, 78),),
+    ),
+)
 _MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
     forecast_name_mapping="ecmwf_aifs025_ensemble",
     full_forecasted_hours=360,
