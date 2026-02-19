@@ -1,3 +1,13 @@
+## v0.21.0 (2026-02-19)
+
+### Feat
+
+- **Add-Icon-Global**: Add Icon Global to SDK
+
+### Fix
+
+- **fix-small-test**: increase credits in request
+
 ## v0.20.2 (2026-02-10)
 
 ### Fix
