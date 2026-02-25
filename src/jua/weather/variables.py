@@ -126,6 +126,9 @@ class Variables(Enum):
         "r",
         "relative_humidity_2m",
     )
+    AIR_DENSITY_AT_HEIGHT_LEVEL_2M = Variable(
+        "air_density_at_height_level_2m", "kg/m³", None, "air_density_2m"
+    )
     AIR_PRESSURE_AT_MEAN_SEA_LEVEL = Variable(
         "air_pressure_at_mean_sea_level", "Pa", "msl", "air_pressure_at_mean_sea_level"
     )
@@ -135,11 +138,41 @@ class Variables(Enum):
     WIND_DIRECTION_AT_HEIGHT_LEVEL_10M = Variable(
         "wind_direction_at_height_level_10m", "deg", "10wdir", "wind_direction_10m"
     )
+    WIND_SPEED_AT_HEIGHT_LEVEL_20M = Variable(
+        "wind_speed_at_height_level_20m", "m/s", None, "wind_speed_20m"
+    )
+    WIND_SPEED_AT_HEIGHT_LEVEL_40M = Variable(
+        "wind_speed_at_height_level_40m", "m/s", None, "wind_speed_40m"
+    )
+    WIND_SPEED_AT_HEIGHT_LEVEL_60M = Variable(
+        "wind_speed_at_height_level_60m", "m/s", None, "wind_speed_60m"
+    )
+    WIND_SPEED_AT_HEIGHT_LEVEL_80M = Variable(
+        "wind_speed_at_height_level_80m", "m/s", None, "wind_speed_80m"
+    )
     WIND_SPEED_AT_HEIGHT_LEVEL_100M = Variable(
         "wind_speed_at_height_level_100m", "m/s", "100si", "wind_speed_100m"
     )
     WIND_DIRECTION_AT_HEIGHT_LEVEL_100M = Variable(
         "wind_direction_at_height_level_100m", "deg", "100wdir", "wind_direction_100m"
+    )
+    WIND_SPEED_AT_HEIGHT_LEVEL_120M = Variable(
+        "wind_speed_at_height_level_120m", "m/s", None, "wind_speed_120m"
+    )
+    WIND_SPEED_AT_HEIGHT_LEVEL_140M = Variable(
+        "wind_speed_at_height_level_140m", "m/s", None, "wind_speed_140m"
+    )
+    WIND_SPEED_AT_HEIGHT_LEVEL_160M = Variable(
+        "wind_speed_at_height_level_160m", "m/s", None, "wind_speed_160m"
+    )
+    WIND_SPEED_AT_HEIGHT_LEVEL_180M = Variable(
+        "wind_speed_at_height_level_180m", "m/s", None, "wind_speed_180m"
+    )
+    WIND_SPEED_AT_HEIGHT_LEVEL_200M = Variable(
+        "wind_speed_at_height_level_200m", "m/s", None, "wind_speed_200m"
+    )
+    WIND_DIRECTION_AT_HEIGHT_LEVEL_200M = Variable(
+        "wind_direction_at_height_level_200m", "deg", None, "wind_direction_200m"
     )
     GEOPOTENTIAL_AT_PRESSURE_LEVEL_50000PA = Variable(
         "geopotential_at_pressure_level_50000Pa",
