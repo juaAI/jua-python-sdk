@@ -1,3 +1,9 @@
+## v0.21.1 (2026-02-25)
+
+### Fix
+
+- **models-support-new-variables-and-enum-for-variables-must-be-adjusted**: Add wind speed at 20m steps and air density to enum
+
 ## v0.21.0 (2026-02-19)
 
 ### Feat
