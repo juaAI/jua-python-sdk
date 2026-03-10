@@ -15,7 +15,6 @@ class JuaSettings(BaseSettings):
     Attributes:
         api_url: Base URL for the JUA API endpoint.
         api_version: Version of the API to use (e.g., "v1").
-        data_base_url: Base URL for data access services.
         auth: Authentication configuration including API keys.
         print_progress: Whether to display progress bars during operations.
 
@@ -44,10 +43,6 @@ class JuaSettings(BaseSettings):
 
     api_version: str = Field(
         default="v1", description="API version to use for requests"
-    )
-
-    data_base_url: str = Field(
-        default="https://data.jua.ai", description="Base URL for JUA data services"
     )
 
     query_engine_url: str = Field(

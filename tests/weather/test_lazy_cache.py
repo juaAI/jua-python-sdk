@@ -1,6 +1,7 @@
 import numpy as np
+import pytest
 
-from jua.weather._lazy_loading.cache import ForecastCache
+from jua.weather._lazy_loading.cache import BBoxCache, ForecastCache, MergedBBox
 from jua.weather.models import Models
 
 
@@ -119,3 +120,79 @@ def test_gap_in_row_splits_rectangles():
         _bbox_for(cache, 0, 2, 4, 6),
     ]
     assert sorted(bboxes) == sorted(expected)
+
+
+def test_stitch_handles_missing_prediction_timedelta_in_bbox():
+    """When a bbox has fewer lead times than global, missing slots should be NaN."""
+    qe = _DummyQueryEngine()
+    cache = ForecastCache(
+        query_engine=qe,
+        model=Models.EPT1_5,
+        variables=["dummy"],
+        init_times=[np.datetime64("2024-01-01T00")],
+        prediction_timedeltas=[
+            np.timedelta64(0, "h"),
+            np.timedelta64(1, "h"),
+            np.timedelta64(2, "h"),
+        ],
+        latitudes=np.array([0.0, 1.0]),
+        longitudes=np.array([0.0, 1.0]),
+        original_kwargs={},
+        grid_chunk=2,
+    )
+
+    bbox = MergedBBox(
+        lat_min=-0.001,
+        lat_max=1.001,
+        lon_min=-0.001,
+        lon_max=1.001,
+        lat_idx_start=0,
+        lat_idx_end=2,
+        lon_idx_start=0,
+        lon_idx_end=2,
+        chunks=[(0, 0)],
+    )
+    # Local bbox data has lead times [0h, 2h], missing 1h.
+    bbox_cache = BBoxCache(
+        init_idx=0,
+        bbox=bbox,
+        pred_td_global_to_local=np.array([0, -1, 1], dtype=int),
+        variables={
+            "dummy": np.array(
+                [
+                    [[10.0, 30.0], [11.0, 31.0]],
+                    [[12.0, 32.0], [13.0, 33.0]],
+                ],
+                dtype=np.float32,
+            )
+        },
+    )
+
+    cache._bbox_cache[bbox_cache.id()] = bbox_cache
+    cache._chunk_to_bbox[(0, 0, 0)] = bbox_cache.id()
+
+    out = cache.get_variable(
+        "dummy",
+        (
+            0,
+            slice(None),
+            np.array([0]),
+            np.array([0]),
+        ),
+    )
+    assert out.shape == (1, 3, 1, 1)
+    assert out[0, 0, 0, 0] == 10.0
+    assert np.isnan(out[0, 1, 0, 0])
+    assert out[0, 2, 0, 0] == 30.0
+
+
+def test_positional_index_rejects_scalar_out_of_bounds():
+    cache = _make_cache()
+    with pytest.raises(IndexError):
+        cache._positional_to_indices(48, 48)
+
+
+def test_positional_index_rejects_array_out_of_bounds():
+    cache = _make_cache()
+    with pytest.raises(IndexError):
+        cache._positional_to_indices(np.array([0, 47, 48]), 48)

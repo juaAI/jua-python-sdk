@@ -11,7 +11,6 @@ class TestJuaSettings:
 
         assert settings.api_url == "https://api.jua.ai"
         assert settings.api_version == "v1"
-        assert settings.data_base_url == "https://data.jua.ai"
         assert settings.print_progress is True
         assert isinstance(settings.auth, AuthenticationSettings)
 
@@ -20,27 +19,23 @@ class TestJuaSettings:
         settings = JuaSettings(
             api_url="https://custom-api.example.com",
             api_version="v2",
-            data_base_url="https://custom-data.example.com",
             print_progress=False,
         )
 
         assert settings.api_url == "https://custom-api.example.com"
         assert settings.api_version == "v2"
-        assert settings.data_base_url == "https://custom-data.example.com"
         assert settings.print_progress is False
 
     def test_load_from_env_vars(self, temp_env: MonkeyPatch) -> None:
         """Test loading settings from environment variables."""
         temp_env.setenv("JUA_API_URL", "https://env-api.example.com")
         temp_env.setenv("JUA_API_VERSION", "v3")
-        temp_env.setenv("JUA_DATA_BASE_URL", "https://env-data.example.com")
         temp_env.setenv("JUA_PRINT_PROGRESS", "false")
 
         settings = JuaSettings()
 
         assert settings.api_url == "https://env-api.example.com"
         assert settings.api_version == "v3"
-        assert settings.data_base_url == "https://env-data.example.com"
         assert settings.print_progress is False
 
     def test_custom_auth_settings(self) -> None:
