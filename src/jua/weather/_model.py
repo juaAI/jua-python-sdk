@@ -18,7 +18,6 @@ from jua.weather._types.query_response_types import (
     ModelMetadata,
 )
 from jua.weather.forecast import Forecast
-from jua.weather.hindcast import Hindcast
 from jua.weather.models import Models as ModelEnum
 from jua.weather.statistics import Statistics
 from jua.weather.variables import Variables
@@ -59,7 +58,7 @@ class Model:
         >>> forecast = model.forecast.get_forecast()
         >>>
         >>> # Access hindcast (historical) data
-        >>> hindcast = model.hindcast.get_hindcast(init_time="2023-05-01")
+        >>> hindcast = model.get_forecasts(init_time="2023-05-01")
     """
 
     def __init__(
@@ -78,10 +77,6 @@ class Model:
 
         self._query_engine = QueryEngine(jua_client=self._client)
         self._forecast = Forecast(
-            client,
-            model=model,
-        )
-        self._hindcast = Hindcast(
             client,
             model=model,
         )
@@ -544,22 +539,6 @@ class Model:
             stacklevel=2,
         )
         return self._forecast
-
-    @property
-    def hindcast(self) -> Hindcast:
-        """Access historical weather data for this model.
-
-        Returns:
-            Hindcast instance configured for this model.
-        """
-        warnings.warn(
-            "Accessing .hindcast is deprecated and will be removed in a future release."
-            " Use model methods directly instead (e.g., model.get_forecasts()). "
-            "Check the docs for more information and examples: https://docs.jua.ai",
-            DeprecationWarning,
-            stacklevel=2,
-        )
-        return self._hindcast
 
     def __repr__(self) -> str:
         """Get string representation of the model.
