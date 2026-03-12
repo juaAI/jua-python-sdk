@@ -69,12 +69,15 @@ class BBoxCache:
     Attributes:
         init_idx: Index of the initialization time in the global init_times array
         bbox: The merged bounding box contained in this cache
+        pred_td_global_to_local: Mapping from global prediction_timedelta index to
+            local index inside this bbox cache. Missing lead times are -1.
         variables: Dictionary mapping variable names to data arrays with
             shape (lat, lon, pred_td)
     """
 
     init_idx: int
     bbox: MergedBBox
+    pred_td_global_to_local: np.ndarray
     variables: dict[str, np.ndarray]
 
     def extent(self) -> tuple[tuple[float, float], tuple[float, float]]:
@@ -131,7 +134,9 @@ class ForecastCache:
         self._model = model
         self._variables = variables
         self._init_times = np.array(init_times)
-        self._prediction_timedeltas = np.array(prediction_timedeltas)
+        self._prediction_timedeltas = np.asarray(
+            prediction_timedeltas, dtype="timedelta64[ns]"
+        )
         self._latitudes = np.array(latitudes)
         self._longitudes = np.array(longitudes)
         self._increasing_lats = increasing_lats
@@ -170,6 +175,10 @@ class ForecastCache:
             idx = int(key_any)
             if idx < 0:
                 idx += size
+            if idx < 0 or idx >= size:
+                raise IndexError(
+                    f"index {idx} is out of bounds for axis with size {size}"
+                )
             return np.array([idx], dtype=int)
 
         if isinstance(key_any, slice):
@@ -186,6 +195,16 @@ class ForecastCache:
 
         arr = arr.astype(int)
         arr[arr < 0] += size
+        if arr.size > 0:
+            oob_mask = (arr < 0) | (arr >= size)
+            if np.any(oob_mask):
+                bad_values = np.unique(arr[oob_mask])
+                preview = ", ".join(str(v) for v in bad_values[:5])
+                if bad_values.size > 5:
+                    preview += ", ..."
+                raise IndexError(
+                    f"indices [{preview}] are out of bounds for axis with size {size}"
+                )
         return arr
 
     def _get_required_grid_cells(
@@ -434,8 +453,32 @@ class ForecastCache:
                                 f"  returned: {returned_lons}\n"
                             )
 
-                        # Extract all variables at once
-                        cache = BBoxCache(init_idx=init_idx, bbox=bbox, variables={})
+                        returned_pred_timedeltas = np.asarray(
+                            ds.prediction_timedelta.values,
+                            dtype="timedelta64[ns]",
+                        )
+                        pred_td_global_to_local = (
+                            self._build_pred_td_global_to_local_map(
+                                returned_pred_timedeltas
+                            )
+                        )
+                        if (
+                            returned_pred_timedeltas.size
+                            != self._prediction_timedeltas.size
+                        ):
+                            logger.warning(
+                                "Returned prediction timedeltas differ from expected "
+                                f"for init_idx={init_idx}, bbox={bbox.extent()}: "
+                                f"expected {self._prediction_timedeltas.size}, "
+                                f"got {returned_pred_timedeltas.size}"
+                            )
+
+                        cache = BBoxCache(
+                            init_idx=init_idx,
+                            bbox=bbox,
+                            pred_td_global_to_local=pred_td_global_to_local,
+                            variables={},
+                        )
                         for var_name in self._variables:
                             if var_name not in ds.data_vars:
                                 logger.warning(
@@ -459,6 +502,30 @@ class ForecastCache:
                                 cache.id()
                             )
 
+    def _build_pred_td_global_to_local_map(
+        self, returned_pred_timedeltas: np.ndarray
+    ) -> np.ndarray:
+        """Map global prediction_timedelta indices to local bbox indices.
+
+        Returns:
+            Array of shape (num_global_pred_timedeltas,) where each value is the
+            corresponding index in returned_pred_timedeltas, or -1 if missing.
+        """
+        mapping = np.full(self._prediction_timedeltas.size, -1, dtype=int)
+        global_ns = self._prediction_timedeltas.astype("timedelta64[ns]").astype(
+            np.int64
+        )
+        returned_ns = np.asarray(
+            returned_pred_timedeltas, dtype="timedelta64[ns]"
+        ).astype(np.int64)
+        _, global_idx, local_idx = np.intersect1d(
+            global_ns,
+            returned_ns,
+            return_indices=True,
+        )
+        mapping[global_idx] = local_idx
+        return mapping
+
     def get_variable(self, variable_name: str, key: tuple) -> np.ndarray:
         """Get the numpy array for a specific variable and index key.
 
@@ -476,14 +543,22 @@ class ForecastCache:
         init_time_key, pred_td_key, lat_key, lon_key = key
 
         # Compute indices for each dimension; keys are positional at this point
-        init_time_indices = self._positional_to_indices(
-            init_time_key, self._init_times.size
-        )
-        pred_td_indices = self._positional_to_indices(
-            pred_td_key, self._prediction_timedeltas.size
-        )
-        lat_indices = self._positional_to_indices(lat_key, self._latitudes.size)
-        lon_indices = self._positional_to_indices(lon_key, self._longitudes.size)
+        try:
+            init_time_indices = self._positional_to_indices(
+                init_time_key, self._init_times.size
+            )
+            pred_td_indices = self._positional_to_indices(
+                pred_td_key, self._prediction_timedeltas.size
+            )
+            lat_indices = self._positional_to_indices(lat_key, self._latitudes.size)
+            lon_indices = self._positional_to_indices(lon_key, self._longitudes.size)
+        except IndexError as e:
+            raise IndexError(
+                "Invalid positional index received by lazy forecast cache: "
+                f"key={key}, sizes=(init_time={self._init_times.size}, "
+                f"prediction_timedelta={self._prediction_timedeltas.size}, "
+                f"latitude={self._latitudes.size}, longitude={self._longitudes.size})"
+            ) from e
 
         # Get required grid cells
         grid_cells = self._get_required_grid_cells(
@@ -606,13 +681,20 @@ class ForecastCache:
                     # Extract data from the bbox
                     var_data = bbox_data.variables[variable_name]
 
+                    pred_td_local_indices = bbox_data.pred_td_global_to_local[
+                        pred_td_indices
+                    ]
+                    valid_pred_mask = pred_td_local_indices >= 0
+                    if not np.any(valid_pred_mask):
+                        continue
+
                     # Get all pred_tds for this location
                     cell_values = var_data[lat_idx_in_bbox, lon_idx_in_bbox, :]
 
-                    # Select only requested pred_tds
-                    result[out_init_idx, :, out_lat_idx, out_lon_idx] = cell_values[
-                        pred_td_indices
-                    ]
+                    # Select requested pred_tds that are available in this bbox
+                    result[out_init_idx, valid_pred_mask, out_lat_idx, out_lon_idx] = (
+                        cell_values[pred_td_local_indices[valid_pred_mask]]
+                    )
 
         return result
 

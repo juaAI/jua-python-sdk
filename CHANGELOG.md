@@ -1,3 +1,13 @@
+## v0.21.2 (2026-03-10)
+
+### Fix
+
+- prevent crashes when fetched dimensions and returned data do not match
+
+### Refactor
+
+- remove outdated data.jua.ai references
+
 ## v0.21.1 (2026-02-25)
 
 ### Fix
