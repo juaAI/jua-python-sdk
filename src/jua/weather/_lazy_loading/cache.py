@@ -422,7 +422,9 @@ class ForecastCache:
                         if not self._increasing_lons:
                             ds = ds.isel(longitude=slice(None, None, -1))
 
-                        # Check that returned coordinate order matches expected order
+                        # Check that returned coordinate order matches expected order.
+                        # Use atol=1e-4 (~10m) to tolerate float32 precision
+                        # differences between the index and data endpoints.
                         returned_lats = ds.latitude.values
                         returned_lons = ds.longitude.values
                         expected_lats = self._latitudes[
@@ -431,14 +433,19 @@ class ForecastCache:
                         expected_lons = self._longitudes[
                             bbox.lon_idx_start : bbox.lon_idx_end
                         ]
-                        if not np.allclose(returned_lats, expected_lats):
+                        coord_atol = 1e-4
+                        if not np.allclose(
+                            returned_lats, expected_lats, atol=coord_atol
+                        ):
                             raise ValueError(
                                 "Failed to fetch lazy-loaded data as the latitudes "
                                 " don't match:\n"
                                 f"  expected: {expected_lats}\n"
                                 f"  returned: {returned_lats}\n"
                             )
-                        if not np.allclose(returned_lons, expected_lons):
+                        if not np.allclose(
+                            returned_lons, expected_lons, atol=coord_atol
+                        ):
                             raise ValueError(
                                 "Failed to fetch lazy-loaded data as the longitudes "
                                 " don't match:\n"
