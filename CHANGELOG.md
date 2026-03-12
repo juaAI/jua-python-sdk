@@ -1,3 +1,9 @@
+## v0.21.3 (2026-03-12)
+
+### Fix
+
+- **Fix-lazy-loading-issue-related-to-tolerance-for-lat-and-lon**: Change tolerance from 1e-8 to 1e-4 for lazy laoding
+
 ## v0.21.2 (2026-03-10)
 
 ### Fix
