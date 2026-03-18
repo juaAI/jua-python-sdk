@@ -9,7 +9,11 @@ from jua._api import QueryEngineAPI
 from jua._utils.remove_none_from_dict import remove_none_from_dict
 from jua.client import JuaClient
 from jua.market_aggregates.model_run import ModelRuns
-from jua.market_aggregates.variables import AggregateVariable, AggregateVariables
+from jua.market_aggregates.variables import (
+    AggregateVariable,
+    AggregateVariables,
+    MWWeighting,
+)
 from jua.types import MarketZones
 from jua.weather.models import Models
 
@@ -257,6 +261,141 @@ class EnergyMarket:
 
         # update variable name
         ds = ds.rename(name_dict={f"avg__{var.name}": var.name})
+        return ds
+
+    @validate_call(config=dict(arbitrary_types_allowed=True))
+    def compare_runs_mw(
+        self,
+        weighting: MWWeighting,
+        model_runs: list[ModelRuns],
+        min_lead_time: int = 0,
+        max_lead_time: int | None = None,
+    ) -> xr.Dataset:
+        """Compare multiple model runs with output in MW.
+
+        Like :meth:`compare_runs`, but applies power curves and returns
+        predicted megawatt (MW) values instead of raw weather variables.
+
+        The response columns depend on the weighting:
+
+        - ``"wind_capacity"`` -> ``wind_onshore_mw``, ``wind_offshore_mw``
+        - ``"solar_capacity"`` -> ``solar_mw``
+
+        Args:
+            weighting: Capacity weighting scheme. Must be
+                ``"wind_capacity"`` or ``"solar_capacity"``.
+
+            model_runs: List of ModelRuns instances specifying which model
+                forecasts to query.
+
+            min_lead_time: Minimum forecast lead time in hours (default: 0).
+
+            max_lead_time: Maximum forecast lead time in hours. If ``None``,
+                returns all available lead times.
+
+        Returns:
+            ``xarray.Dataset`` with ``model_run`` and ``time`` dimensions
+            and MW data variables (e.g. ``wind_onshore_mw``).
+
+        Raises:
+            RuntimeError: If the API request fails.
+
+        Examples:
+            >>> from jua import JuaClient
+            >>> from jua.market_aggregates import ModelRuns
+            >>> from jua.weather import Models
+            >>> from jua.types import MarketZones
+            >>>
+            >>> client = JuaClient()
+            >>> germany = client.market_aggregates.get_market(MarketZones.DE)
+            >>>
+            >>> ds = germany.compare_runs_mw(
+            ...     weighting="wind_capacity",
+            ...     model_runs=[ModelRuns(Models.EPT2, [0, 1])],
+            ...     max_lead_time=48,
+            ... )
+        """
+        attrs = {
+            "unit": "MW",
+            "weighting": weighting,
+            "market_zone": self.market_zone,
+            "min_lead_time": min_lead_time,
+            "max_lead_time": max_lead_time,
+        }
+
+        all_model_runs: dict[Models, list[datetime | int]] = defaultdict(list)
+        for model_run in model_runs:
+            init_times_list = model_run.get_init_times_list()
+            all_model_runs[model_run.model].extend(init_times_list)
+
+        model_to_init_times: dict[Models, list[datetime]] = {}
+        for model, init_times in all_model_runs.items():
+            model_to_init_times[model] = self._resolve_init_times_for_model(
+                model, init_times
+            )
+
+        init_time_to_models: dict[datetime, list[Models]] = defaultdict(list)
+        for model, resolved_times in model_to_init_times.items():
+            for init_time in resolved_times:
+                init_time_to_models[init_time].append(model)
+
+        all_dataframes = []
+        for init_time in sorted(init_time_to_models.keys()):
+            models = init_time_to_models[init_time]
+            params: dict = {
+                "models": [m.value for m in models],
+                "init_time": init_time.isoformat(),
+                "weighting": weighting,
+                "market_zones": self.market_zone,
+                "include_time": True,
+                "unit": "mw",
+            }
+            if min_lead_time > 0:
+                params["min_prediction_timedelta"] = min_lead_time
+            if max_lead_time is not None:
+                params["max_prediction_timedelta"] = max_lead_time
+
+            try:
+                response = self._query_engine_api.get(
+                    "forecast/market-aggregate",
+                    params=remove_none_from_dict(params),
+                    requires_auth=True,
+                )
+
+                data = response.json()
+                df = pd.DataFrame(data)
+                if not df.empty:
+                    all_dataframes.append(df)
+
+            except Exception as e:
+                raise RuntimeError(
+                    f"Failed to fetch MW data for models "
+                    f"{[m.value for m in models]} at "
+                    f"init_time {init_time.isoformat()}: {e}"
+                ) from e
+
+        if not all_dataframes:
+            ds = xr.Dataset()
+            ds.assign_attrs(**attrs)
+            return ds
+
+        df = pd.concat(all_dataframes, ignore_index=True)
+
+        df["time"] = pd.to_datetime(df["time"])
+        df["init_time"] = pd.to_datetime(df["init_time"])
+        df["model_run"] = (
+            df["model"] + " " + df["init_time"].dt.strftime("%Y-%m-%dT%H:%M")
+        )
+
+        model_per_run = df.groupby("model_run")["model"].first()
+        init_time_per_run = df.groupby("model_run")["init_time"].first()
+        df_for_ds = df.drop(columns=["model", "init_time"])
+
+        ds = xr.Dataset.from_dataframe(df_for_ds.set_index(["model_run", "time"]))
+        ds = ds.assign_attrs(**attrs)
+        ds.coords["model"] = ("model_run", model_per_run.values)
+        ds.coords["init_time"] = ("model_run", init_time_per_run.values)
+
         return ds
 
     def __repr__(self) -> str:

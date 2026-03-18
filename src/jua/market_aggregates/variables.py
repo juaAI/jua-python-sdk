@@ -1,7 +1,10 @@
 from dataclasses import dataclass
 from enum import Enum, StrEnum
+from typing import Literal
 
 from jua.weather.variables import Variables
+
+MWWeighting = Literal["wind_capacity", "solar_capacity"]
 
 
 class Weighting(StrEnum):
