@@ -1,3 +1,12 @@
+## v0.22.0 (2026-03-18)
+
+### Feat
+
+- Add plot example for power forecast
+- Add tests for MA and power forecast
+- Add Jua power forecast support
+- Support MW output for market aggregates
+
 ## v0.21.3 (2026-03-12)
 
 ### Fix
