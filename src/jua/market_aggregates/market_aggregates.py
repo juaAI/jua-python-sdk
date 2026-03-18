@@ -1,5 +1,6 @@
 """Market aggregates module for the Jua SDK."""
 
+from jua._api import QueryEngineAPI
 from jua.client import JuaClient
 from jua.market_aggregates.energy_market import EnergyMarket
 from jua.types import MarketZones
@@ -43,6 +44,7 @@ class MarketAggregates:
             client: JuaClient instance for API communication.
         """
         self._client = client
+        self._query_engine_api = QueryEngineAPI(jua_client=self._client)
 
     def get_market(
         self, market_zone: MarketZones | str | list[MarketZones | str]
@@ -67,3 +69,31 @@ class MarketAggregates:
             >>> )
         """
         return EnergyMarket(client=self._client, market_zone=market_zone)
+
+    def get_mw_zones(self) -> dict[str, list[str]]:
+        """Get market zones capable of MW output.
+
+        Returns zones that have both installed capacity data and fitted
+        power curves, broken down by energy type (wind and solar).
+
+        Returns:
+            Dictionary with ``"wind"`` and ``"solar"`` keys, each mapping
+            to a list of zone codes.
+
+        Raises:
+            RuntimeError: If the API request fails.
+
+        Examples:
+            >>> mw_zones = client.market_aggregates.get_mw_zones()
+            >>> print(mw_zones["wind"])   # ["AT", "BE", "DE", "FR", ...]
+            >>> print(mw_zones["solar"])  # ["AT", "BE", "DE", "FR", ...]
+        """
+        try:
+            response = self._query_engine_api.get(
+                "forecast/market-aggregate/mw-zones",
+                requires_auth=False,
+            )
+            data = response.json()
+            return {"wind": data["wind"], "solar": data["solar"]}
+        except Exception as e:
+            raise RuntimeError(f"Failed to fetch MW-capable market zones: {e}") from e

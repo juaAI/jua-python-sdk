@@ -350,6 +350,117 @@ def test_variable_weighting_types(client: JuaClient):
         pytest.fail(f"Failed to test variable weighting types: {e}")
 
 
+def test_compare_runs_mw_wind(client: JuaClient):
+    """Test retrieving market aggregates in MW with wind capacity weighting.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        market = client.market_aggregates.get_market(market_zone=MarketZones.DE)
+        model_runs = [ModelRuns(Models.EPT2, 0)]
+
+        ds = market.compare_runs_mw(
+            weighting="wind_capacity",
+            model_runs=model_runs,
+            max_lead_time=48,
+        )
+
+        assert ds is not None, "No data returned for wind MW"
+        assert "model_run" in ds.dims, "Missing model_run dimension"
+        assert "time" in ds.dims, "Missing time dimension"
+        assert "wind_onshore_mw" in ds.data_vars, "Missing wind_onshore_mw variable"
+        assert "wind_offshore_mw" in ds.data_vars, "Missing wind_offshore_mw variable"
+        assert ds.attrs.get("unit") == "MW"
+        assert ds.attrs.get("weighting") == "wind_capacity"
+
+        print("✓ Wind MW: Successfully retrieved market aggregate MW data")
+        print(f"  Variables: {list(ds.data_vars.keys())}")
+
+    except Exception as e:
+        pytest.fail(f"Failed to retrieve wind MW data: {e}")
+
+
+def test_compare_runs_mw_solar(client: JuaClient):
+    """Test retrieving market aggregates in MW with solar capacity weighting.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        market = client.market_aggregates.get_market(market_zone=MarketZones.DE)
+        model_runs = [ModelRuns(Models.EPT2, 0)]
+
+        ds = market.compare_runs_mw(
+            weighting="solar_capacity",
+            model_runs=model_runs,
+            max_lead_time=48,
+        )
+
+        assert ds is not None, "No data returned for solar MW"
+        assert "model_run" in ds.dims, "Missing model_run dimension"
+        assert "time" in ds.dims, "Missing time dimension"
+        assert "solar_mw" in ds.data_vars, "Missing solar_mw variable"
+        assert ds.attrs.get("unit") == "MW"
+        assert ds.attrs.get("weighting") == "solar_capacity"
+
+        print("✓ Solar MW: Successfully retrieved market aggregate MW data")
+        print(f"  Variables: {list(ds.data_vars.keys())}")
+
+    except Exception as e:
+        pytest.fail(f"Failed to retrieve solar MW data: {e}")
+
+
+def test_get_mw_zones(client: JuaClient):
+    """Test discovering which market zones support MW output.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        zones = client.market_aggregates.get_mw_zones()
+
+        assert isinstance(zones, dict), "Expected dict from get_mw_zones()"
+        assert len(zones) > 0, "No MW zones returned"
+
+        print("✓ MW zones: Successfully retrieved supported zones")
+        print(f"  Categories: {list(zones.keys())}")
+        for category, zone_list in zones.items():
+            print(f"  {category}: {zone_list[:5]}{'...' if len(zone_list) > 5 else ''}")
+
+    except Exception as e:
+        pytest.fail(f"Failed to retrieve MW zones: {e}")
+
+
+def test_compare_runs_mw_multiple_runs(client: JuaClient):
+    """Test retrieving MW data for multiple model runs.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        market = client.market_aggregates.get_market(market_zone=MarketZones.DE)
+        model_runs = [ModelRuns(Models.EPT2, [0, 1])]
+
+        ds = market.compare_runs_mw(
+            weighting="wind_capacity",
+            model_runs=model_runs,
+            max_lead_time=24,
+        )
+
+        assert ds is not None
+        assert ds.sizes["model_run"] == 2, (
+            f"Expected 2 model runs, got {ds.sizes['model_run']}"
+        )
+        assert "init_time" in ds.coords, "Missing init_time coordinate"
+
+        print("✓ MW multiple runs: Successfully retrieved 2 runs")
+        print(f"  Model runs: {list(ds.coords['model_run'].values)}")
+
+    except Exception as e:
+        pytest.fail(f"Failed to retrieve MW data for multiple runs: {e}")
+
+
 def test_dataset_structure(client: JuaClient):
     """Test the structure of the returned xarray dataset.
 

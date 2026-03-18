@@ -44,6 +44,7 @@ class JuaClient:
         self.request_credit_limit = request_credit_limit
         self._weather = None
         self._market_aggregates = None
+        self._power_forecast = None
 
         if jua_log_level is not None:
             logging.getLogger("jua").setLevel(jua_log_level)
@@ -73,6 +74,20 @@ class JuaClient:
 
             self._market_aggregates = MarketAggregates(self)
         return self._market_aggregates
+
+    @property
+    def power_forecast(self):
+        """Access to Jua's power forecast services (MW).
+
+        Returns:
+            PowerForecast client interface for querying renewable energy
+            generation forecasts in MW.
+        """
+        if self._power_forecast is None:
+            from jua.power_forecast import PowerForecast
+
+            self._power_forecast = PowerForecast(self)
+        return self._power_forecast
 
     def __enter__(self):
         return self

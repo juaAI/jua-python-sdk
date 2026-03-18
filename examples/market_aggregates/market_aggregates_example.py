@@ -123,6 +123,29 @@ def main():
     print(f"Init times: {historical_wind.init_time.values}")
     print(f"Dataset:\n{historical_wind}")
 
+    # Example: MW output using compare_runs_mw
+    print("\nExample: MW output for Germany (wind capacity)")
+    mw_data = germany.compare_runs_mw(
+        weighting="wind_capacity",
+        model_runs=[ModelRuns(Models.EPT2, [0, 1])],
+        max_lead_time=48,
+    )
+    print(f"MW dataset:\n{mw_data}")
+
+    print("\nExample: MW output for Germany (solar capacity)")
+    solar_mw = germany.compare_runs_mw(
+        weighting="solar_capacity",
+        model_runs=[ModelRuns(Models.EPT2, 0)],
+        max_lead_time=24,
+    )
+    print(f"Solar MW dataset:\n{solar_mw}")
+
+    # Example: Discover MW-capable zones
+    print("\nExample: MW-capable market zones")
+    mw_zones = client.market_aggregates.get_mw_zones()
+    print(f"Wind MW zones: {mw_zones['wind']}")
+    print(f"Solar MW zones: {mw_zones['solar']}")
+
 
 if __name__ == "__main__":
     main()
