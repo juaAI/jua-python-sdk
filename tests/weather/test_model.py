@@ -226,6 +226,19 @@ def test_grid_slice_query(ept2_model, stream, print_progress):
     assert temp_flat.std() > 0.1  # Should have some variation
 
 
+def test_duplicate_point_labels_rejected(ept2_model):
+    """Duplicate LatLon labels must raise before any API call is made."""
+    points = [
+        LatLon(lat=55.06, lon=13.00, label="Kriegers"),
+        LatLon(lat=55.00, lon=14.00, label="Kriegers"),
+    ]
+    with pytest.raises(ValueError, match="unique keys"):
+        ept2_model.get_forecasts(
+            points=points,
+            variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
+        )
+
+
 @pytest.mark.parametrize("stream", [True, False])
 @pytest.mark.parametrize("print_progress", [True, False])
 def test_latest_init_time_query(ept2_model, stream, print_progress):

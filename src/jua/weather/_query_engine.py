@@ -11,7 +11,12 @@ from pydantic import validate_call
 from jua._api import QueryEngineAPI
 from jua._utils.remove_none_from_dict import remove_none_from_dict
 from jua.client import JuaClient
-from jua.types.geo import LatLon, PredictionTimeDelta, SpatialSelection
+from jua.types.geo import (
+    LatLon,
+    PredictionTimeDelta,
+    SpatialSelection,
+    validate_unique_point_keys,
+)
 from jua.weather._model_meta import get_model_meta_info
 from jua.weather._stream import process_arrow_streaming_response
 from jua.weather._types.forecast import ForecastData
@@ -328,6 +333,8 @@ class QueryEngine:
         """
         if isinstance(points, LatLon):
             points = [points]
+        if points is not None:
+            validate_unique_point_keys(points)
 
         geo = build_geo_filter(latitude, longitude, points, method)
         model_meta = get_model_meta_info(model)
