@@ -1,3 +1,9 @@
+## v0.23.0 (2026-03-26)
+
+### Feat
+
+- **weather**: add precipitation_amount_sum_6h to Variables enum
+
 ## v0.22.0 (2026-03-18)
 
 ### Feat
