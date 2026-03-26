@@ -1,3 +1,9 @@
+## v0.23.1 (2026-03-26)
+
+### Fix
+
+- validate unique LatLon point keys before querying
+
 ## v0.23.0 (2026-03-26)
 
 ### Feat
