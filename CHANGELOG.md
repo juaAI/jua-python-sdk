@@ -1,3 +1,10 @@
+## v0.23.2 (2026-03-27)
+
+### Fix
+
+- remove deprecated OpenMeteo AIFS single and IFS ensemble models
+- update CLI auth frontend URL to athena.jua.ai
+
 ## v0.23.1 (2026-03-26)
 
 ### Fix
