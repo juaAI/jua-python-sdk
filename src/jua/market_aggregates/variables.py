@@ -15,6 +15,49 @@ class Weighting(StrEnum):
     WIND_CAPACITY = "wind_capacity"
 
 
+class AggregationFrequency(StrEnum):
+    """Frequency for temporal aggregation of market aggregate data."""
+
+    DAILY = "1D"
+    WEEKLY = "1W"
+
+
+class AggregationMethod(StrEnum):
+    """Method used to aggregate values within each time bucket."""
+
+    MEAN = "mean"
+    SUM = "sum"
+    MIN = "min"
+    MAX = "max"
+
+
+@dataclass(frozen=True)
+class TemporalAggregation:
+    """Configuration for client-side temporal resampling of market aggregate data.
+
+    Resamples the ``time`` dimension of the returned ``xr.Dataset`` into
+    fixed-frequency buckets (e.g. daily) using the specified method.
+
+    Attributes:
+        frequency: The target resampling frequency.
+        method: The reduction applied within each bucket (default: mean).
+
+    Examples:
+        >>> from jua.market_aggregates import (
+        ...     TemporalAggregation,
+        ...     AggregationFrequency,
+        ...     AggregationMethod,
+        ... )
+        >>> daily_mean = TemporalAggregation(AggregationFrequency.DAILY)
+        >>> daily_sum = TemporalAggregation(
+        ...     AggregationFrequency.DAILY, AggregationMethod.SUM,
+        ... )
+    """
+
+    frequency: AggregationFrequency
+    method: AggregationMethod = AggregationMethod.MEAN
+
+
 @dataclass(frozen=True)
 class AggregateVariable:
     """Internal representation of a variable to be used for market aggregates.
