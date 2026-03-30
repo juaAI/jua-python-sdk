@@ -1,3 +1,9 @@
+## v0.24.0 (2026-03-30)
+
+### Feat
+
+- add temporal aggregation for market aggregates (daily, weekly)
+
 ## v0.23.2 (2026-03-27)
 
 ### Fix
