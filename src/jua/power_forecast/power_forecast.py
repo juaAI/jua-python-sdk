@@ -127,16 +127,14 @@ class PowerForecast:
 
     def get_init_times(
         self,
-        zone_key: str | list[str] | None = None,
+        zone_key: str | None = None,
         psr_type: str | list[str] | None = None,
         limit: int = 96,
     ) -> list[InitTimeInfo]:
         """Get available forecast init times.
 
         Args:
-            zone_key: Optional zone code(s) to filter by. When multiple
-                are given, only init times available for all of them are
-                returned (intersection semantics).
+            zone_key: Optional zone code to filter by.
             psr_type: Optional PSR type(s) to filter by. When multiple are
                 given, only init times available for all of them are returned.
             limit: Maximum number of init times to return (default 96).
@@ -338,15 +336,34 @@ class PowerForecast:
     ) -> list[datetime]:
         """Get available init times filtered by zone and PSR types.
 
-        Delegates intersection semantics to the server by passing all
-        zone_keys in a single ``/init-times`` call.
+        When multiple zones are given, returns the intersection (init
+        times available for every zone).
         """
-        infos = self.get_init_times(
-            zone_key=zone_keys,
-            psr_type=psr_types,
-            limit=limit,
-        )
-        return [info.init_time for info in infos]
+        zones = zone_keys or [None]  # type: ignore[list-item]
+        per_zone: list[set[datetime]] | None = None
+
+        fetch_limit = max(limit, 1) * 10
+
+        for zone in zones:
+            infos = self.get_init_times(
+                zone_key=zone,
+                psr_type=psr_types,
+                limit=fetch_limit,
+            )
+            times = {info.init_time for info in infos}
+            if per_zone is None:
+                per_zone = [times]
+            else:
+                per_zone.append(times)
+
+        if per_zone is None:
+            return []
+
+        common = per_zone[0]
+        for s in per_zone[1:]:
+            common &= s
+
+        return sorted(common, reverse=True)[:limit]
 
     @staticmethod
     def _is_relative(value: str | int | datetime) -> bool:
