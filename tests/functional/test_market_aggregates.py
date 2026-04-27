@@ -375,8 +375,8 @@ def test_compare_runs_mw_wind(client: JuaClient):
         assert ds is not None, "No data returned for wind MW"
         assert "model_run" in ds.dims, "Missing model_run dimension"
         assert "time" in ds.dims, "Missing time dimension"
-        assert "wind_onshore" in ds.data_vars, "Missing wind_onshore variable"
-        assert "wind_offshore" in ds.data_vars, "Missing wind_offshore variable"
+        assert "wind_onshore_mw" in ds.data_vars, "Missing wind_onshore_mw variable"
+        assert "wind_offshore_mw" in ds.data_vars, "Missing wind_offshore_mw variable"
         assert ds.attrs.get("unit") == "MW"
         assert ds.attrs.get("weighting") == "wind_capacity"
 
@@ -406,7 +406,7 @@ def test_compare_runs_mw_solar(client: JuaClient):
         assert ds is not None, "No data returned for solar MW"
         assert "model_run" in ds.dims, "Missing model_run dimension"
         assert "time" in ds.dims, "Missing time dimension"
-        assert "solar" in ds.data_vars, "Missing solar variable"
+        assert "solar_mw" in ds.data_vars, "Missing solar_mw variable"
         assert ds.attrs.get("unit") == "MW"
         assert ds.attrs.get("weighting") == "solar_capacity"
 
