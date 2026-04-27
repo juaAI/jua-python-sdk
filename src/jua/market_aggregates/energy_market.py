@@ -226,8 +226,8 @@ class EnergyMarket:
 
         The response columns depend on the weighting:
 
-        - ``"wind_capacity"`` -> ``wind_onshore_mw``, ``wind_offshore_mw``
-        - ``"solar_capacity"`` -> ``solar_mw``
+        - ``"wind_capacity"`` -> ``wind_onshore``, ``wind_offshore``
+        - ``"solar_capacity"`` -> ``solar``
 
         Args:
             weighting: Capacity weighting scheme. Must be
@@ -248,7 +248,7 @@ class EnergyMarket:
 
         Returns:
             ``xarray.Dataset`` with ``model_run`` and ``time`` dimensions
-            and MW data variables (e.g. ``wind_onshore_mw``).
+            and MW data variables (e.g. ``wind_onshore``).
             When ``temporal_aggregation`` is set, the ``time`` dimension
             reflects the resampled frequency.
 
