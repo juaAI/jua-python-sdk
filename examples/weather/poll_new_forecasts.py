@@ -1,12 +1,11 @@
 """
-Jua Weather SDK – Detect when new forecasts become available.
+Jua Weather SDK — Forecast availability monitor.
 
-Uses the built-in ForecastWatcher to poll for init_time changes.
-When a new model run appears the ``handle_new_forecast`` callback
-fires — replace its body with your own logic (fetch data, trigger a
-pipeline, send a Slack message, …).
-
-Get API credentials at https://athena.jua.ai/api-keys
+Uses the built-in ForecastWatcher to poll for changes to a model's
+init_time. When a new model run is detected, the ``handle_new_forecast``
+callback is invoked; replace its implementation with your own logic
+(e.g. fetching data, triggering a downstream pipeline, or emitting a
+notification).
 """
 
 from jua import JuaClient

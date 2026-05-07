@@ -22,14 +22,6 @@ OnNewForecast = Callable[[str, LatestForecastInfo], None]
 class ForecastWatcher:
     """Polls for new forecast availability and triggers a callback.
 
-    This is the SDK-native "smart short polling" approach: periodically
-    query ``get_latest_init_time`` for each watched model, compare
-    against the previously seen ``init_time``, and invoke the callback
-    whenever a newer run is detected.
-
-    Because weather model runs update at most a few times per day, a
-    polling interval of 60-300 seconds is typically sufficient.
-
     Args:
         client: An authenticated ``JuaClient``.
         models: One or more models to watch.
