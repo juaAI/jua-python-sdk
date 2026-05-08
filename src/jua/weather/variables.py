@@ -225,6 +225,9 @@ class Variables(Enum):
     PRECIPITATION_AMOUNT_SUM_1H = Variable(
         "precipitation_amount_sum_1h", "mm / m^2", "tp", "precipitation_amount"
     )
+    PRECIPITATION_AMOUNT_SUM_6H = Variable(
+        "precipitation_amount_sum_6h", "mm / m^2", None, None
+    )
 
     CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE = Variable(
         "cloud_area_fraction_at_entire_atmosphere", "[0,1]", "tcc", None

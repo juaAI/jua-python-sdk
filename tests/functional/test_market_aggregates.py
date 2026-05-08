@@ -9,7 +9,13 @@ from datetime import datetime
 import pytest
 
 from jua import JuaClient
-from jua.market_aggregates import AggregateVariables, ModelRuns
+from jua.market_aggregates import (
+    AggregateVariables,
+    AggregationFrequency,
+    AggregationMethod,
+    ModelRuns,
+    TemporalAggregation,
+)
 from jua.types import MarketZones
 from jua.weather import Models
 
@@ -512,3 +518,172 @@ def test_dataset_structure(client: JuaClient):
 
     except Exception as e:
         pytest.fail(f"Failed to validate dataset structure: {e}")
+
+
+# ---------------------------------------------------------------------------
+# Temporal aggregation tests
+# ---------------------------------------------------------------------------
+
+
+def test_daily_aggregation_mean(client: JuaClient):
+    """Test that daily mean aggregation reduces the time dimension to one value per day.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        market = client.market_aggregates.get_market(market_zone=MarketZones.DE)
+        model_runs = [ModelRuns(Models.EPT2, 0)]
+
+        ds_hourly = market.compare_runs(
+            agg_variable=AggregateVariables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+            model_runs=model_runs,
+            max_lead_time=72,
+        )
+
+        ds_daily = market.compare_runs(
+            agg_variable=AggregateVariables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+            model_runs=model_runs,
+            max_lead_time=72,
+            temporal_aggregation=TemporalAggregation(AggregationFrequency.DAILY),
+        )
+
+        assert ds_daily is not None
+        assert "model_run" in ds_daily.dims
+        assert "time" in ds_daily.dims
+        assert ds_daily.sizes["time"] < ds_hourly.sizes["time"]
+        assert "temporal_aggregation_frequency" in ds_daily.attrs
+        assert ds_daily.attrs["temporal_aggregation_frequency"] == "1D"
+        assert ds_daily.attrs["temporal_aggregation_method"] == "mean"
+
+        print("✓ Daily mean aggregation works correctly")
+        print(
+            f"  Hourly time steps: {ds_hourly.sizes['time']}, "
+            f"Daily time steps: {ds_daily.sizes['time']}"
+        )
+
+    except Exception as e:
+        pytest.fail(f"Failed daily mean aggregation: {e}")
+
+
+def test_daily_aggregation_sum(client: JuaClient):
+    """Test daily sum aggregation (useful for radiation / energy variables).
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        market = client.market_aggregates.get_market(market_zone=MarketZones.DE)
+        model_runs = [ModelRuns(Models.EPT2, 0)]
+
+        ds = market.compare_runs(
+            agg_variable=AggregateVariables.SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H,
+            model_runs=model_runs,
+            max_lead_time=72,
+            temporal_aggregation=TemporalAggregation(
+                AggregationFrequency.DAILY, AggregationMethod.SUM
+            ),
+        )
+
+        assert ds is not None
+        assert "time" in ds.dims
+        assert ds.attrs["temporal_aggregation_method"] == "sum"
+
+        print("✓ Daily sum aggregation works correctly")
+        print(f"  Daily time steps: {ds.sizes['time']}")
+
+    except Exception as e:
+        pytest.fail(f"Failed daily sum aggregation: {e}")
+
+
+def test_daily_aggregation_mw(client: JuaClient):
+    """Test daily aggregation on MW output.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        market = client.market_aggregates.get_market(market_zone=MarketZones.DE)
+        model_runs = [ModelRuns(Models.EPT2, 0)]
+
+        ds = market.compare_runs_mw(
+            weighting="wind_capacity",
+            model_runs=model_runs,
+            max_lead_time=72,
+            temporal_aggregation=TemporalAggregation(AggregationFrequency.DAILY),
+        )
+
+        assert ds is not None
+        assert "time" in ds.dims
+        assert ds.attrs["temporal_aggregation_frequency"] == "1D"
+        assert ds.attrs["unit"] == "MW"
+
+        print("✓ Daily MW aggregation works correctly")
+        print(f"  Daily time steps: {ds.sizes['time']}")
+
+    except Exception as e:
+        pytest.fail(f"Failed daily MW aggregation: {e}")
+
+
+def test_no_aggregation_unchanged(client: JuaClient):
+    """Test that passing no temporal_aggregation returns the same result as before.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        market = client.market_aggregates.get_market(market_zone=MarketZones.DE)
+        model_runs = [ModelRuns(Models.EPT2, 0)]
+
+        ds_default = market.compare_runs(
+            agg_variable=AggregateVariables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+            model_runs=model_runs,
+            max_lead_time=48,
+        )
+
+        ds_none = market.compare_runs(
+            agg_variable=AggregateVariables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+            model_runs=model_runs,
+            max_lead_time=48,
+            temporal_aggregation=None,
+        )
+
+        assert ds_default.sizes == ds_none.sizes
+        assert "temporal_aggregation_frequency" not in ds_default.attrs
+        assert "temporal_aggregation_frequency" not in ds_none.attrs
+
+        print("✓ No aggregation leaves dataset unchanged")
+
+    except Exception as e:
+        pytest.fail(f"Failed no-aggregation check: {e}")
+
+
+def test_aggregation_preserves_attrs(client: JuaClient):
+    """Test that temporal aggregation preserves existing dataset attributes.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        market = client.market_aggregates.get_market(market_zone=MarketZones.DE)
+        model_runs = [ModelRuns(Models.EPT2, 0)]
+
+        ds = market.compare_runs(
+            agg_variable=AggregateVariables.WIND_SPEED_AT_HEIGHT_LEVEL_10M,
+            model_runs=model_runs,
+            max_lead_time=72,
+            temporal_aggregation=TemporalAggregation(AggregationFrequency.DAILY),
+        )
+
+        assert "market_zone" in ds.attrs
+        assert "min_lead_time" in ds.attrs
+        assert "max_lead_time" in ds.attrs
+        assert "var_name" in ds.attrs
+        assert "temporal_aggregation_frequency" in ds.attrs
+        assert "temporal_aggregation_method" in ds.attrs
+
+        print("✓ Aggregation preserves all dataset attributes")
+        print(f"  Attributes: {list(ds.attrs.keys())}")
+
+    except Exception as e:
+        pytest.fail(f"Failed attribute preservation check: {e}")

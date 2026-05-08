@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import numpy as np
 from pydantic import Field
 from pydantic.dataclasses import dataclass
@@ -83,6 +85,25 @@ class LatLon:
             f"LatLon(lat={self.lat}, lon={self.lon}, "
             f"label={self.label}, key={self.key})"
         )
+
+
+def validate_unique_point_keys(points: list[LatLon]) -> None:
+    """Raise ``ValueError`` if any points share the same key.
+
+    Two ``LatLon`` objects share a key when they have the same label (or the
+    same coordinates and no label).  Duplicate keys make the resulting xarray
+    index ambiguous, so we reject them early with a clear message.
+    """
+    seen: dict[str, int] = {}
+    for i, point in enumerate(points):
+        key = str(point)
+        if key in seen:
+            raise ValueError(
+                f"Points must have unique keys, but points[{seen[key]}] and "
+                f"points[{i}] both resolve to key '{key}'. "
+                f"Use distinct labels to disambiguate."
+            )
+        seen[key] = i
 
 
 PredictionTimeDelta = int | np.timedelta64 | slice | list[int] | list[np.timedelta64]

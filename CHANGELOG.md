@@ -1,3 +1,34 @@
+## v0.24.1 (2026-05-08)
+
+### Fix
+
+- correctly set group by
+
+## v0.24.0 (2026-03-30)
+
+### Feat
+
+- add temporal aggregation for market aggregates (daily, weekly)
+
+## v0.23.2 (2026-03-27)
+
+### Fix
+
+- remove deprecated OpenMeteo AIFS single and IFS ensemble models
+- update CLI auth frontend URL to athena.jua.ai
+
+## v0.23.1 (2026-03-26)
+
+### Fix
+
+- validate unique LatLon point keys before querying
+
+## v0.23.0 (2026-03-26)
+
+### Feat
+
+- **weather**: add precipitation_amount_sum_6h to Variables enum
+
 ## v0.22.0 (2026-03-18)
 
 ### Feat
