@@ -1,3 +1,13 @@
+## v0.25.0 (2026-05-08)
+
+### Feat
+
+- add ForecastWatcher for polling new forecast availability
+
+### Fix
+
+- delegate multi-zone init_time resolution to server
+
 ## v0.24.2 (2026-05-08)
 
 ### Fix
