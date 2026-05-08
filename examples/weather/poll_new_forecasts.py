@@ -8,6 +8,8 @@ callback is invoked; replace its implementation with your own logic
 notification).
 """
 
+import os
+
 from jua import JuaClient
 from jua.weather import ForecastWatcher, Models
 from jua.weather._types.query_response_types import LatestForecastInfo
@@ -36,8 +38,11 @@ def main() -> None:
         min_prediction_timedelta=MIN_PREDICTION_TIMEDELTA,
     )
 
+    max_cycles_env = os.environ.get("POLL_MAX_CYCLES")
+    max_cycles = int(max_cycles_env) if max_cycles_env else None
+
     print(f"Polling every {POLL_INTERVAL_SECONDS}s — press Ctrl+C to stop.\n")
-    watcher.watch()
+    watcher.watch(max_cycles=max_cycles)
 
 
 if __name__ == "__main__":
