@@ -540,6 +540,8 @@ class QueryEngine:
                 ["points", "init_time", "prediction_timedelta"],
                 inplace=True,
             )
+            # Remove duplicates, if there are any (remove once duplicates are handeled)
+            df = df.loc[~df.index.duplicated()]
 
             ds = xr.Dataset.from_dataframe(df)
             # Align point_coords with the xarray dataset's points dimension order
