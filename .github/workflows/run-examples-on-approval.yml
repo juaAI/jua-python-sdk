@@ -138,6 +138,7 @@ jobs:
           JUA_API_KEY_ID: ${{ secrets.JUA_API_KEY_ID }}
           JUA_API_KEY_SECRET: ${{ secrets.JUA_API_KEY_SECRET }}
           MPLBACKEND: Agg  # Use non-interactive matplotlib backend
+          POLL_MAX_CYCLES: "1"  # Bound poll_new_forecasts.py in CI
         shell: bash
         run: |
           for script in examples/weather/*.py; do
