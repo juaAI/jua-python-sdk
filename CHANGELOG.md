@@ -1,3 +1,9 @@
+## v0.24.2 (2026-05-08)
+
+### Fix
+
+- delegate multi-zone init_time resolution to server
+
 ## v0.24.1 (2026-05-08)
 
 ### Fix
