@@ -221,6 +221,12 @@ _MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
     has_forecast_file_access=False,
     has_statistics=True,
 )
+_MODEL_META_INFO[Models.ECMWF_IFS_ENSEMBLE] = ModelMetaInfo(
+    full_forecasted_hours=360,
+    has_forecast_file_access=False,
+    has_statistics=True,
+    temporal_resolution=TemporalResolution(base=6, special=((3, 0, 144),)),
+)
 
 
 def get_model_meta_info(model: Models) -> ModelMetaInfo:
