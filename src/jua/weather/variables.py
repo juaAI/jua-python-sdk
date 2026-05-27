@@ -139,7 +139,7 @@ class Variables(Enum):
         "wind_direction_at_height_level_10m", "deg", "10wdir", "wind_direction_10m"
     )
     WIND_SPEED_OF_GUST_AT_HEIGHT_LEVEL_10M_MAX = Variable(
-        "wind_speed_of_gust_at_height_level_10m_max", "m/s", "10fg", None
+        "wind_speed_of_gust_at_height_level_10m_max", "m/s", None, None
     )
     WIND_SPEED_AT_HEIGHT_LEVEL_20M = Variable(
         "wind_speed_at_height_level_20m", "m/s", None, "wind_speed_20m"
