@@ -1,3 +1,14 @@
+## v0.26.0 (2026-05-28)
+
+### Feat
+
+- **variables**: add WIND_SPEED_OF_GUST_AT_HEIGHT_LEVEL_10M_MAX
+- **models**: add ECMWF_IFS_ENSEMBLE
+
+### Fix
+
+- **variables**: drop emcwf_code for wind gust 10m max
+
 ## v0.25.0 (2026-05-08)
 
 ### Feat
