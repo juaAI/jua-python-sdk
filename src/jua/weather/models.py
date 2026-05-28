@@ -36,6 +36,7 @@ class Models(str, Enum):
 
     # Without Grid Access
     ECMWF_AIFS_ENSEMBLE = "ecmwf_aifs025_ensemble"
+    ECMWF_IFS_ENSEMBLE = "ecmwf_ens"
     GFS_GLOBAL_ENSEMBLE = "gfs_global_ensemble"
     GFS_GLOBAL_SINGLE = "gfs_global_single"
     GFS_GRAPHCAST = "gfs_graphcast025"
