@@ -3,6 +3,7 @@ import importlib.metadata
 import requests  # type: ignore[import-untyped]
 from requests import JSONDecodeError
 
+from jua._retry import build_session
 from jua.client import JuaClient
 from jua.errors.api_errors import (
     NotAuthenticatedError,
@@ -18,6 +19,10 @@ class API:
 
     This class handles API requests, authentication, URL construction,
     and error handling. Not intended for direct use by SDK users.
+
+    Transient failures (connection errors and retryable status codes such as
+    502/503/504) are retried automatically at the HTTP level according to the
+    retry settings on the client. See :class:`jua.settings.jua_settings.JuaSettings`.
     """
 
     def __init__(self, jua_client: JuaClient):
@@ -28,6 +33,7 @@ class API:
         """
         self._jua_client = jua_client
         self._user_agent = _get_user_agent()
+        self._session = build_session(jua_client.settings)
 
     def _get_headers(self, requires_auth: bool = True) -> dict:
         """Construct HTTP headers for API requests.
@@ -127,7 +133,7 @@ class API:
             JuaError: For other non-2xx responses.
         """
         headers = self._get_headers(requires_auth)
-        response = requests.get(self._get_url(url), headers=headers, params=params)
+        response = self._session.get(self._get_url(url), headers=headers, params=params)
         self._validate_response_status(response)
         return response
 
@@ -163,7 +169,7 @@ class API:
         if extra_headers is not None:
             headers.update(**extra_headers)
 
-        response = requests.post(
+        response = self._session.post(
             self._get_url(url),
             headers=headers,
             json=data,
@@ -193,7 +199,7 @@ class API:
             JuaError: For other non-2xx responses.
         """
         headers = self._get_headers(requires_auth)
-        response = requests.put(self._get_url(url), headers=headers, json=data)
+        response = self._session.put(self._get_url(url), headers=headers, json=data)
         self._validate_response_status(response)
         return response
 
@@ -214,7 +220,7 @@ class API:
             JuaError: For other non-2xx responses.
         """
         headers = self._get_headers(requires_auth)
-        response = requests.delete(self._get_url(url), headers=headers)
+        response = self._session.delete(self._get_url(url), headers=headers)
         self._validate_response_status(response)
         return response
 
@@ -238,7 +244,7 @@ class API:
             JuaError: For other non-2xx responses.
         """
         headers = self._get_headers(requires_auth)
-        response = requests.patch(self._get_url(url), headers=headers, json=data)
+        response = self._session.patch(self._get_url(url), headers=headers, json=data)
         self._validate_response_status(response)
         return response
 

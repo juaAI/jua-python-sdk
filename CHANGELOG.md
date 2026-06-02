@@ -1,9 +1,13 @@
-## Unreleased
+## v0.27.0 (2026-06-02)
 
 ### Feat
 
-- models: add EPT2_HELIOS and EPT2_EUROPA
-- variables: add 30min SSWR (ssrd) and FDIR variants
+- **api**: size connection pool for concurrent shared-session requests
+- **api**: add permissive HTTP retry policy for transient failures
+
+### Fix
+
+- **api**: ignore missing requests.adapters stubs for mypy lint hook
 
 ## v0.26.0 (2026-05-28)
 

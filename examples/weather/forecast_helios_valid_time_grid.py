@@ -8,10 +8,16 @@ Cells on the same column share the same valid time but have different lead times
 """
 
 import logging
+import sys
 from datetime import datetime, timedelta
 
-import cartopy.crs as ccrs
-import cartopy.feature as cfeature
+try:
+    import cartopy.crs as ccrs
+    import cartopy.feature as cfeature
+except ImportError:
+    print("This example requires cartopy: pip install cartopy")
+    sys.exit(0)
+
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
