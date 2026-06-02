@@ -1,3 +1,14 @@
+## v0.27.0 (2026-06-02)
+
+### Feat
+
+- **api**: size connection pool for concurrent shared-session requests
+- **api**: add permissive HTTP retry policy for transient failures
+
+### Fix
+
+- **api**: ignore missing requests.adapters stubs for mypy lint hook
+
 ## v0.26.0 (2026-05-28)
 
 ### Feat
