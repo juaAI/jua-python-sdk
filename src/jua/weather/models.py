@@ -27,6 +27,8 @@ class Models(str, Enum):
     EPT2_HRRR = "ept2_hrrr"
     EPT2_RR = "ept2_rr"
     EPT2_REASONING = "ept2_reasoning"
+    EPT2_HELIOS = "ept2_helios"
+    EPT2_EUROPA = "ept2_europa"
     AIFS = "aifs"
     AURORA = "aurora"
     ECMWF_IFS_SINGLE = "ecmwf_ifs_single"

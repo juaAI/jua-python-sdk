@@ -200,8 +200,16 @@ class Variables(Enum):
         "surface_downwelling_shortwave_flux_sum_1h", "J / m^2", "ssrd", None
     )
 
+    SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_30MIN = Variable(
+        "surface_downwelling_shortwave_flux_sum_30min", "J / m^2", None, None
+    )
+
     SURFACE_DIRECT_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
         "surface_direct_downwelling_shortwave_flux_sum_1h", "J / m^2", "fdir", None
+    )
+
+    SURFACE_DIRECT_DOWNWELLING_SHORTWAVE_FLUX_SUM_30MIN = Variable(
+        "surface_direct_downwelling_shortwave_flux_sum_30min", "J / m^2", None, None
     )
 
     SURFACE_NET_DOWNWARD_SHORTWAVE_FLUX_SUM_1H = Variable(

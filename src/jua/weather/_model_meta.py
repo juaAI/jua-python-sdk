@@ -153,6 +153,25 @@ _MODEL_META_INFO[Models.EPT2_REASONING] = ModelMetaInfo(
     full_forecasted_hours=480,
     temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
 )
+_MODEL_META_INFO[Models.EPT2_HELIOS] = ModelMetaInfo(
+    has_grid_access=True,
+    forecast_name_mapping="ept-2-helios",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+    num_lats=2160,
+    num_lons=4320,
+    forecasts_per_day=48,  # 30-minute update frequency
+    temporal_resolution=TemporalResolution(base=1),  # 30-min steps handled by API
+)
+_MODEL_META_INFO[Models.EPT2_EUROPA] = ModelMetaInfo(
+    has_grid_access=True,
+    forecast_name_mapping="ept-2-europa",
+    full_forecasted_hours=480,
+    has_forecast_file_access=True,
+    num_lats=2160,
+    num_lons=4320,
+    temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
+)
 _MODEL_META_INFO[Models.AIFS] = ModelMetaInfo(
     has_grid_access=True,
     forecast_name_mapping="aifs",
