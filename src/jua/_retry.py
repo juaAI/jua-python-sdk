@@ -4,6 +4,12 @@ This module builds a :class:`requests.Session` with a permissive but bounded
 retry policy so that transient failures (connection errors and retryable status
 codes such as ``502``/``503``/``504``) are retried at the HTTP level, below the
 "retry the whole job" granularity.
+
+The session is safe to share across threads: ``urllib3``'s connection pool is
+thread-safe, the :class:`urllib3.util.retry.Retry` object is used as an
+immutable template (urllib3 copies it per request), and the session's own
+mutable state (headers, cookies, params) is never mutated after construction
+because callers pass headers/params per request.
 """
 
 from logging import getLogger
@@ -67,6 +73,11 @@ def build_retry(settings: JuaSettings) -> Retry:
 def build_session(settings: JuaSettings) -> requests.Session:
     """Create a :class:`requests.Session` configured with the retry policy.
 
+    The returned session is safe to share across threads (see the module
+    docstring). Its connection pool is sized via ``connection_pool_maxsize`` so
+    that concurrent fetches (e.g. from the lazy xarray backend) reuse pooled
+    connections instead of churning new ones.
+
     Args:
         settings: Client settings controlling the retry behavior.
 
@@ -76,7 +87,11 @@ def build_session(settings: JuaSettings) -> requests.Session:
     """
     session = requests.Session()
     retry = build_retry(settings)
-    adapter = HTTPAdapter(max_retries=retry)
+    adapter = HTTPAdapter(
+        max_retries=retry,
+        pool_connections=settings.connection_pool_maxsize,
+        pool_maxsize=settings.connection_pool_maxsize,
+    )
     session.mount("http://", adapter)
     session.mount("https://", adapter)
     return session

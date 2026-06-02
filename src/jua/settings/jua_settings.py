@@ -30,6 +30,10 @@ class JuaSettings(BaseSettings):
             retry.
         respect_retry_after_header: Whether to honor the ``Retry-After`` header
             returned by the server (capped by ``retry_backoff_max``).
+        connection_pool_maxsize: Maximum number of HTTP connections kept in the
+            pool per host. Controls how many requests can reuse pooled
+            connections concurrently (e.g. when the lazy xarray backend fetches
+            chunks in parallel).
 
     Examples:
         Create with defaults:
@@ -118,6 +122,17 @@ class JuaSettings(BaseSettings):
         description=(
             "Whether to honor the Retry-After header returned by the server "
             "(capped by retry_backoff_max)."
+        ),
+    )
+
+    connection_pool_maxsize: int = Field(
+        default=16,
+        ge=1,
+        description=(
+            "Maximum number of HTTP connections kept in the pool per host. "
+            "Controls how many requests can reuse pooled connections "
+            "concurrently (e.g. when the lazy xarray backend fetches chunks in "
+            "parallel)."
         ),
     )
 

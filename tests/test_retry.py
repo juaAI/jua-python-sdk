@@ -148,6 +148,13 @@ class TestSessionRetries:
         session = build_session(JuaSettings())
         assert set(session.adapters) >= {"http://", "https://"}
 
+    def test_pool_size_from_settings(self):
+        session = build_session(JuaSettings(connection_pool_maxsize=32))
+        for scheme in ("http://", "https://"):
+            adapter = session.get_adapter(scheme)
+            assert adapter._pool_maxsize == 32
+            assert adapter._pool_connections == 32
+
     def test_retries_on_504_then_succeeds(self, flaky_server):
         _FlakyHandler.fail_times = 2
         _FlakyHandler.fail_status = 504
@@ -198,3 +205,26 @@ class TestSessionRetries:
 
         assert response.status_code == 400
         assert _FlakyHandler.request_count == 1
+
+    def test_concurrent_requests_share_session(self, flaky_server):
+        """A shared session handles many concurrent requests without error."""
+        _FlakyHandler.fail_times = 0  # all succeed
+
+        session = build_session(_fast_settings(connection_pool_maxsize=8))
+        results: list[int] = []
+        results_lock = threading.Lock()
+
+        def _worker():
+            resp = session.get(flaky_server)
+            with results_lock:
+                results.append(resp.status_code)
+
+        threads = [threading.Thread(target=_worker) for _ in range(24)]
+        for t in threads:
+            t.start()
+        for t in threads:
+            t.join()
+
+        assert len(results) == 24
+        assert all(code == 200 for code in results)
+        assert _FlakyHandler.request_count == 24
