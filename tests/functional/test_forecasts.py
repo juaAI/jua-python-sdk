@@ -38,8 +38,14 @@ MODEL_SPECIFIC_FORECAST_DATES = {
     Models.ICON_EU: datetime(2026, 2, 9, 0, 0, 0),
 }
 
-ALL_MODELS = list(Models)
-INTERNAL_MODELS = [m for m in Models if get_model_meta_info(m).has_grid_access]
+SOLAR_ONLY_MODELS = {Models.EPT2_HELIOS}
+
+ALL_MODELS = [m for m in Models if m not in SOLAR_ONLY_MODELS]
+INTERNAL_MODELS = [
+    m
+    for m in Models
+    if get_model_meta_info(m).has_grid_access and m not in SOLAR_ONLY_MODELS
+]
 
 
 def get_forecast_date(model: Models) -> datetime:
