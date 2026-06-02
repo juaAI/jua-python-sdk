@@ -1,3 +1,10 @@
+## Unreleased
+
+### Feat
+
+- models: add EPT2_HELIOS and EPT2_EUROPA
+- variables: add 30min SSWR (ssrd) and FDIR variants
+
 ## v0.26.0 (2026-05-28)
 
 ### Feat
