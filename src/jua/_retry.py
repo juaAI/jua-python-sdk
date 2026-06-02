@@ -9,7 +9,7 @@ codes such as ``502``/``503``/``504``) are retried at the HTTP level, below the
 from logging import getLogger
 
 import requests  # type: ignore[import-untyped]
-from requests.adapters import HTTPAdapter
+from requests.adapters import HTTPAdapter  # type: ignore[import-untyped]
 from urllib3.util.retry import Retry
 
 from jua.settings.jua_settings import JuaSettings
