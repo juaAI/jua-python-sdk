@@ -155,14 +155,15 @@ _MODEL_META_INFO[Models.EPT2_REASONING] = ModelMetaInfo(
 )
 _MODEL_META_INFO[Models.EPT2_HELIOS] = ModelMetaInfo(
     has_grid_access=True,
-    full_forecasted_hours=480,
+    full_forecasted_hours=48,
     forecasts_per_day=48,
     temporal_resolution=TemporalResolution(base=1),
 )
 _MODEL_META_INFO[Models.EPT2_EUROPA] = ModelMetaInfo(
     has_grid_access=True,
-    full_forecasted_hours=480,
-    temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
+    full_forecasted_hours=48,
+    forecasts_per_day=24,
+    temporal_resolution=TemporalResolution(base=1),
 )
 _MODEL_META_INFO[Models.AIFS] = ModelMetaInfo(
     has_grid_access=True,
