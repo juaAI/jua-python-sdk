@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
 
 import pandas as pd
 import xarray as xr
+from zoneinfo import ZoneInfo
 
 from jua._api import QueryEngineAPI
 from jua._utils.remove_none_from_dict import remove_none_from_dict
@@ -291,6 +292,113 @@ class PowerForecast:
             return self._to_dataset(data)
         except Exception as e:
             raise RuntimeError(f"Failed to fetch power forecast data: {e}") from e
+
+    # ------------------------------------------------------------------
+    # Stitched day-ahead time series
+    # ------------------------------------------------------------------
+    def get_day_ahead_timeseries(
+        self,
+        *,
+        zone_keys: list[str],
+        psr_types: list[str] | None = None,
+        init_hour: int,
+        time_zone: str = "UTC",
+        max_init_times: int = 365,
+    ) -> xr.Dataset:
+        """Return a continuous day-ahead time series stitched across runs.
+
+        This helper selects all forecast runs whose local init-time hour matches
+        ``init_hour`` (interpreted in ``time_zone``), takes from each run the
+        day-ahead window, and concatenates the results into a single continuous
+        ``time`` axis.
+
+        The day-ahead window is defined by the forecast lead range:
+        ``[(24 - init_hour), (24 - init_hour) + 24)`` hours from the init time.
+        For example, for ``init_hour = 9`` the selected window is
+        ``[15h, 39h]`` from each init (i.e., 00:00..23:00 of D when the run is
+        at D-1 09:00).
+
+        Args:
+            zone_keys: Zone codes to query (e.g. ``["DE"]``).
+            psr_types: Optional PSR types to include
+                (e.g. ``["Solar"]``). If ``None``, returns all available types.
+            init_hour: Local hour-of-day (0..23) of the runs to stitch together.
+            time_zone: IANA time zone used to interpret ``init_hour`` when
+                matching runs (default ``\"UTC\"``).
+            max_init_times: Upper bound on how many matching init times are
+                requested from the server (controls history depth).
+
+        Returns:
+            ``xarray.Dataset`` with dims ``(zone_key, psr_type, time)`` and
+            variable ``value`` (MW). The series is continuous across days.
+        """
+        if not (0 <= init_hour <= 23):
+            raise ValueError("init_hour must be in the range 0..23")
+        if not zone_keys or not isinstance(zone_keys, list):
+            raise ValueError("zone_keys must be a non-empty list of zone codes")
+
+        # Compute lead range in minutes for the day-ahead slice
+        start_lead_hours = (24 - init_hour) % 24
+        end_lead_hours = start_lead_hours + 24
+        end_lead_minutes = int(end_lead_hours * 60)
+
+        # Fetch recent init times filtered by zone/PSR and keep only those whose
+        # local hour (in time_zone) matches init_hour.
+        tz = ZoneInfo(time_zone)
+        init_infos = self.get_init_times(
+            zone_key=zone_keys, psr_type=psr_types, limit=max_init_times
+        )
+        matching_inits: list[datetime] = []
+        for info in init_infos:
+            it = info.init_time
+            # Ensure timezone-aware then convert to desired zone for comparison
+            local_hour = (it if it.tzinfo else it.replace(tzinfo=ZoneInfo("UTC"))).astimezone(tz).hour
+            if local_hour == init_hour:
+                matching_inits.append(it)
+
+        if not matching_inits:
+            # Nothing to stitch – return empty dataset with expected coords
+            return xr.Dataset(attrs={"unit": "MW"})
+
+        # Query data up to the end of the day-ahead window to avoid downloading
+        # unnecessarily long horizons. We keep all times up to end_lead and
+        # filter the earlier hours client-side.
+        ds = self.get_data(
+            zone_keys=zone_keys,
+            psr_types=psr_types,
+            init_time=matching_inits,
+            max_prediction_timedelta=end_lead_minutes,
+            time_zone=time_zone,
+        )
+
+        if "value" not in ds:
+            return xr.Dataset(attrs={"unit": "MW"})
+
+        # Convert to a DataFrame to easily compute (time - init_time) and filter
+        df = ds.to_dataframe().reset_index()
+        if df.empty:
+            return xr.Dataset(attrs={"unit": "MW"})
+
+        # Drop NaNs and compute lead in hours from each init to each valid time
+        df = df.dropna(subset=["value"])
+        # Ensure both are timezone-aware for subtraction
+        if pd.api.types.is_datetime64_any_dtype(df["init_time"]):
+            pass
+        df["lead_hours"] = (df["time"] - df["init_time"]) / pd.Timedelta(hours=1)
+        mask = (df["lead_hours"] >= start_lead_hours) & (df["lead_hours"] < end_lead_hours)
+        df = df.loc[mask].drop(columns=["lead_hours", "init_time"])
+
+        if df.empty:
+            return xr.Dataset(attrs={"unit": "MW"})
+
+        # Sort and reindex to have a clean continuous time series
+        df = df.sort_values(["zone_key", "psr_type", "time"])
+
+        index_cols = [c for c in ["zone_key", "psr_type", "time"] if c in df.columns]
+        stitched = xr.Dataset.from_dataframe(df.set_index(index_cols))
+        # Preserve unit
+        stitched = stitched.assign_attrs(unit=ds.attrs.get("unit", "MW"))
+        return stitched
 
     # ------------------------------------------------------------------
     # Init-time resolution
