@@ -6,10 +6,10 @@ import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from typing import TYPE_CHECKING
+from zoneinfo import ZoneInfo
 
 import pandas as pd
 import xarray as xr
-from zoneinfo import ZoneInfo
 
 from jua._api import QueryEngineAPI
 from jua._utils.remove_none_from_dict import remove_none_from_dict
@@ -303,11 +303,13 @@ class PowerForecast:
         psr_types: list[str] | None = None,
         init_hour: int,
         time_zone: str = "UTC",
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
         max_init_times: int = 365,
     ) -> xr.Dataset:
         """Return a continuous day-ahead time series stitched across runs.
 
-        This helper selects all forecast runs whose local init-time hour matches
+        This helper selects the forecast runs whose local init-time hour matches
         ``init_hour`` (interpreted in ``time_zone``), takes from each run the
         day-ahead window, and concatenates the results into a single continuous
         ``time`` axis.
@@ -318,15 +320,35 @@ class PowerForecast:
         ``[15h, 39h]`` from each init (i.e., 00:00..23:00 of D when the run is
         at D-1 09:00).
 
+        Two selection modes are supported:
+
+        **Date-range mode** (``start_date`` and/or ``end_date`` given):
+            The daily ``init_hour`` runs spanning the range are constructed
+            directly and fetched in a single request. This bypasses the
+            init-times listing limit, so arbitrarily long histories (e.g. a full
+            year) can be stitched. ``start_date``/``end_date`` bound the
+            resulting *valid time* axis.
+
+        **Latest mode** (no dates):
+            The most recent matching runs are discovered via the init-times
+            endpoint (bounded by ``max_init_times``).
+
         Args:
             zone_keys: Zone codes to query (e.g. ``["DE"]``).
             psr_types: Optional PSR types to include
                 (e.g. ``["Solar"]``). If ``None``, returns all available types.
             init_hour: Local hour-of-day (0..23) of the runs to stitch together.
             time_zone: IANA time zone used to interpret ``init_hour`` when
-                matching runs (default ``\"UTC\"``).
+                matching runs (default ``"UTC"``).
+            start_date: Inclusive lower bound on the valid-time axis. Enables
+                date-range mode. Naive datetimes are interpreted in
+                ``time_zone``.
+            end_date: Exclusive upper bound on the valid-time axis. Enables
+                date-range mode. Naive datetimes are interpreted in
+                ``time_zone``.
             max_init_times: Upper bound on how many matching init times are
-                requested from the server (controls history depth).
+                requested from the server in latest mode (controls history
+                depth).
 
         Returns:
             ``xarray.Dataset`` with dims ``(zone_key, psr_type, time)`` and
@@ -342,27 +364,68 @@ class PowerForecast:
         end_lead_hours = start_lead_hours + 24
         end_lead_minutes = int(end_lead_hours * 60)
 
-        # Fetch recent init times filtered by zone/PSR and keep only those whose
-        # local hour (in time_zone) matches init_hour.
         tz = ZoneInfo(time_zone)
+
+        if start_date is not None or end_date is not None:
+            df = self._fetch_day_ahead_by_date_range(
+                zone_keys=zone_keys,
+                psr_types=psr_types,
+                init_hour=init_hour,
+                tz=tz,
+                time_zone=time_zone,
+                start_date=start_date,
+                end_date=end_date,
+                end_lead_minutes=end_lead_minutes,
+            )
+        else:
+            df = self._fetch_day_ahead_latest(
+                zone_keys=zone_keys,
+                psr_types=psr_types,
+                init_hour=init_hour,
+                tz=tz,
+                time_zone=time_zone,
+                end_lead_minutes=end_lead_minutes,
+                max_init_times=max_init_times,
+            )
+
+        return self._stitch_day_ahead(
+            df,
+            start_lead_hours=start_lead_hours,
+            end_lead_hours=end_lead_hours,
+            tz=tz,
+            start_date=start_date,
+            end_date=end_date,
+        )
+
+    def _fetch_day_ahead_latest(
+        self,
+        *,
+        zone_keys: list[str],
+        psr_types: list[str] | None,
+        init_hour: int,
+        tz: ZoneInfo,
+        time_zone: str,
+        end_lead_minutes: int,
+        max_init_times: int,
+    ) -> pd.DataFrame:
+        """Fetch day-ahead data for the most recent matching runs."""
         init_infos = self.get_init_times(
             zone_key=zone_keys, psr_type=psr_types, limit=max_init_times
         )
-        matching_inits: list[datetime] = []
+        matching_inits: list[str | int | datetime] = []
         for info in init_infos:
             it = info.init_time
-            # Ensure timezone-aware then convert to desired zone for comparison
-            local_hour = (it if it.tzinfo else it.replace(tzinfo=ZoneInfo("UTC"))).astimezone(tz).hour
+            local_hour = (
+                (it if it.tzinfo else it.replace(tzinfo=ZoneInfo("UTC")))
+                .astimezone(tz)
+                .hour
+            )
             if local_hour == init_hour:
                 matching_inits.append(it)
 
         if not matching_inits:
-            # Nothing to stitch – return empty dataset with expected coords
-            return xr.Dataset(attrs={"unit": "MW"})
+            return pd.DataFrame()
 
-        # Query data up to the end of the day-ahead window to avoid downloading
-        # unnecessarily long horizons. We keep all times up to end_lead and
-        # filter the earlier hours client-side.
         ds = self.get_data(
             zone_keys=zone_keys,
             psr_types=psr_types,
@@ -370,35 +433,171 @@ class PowerForecast:
             max_prediction_timedelta=end_lead_minutes,
             time_zone=time_zone,
         )
-
         if "value" not in ds:
+            return pd.DataFrame()
+        return ds.to_dataframe().reset_index()
+
+    def _fetch_day_ahead_by_date_range(
+        self,
+        *,
+        zone_keys: list[str],
+        psr_types: list[str] | None,
+        init_hour: int,
+        tz: ZoneInfo,
+        time_zone: str,
+        start_date: datetime | None,
+        end_date: datetime | None,
+        end_lead_minutes: int,
+    ) -> pd.DataFrame:
+        """Fetch day-ahead data by constructing daily init runs over a range.
+
+        The day-ahead run for valid day ``D`` is issued on ``D - 1`` at
+        ``init_hour``. We therefore build one init datetime per day from
+        ``start_date - 1`` through ``end_date`` and fetch them in a single
+        request.
+        """
+        init_times = self._build_day_ahead_inits(
+            init_hour=init_hour,
+            tz=tz,
+            start_date=start_date,
+            end_date=end_date,
+        )
+        if not init_times:
+            return pd.DataFrame()
+
+        ds = self.get_data(
+            zone_keys=zone_keys,
+            psr_types=psr_types,
+            init_time=init_times,
+            max_prediction_timedelta=end_lead_minutes,
+            time_zone=time_zone,
+        )
+        if "value" not in ds:
+            return pd.DataFrame()
+        return ds.to_dataframe().reset_index()
+
+    @staticmethod
+    def _build_day_ahead_inits(
+        *,
+        init_hour: int,
+        tz: ZoneInfo,
+        start_date: datetime | None,
+        end_date: datetime | None,
+    ) -> list[str | int | datetime]:
+        """Construct one ``init_hour`` init datetime per day spanning the range.
+
+        ``start_date``/``end_date`` bound the valid-time axis; the day-ahead run
+        for valid day ``D`` is issued the previous day. Naive bounds are
+        interpreted in ``tz``. Returned datetimes are timezone-aware (UTC).
+        """
+        utc = ZoneInfo("UTC")
+
+        def _localize(value: datetime) -> datetime:
+            return value if value.tzinfo else value.replace(tzinfo=tz)
+
+        if end_date is None:
+            end_local = datetime.now(utc).astimezone(tz)
+        else:
+            end_local = _localize(end_date).astimezone(tz)
+
+        if start_date is None:
+            # Default to ~1 year of history when only an end is supplied.
+            start_local = end_local - timedelta(days=365)
+        else:
+            start_local = _localize(start_date).astimezone(tz)
+
+        # Runs issued from (start_date - 1 day) cover valid times from start_date
+        first_init_day = (start_local - timedelta(days=1)).date()
+        last_init_day = end_local.date()
+
+        inits: list[str | int | datetime] = []
+        day = first_init_day
+        while day <= last_init_day:
+            local_init = datetime(day.year, day.month, day.day, init_hour, tzinfo=tz)
+            inits.append(local_init.astimezone(utc))
+            day = day + timedelta(days=1)
+        return inits
+
+    @staticmethod
+    def _stitch_day_ahead(
+        df: pd.DataFrame,
+        *,
+        start_lead_hours: int,
+        end_lead_hours: int,
+        tz: ZoneInfo,
+        start_date: datetime | None,
+        end_date: datetime | None,
+    ) -> xr.Dataset:
+        """Filter to the day-ahead window, dedupe overlaps, and build a Dataset."""
+        if df.empty or "value" not in df.columns:
             return xr.Dataset(attrs={"unit": "MW"})
 
-        # Convert to a DataFrame to easily compute (time - init_time) and filter
-        df = ds.to_dataframe().reset_index()
+        df = df.dropna(subset=["value"]).copy()
         if df.empty:
             return xr.Dataset(attrs={"unit": "MW"})
 
-        # Drop NaNs and compute lead in hours from each init to each valid time
-        df = df.dropna(subset=["value"])
-        # Ensure both are timezone-aware for subtraction
-        if pd.api.types.is_datetime64_any_dtype(df["init_time"]):
-            pass
         df["lead_hours"] = (df["time"] - df["init_time"]) / pd.Timedelta(hours=1)
-        mask = (df["lead_hours"] >= start_lead_hours) & (df["lead_hours"] < end_lead_hours)
-        df = df.loc[mask].drop(columns=["lead_hours", "init_time"])
+        mask = (df["lead_hours"] >= start_lead_hours) & (
+            df["lead_hours"] < end_lead_hours
+        )
+        df = df.loc[mask].drop(columns=["lead_hours"])
 
         if df.empty:
             return xr.Dataset(attrs={"unit": "MW"})
-
-        # Sort and reindex to have a clean continuous time series
-        df = df.sort_values(["zone_key", "psr_type", "time"])
 
         index_cols = [c for c in ["zone_key", "psr_type", "time"] if c in df.columns]
+
+        # Several matching runs can share the same target hour (e.g. sub-hourly
+        # runs like 07:00 and 07:30), so their day-ahead windows overlap and
+        # produce duplicate (zone_key, psr_type, time) rows. Keep the value from
+        # the most recent init for each valid time so the stitched index stays
+        # unique and reflects the freshest forecast.
+        sort_cols = [c for c in index_cols if c != "time"] + ["time", "init_time"]
+        df = (
+            df.sort_values(sort_cols)
+            .drop_duplicates(subset=index_cols, keep="last")
+            .drop(columns=["init_time"])
+        )
+
+        # Clip the valid-time axis to the requested bounds (date-range mode).
+        if start_date is not None or end_date is not None:
+            df = PowerForecast._clip_time(df, tz, start_date, end_date)
+            if df.empty:
+                return xr.Dataset(attrs={"unit": "MW"})
+
+        df = df.sort_values(index_cols)
         stitched = xr.Dataset.from_dataframe(df.set_index(index_cols))
-        # Preserve unit
-        stitched = stitched.assign_attrs(unit=ds.attrs.get("unit", "MW"))
+        stitched = stitched.assign_attrs(unit="MW")
         return stitched
+
+    @staticmethod
+    def _clip_time(
+        df: pd.DataFrame,
+        tz: ZoneInfo,
+        start_date: datetime | None,
+        end_date: datetime | None,
+    ) -> pd.DataFrame:
+        """Clip ``df`` to ``[start_date, end_date)`` on the ``time`` column.
+
+        Comparison is done in UTC to avoid tz/naive mismatches regardless of how
+        the API localized the returned ``time`` values.
+        """
+        times = pd.DatetimeIndex(df["time"])
+        if times.tz is None:
+            times_utc = times.tz_localize(tz).tz_convert("UTC")
+        else:
+            times_utc = times.tz_convert("UTC")
+
+        keep = pd.Series(True, index=df.index)
+        if start_date is not None:
+            lo = pd.Timestamp(start_date)
+            lo = lo.tz_localize(tz) if lo.tzinfo is None else lo
+            keep &= times_utc.tz_convert("UTC") >= lo.tz_convert("UTC")
+        if end_date is not None:
+            hi = pd.Timestamp(end_date)
+            hi = hi.tz_localize(tz) if hi.tzinfo is None else hi
+            keep &= times_utc.tz_convert("UTC") < hi.tz_convert("UTC")
+        return df.loc[keep.values]
 
     # ------------------------------------------------------------------
     # Init-time resolution
