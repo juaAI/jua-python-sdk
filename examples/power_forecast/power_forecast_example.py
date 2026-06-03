@@ -72,6 +72,19 @@ def main():
         end_time=now,
     )
     print(ds3)
+    print()
+
+    # --- Stitched day-ahead series (by init hour) ---
+    if zones:
+        print(f"Stitched day-ahead series for {zones[0]} Solar, runs at 09:00 UTC")
+        ds4 = pf.get_day_ahead_timeseries(
+            zone_keys=[zones[0]],
+            psr_types=["Solar"],
+            init_hour=9,       # e.g. D-1 09:00
+            time_zone=\"UTC\",
+            max_init_times=10,  # stitch up to 10 matching days
+        )
+        print(ds4)
 
 
 if __name__ == "__main__":
