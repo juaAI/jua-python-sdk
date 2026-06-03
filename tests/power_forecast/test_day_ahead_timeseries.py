@@ -50,7 +50,7 @@ def test_get_day_ahead_timeseries_stitches_across_days(monkeypatch):
     assert "time" in stitched.dims
     # Expect 48 hours (two days) starting at midnight after the first init
     assert stitched.sizes["time"] == 48
-    first_time = pd.Timestamp(datetime(2025, 1, 2, 0, 0, tzinfo=timezone.utc))
-    last_time = pd.Timestamp(datetime(2025, 1, 3, 23, 0, tzinfo=timezone.utc))
+    first_time = pd.Timestamp(datetime(2025, 1, 2, 0, 0)).tz_localize(None)
+    last_time = pd.Timestamp(datetime(2025, 1, 3, 23, 0)).tz_localize(None)
     assert pd.Timestamp(stitched.time.values[0]) == first_time
     assert pd.Timestamp(stitched.time.values[-1]) == last_time
