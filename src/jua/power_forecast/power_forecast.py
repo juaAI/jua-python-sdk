@@ -592,11 +592,11 @@ class PowerForecast:
         if start_date is not None:
             lo = pd.Timestamp(start_date)
             lo = lo.tz_localize(tz) if lo.tzinfo is None else lo
-            keep &= times_utc.tz_convert("UTC") >= lo.tz_convert("UTC")
+            keep &= times_utc >= lo
         if end_date is not None:
             hi = pd.Timestamp(end_date)
             hi = hi.tz_localize(tz) if hi.tzinfo is None else hi
-            keep &= times_utc.tz_convert("UTC") < hi.tz_convert("UTC")
+            keep &= times_utc < hi
         return df.loc[keep.values]
 
     # ------------------------------------------------------------------
