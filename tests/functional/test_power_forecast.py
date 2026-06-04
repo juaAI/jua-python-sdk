@@ -90,7 +90,12 @@ class TestMetadata:
 
         assert isinstance(init_times, list)
         assert len(init_times) > 0
-        assert all(start <= it.init_time < end for it in init_times)
+
+        def _as_utc(dt):
+            # The endpoint may return naive datetimes; treat them as UTC.
+            return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+        assert all(start <= _as_utc(it.init_time) < end for it in init_times)
         # A 30-day window exceeds the legacy 1000-item count cap.
         assert len(init_times) > 1000
 
