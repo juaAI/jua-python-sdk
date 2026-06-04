@@ -1,6 +1,6 @@
-"""Plot stitched day-ahead power forecast time series for Germany (DE).
+"""Plot stitched day-ahead power forecast time series.
 
-Two examples are produced:
+For each zone (DE and GB) two examples are produced:
 
 1. A full year of day-ahead generation, stitched from the 09:00 UTC run each
    day (``plot_yearly_day_ahead``).
@@ -19,11 +19,14 @@ import matplotlib.pyplot as plt
 
 from jua import JuaClient
 
-ZONE = "DE"
+ZONES = ["DE", "GB"]
 PSR_COLORS = {
     "Solar": "#F59E0B",
+    "Wind": "#10B981",
     "Wind Onshore": "#3B82F6",
     "Wind Offshore": "#06B6D4",
+    "Wind Transmission": "#6366F1",
+    "Wind Embedded": "#EC4899",
 }
 
 
@@ -35,15 +38,15 @@ def _to_frame(ds):
     return df.dropna(subset=["value"]).sort_values("time")
 
 
-def plot_yearly_day_ahead(pf) -> None:
-    """Plot a year of DE day-ahead generation from the 09:00 UTC run."""
-    psr_types = ["Solar", "Wind Onshore", "Wind Offshore"]
+def plot_yearly_day_ahead(pf, zone: str) -> None:
+    """Plot a year of day-ahead generation from the 09:00 UTC run."""
+    psr_types = pf.get_psr_types(zone_key=zone)
     end = datetime.now(timezone.utc)
     start = end - timedelta(days=365)
 
-    print(f"Fetching yearly day-ahead series for {ZONE} (09:00 UTC run)...")
+    print(f"Fetching yearly day-ahead series for {zone} (09:00 UTC run)...")
     ds = pf.get_day_ahead_timeseries(
-        zone_keys=[ZONE],
+        zone_keys=[zone],
         psr_types=psr_types,
         init_hour=9,
         time_zone="UTC",
@@ -71,7 +74,7 @@ def plot_yearly_day_ahead(pf) -> None:
 
     ax.set_ylabel("Power [MW]", fontsize=12)
     ax.set_title(
-        f"{ZONE} — Yearly day-ahead generation (09:00 UTC run)",
+        f"{zone} — Yearly day-ahead generation (09:00 UTC run)",
         fontsize=14,
         fontweight="bold",
     )
@@ -81,14 +84,14 @@ def plot_yearly_day_ahead(pf) -> None:
     ax.xaxis.set_major_locator(mdates.MonthLocator())
     fig.autofmt_xdate()
 
-    out = "day_ahead_de_yearly_09utc.png"
+    out = f"day_ahead_{zone.lower()}_yearly_09utc.png"
     plt.tight_layout()
     fig.savefig(out, dpi=150, bbox_inches="tight", facecolor="white")
     print(f"  Saved {out}")
 
 
-def plot_init_hour_comparison(pf) -> None:
-    """Compare the last month of DE Solar day-ahead across 10/12/18 UTC runs."""
+def plot_init_hour_comparison(pf, zone: str) -> None:
+    """Compare the last month of Solar day-ahead across 10/12/18 UTC runs."""
     init_hours = [10, 12, 18]
     psr = "Solar"
     end = datetime.now(timezone.utc)
@@ -98,9 +101,9 @@ def plot_init_hour_comparison(pf) -> None:
     cmap = plt.get_cmap("viridis")
 
     for idx, init_hour in enumerate(init_hours):
-        print(f"Fetching last-month {ZONE} {psr} day-ahead ({init_hour:02d}:00 UTC)...")
+        print(f"Fetching last-month {zone} {psr} day-ahead ({init_hour:02d}:00 UTC)...")
         ds = pf.get_day_ahead_timeseries(
-            zone_keys=[ZONE],
+            zone_keys=[zone],
             psr_types=[psr],
             init_hour=init_hour,
             time_zone="UTC",
@@ -122,7 +125,7 @@ def plot_init_hour_comparison(pf) -> None:
 
     ax.set_ylabel("Power [MW]", fontsize=12)
     ax.set_title(
-        f"{ZONE} — {psr} day-ahead, last month by init hour",
+        f"{zone} — {psr} day-ahead, last month by init hour",
         fontsize=14,
         fontweight="bold",
     )
@@ -132,7 +135,7 @@ def plot_init_hour_comparison(pf) -> None:
     ax.xaxis.set_major_locator(mdates.DayLocator(interval=3))
     fig.autofmt_xdate()
 
-    out = "day_ahead_de_last_month_init_hours.png"
+    out = f"day_ahead_{zone.lower()}_last_month_init_hours.png"
     plt.tight_layout()
     fig.savefig(out, dpi=150, bbox_inches="tight", facecolor="white")
     print(f"  Saved {out}")
@@ -142,8 +145,9 @@ def main():
     client = JuaClient()
     pf = client.power_forecast
 
-    plot_yearly_day_ahead(pf)
-    plot_init_hour_comparison(pf)
+    for zone in ZONES:
+        plot_yearly_day_ahead(pf, zone)
+        plot_init_hour_comparison(pf, zone)
 
 
 if __name__ == "__main__":
