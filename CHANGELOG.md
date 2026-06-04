@@ -1,3 +1,9 @@
+## v0.29.0 (2026-06-04)
+
+### Feat
+
+- **power_forecast**: add time-window mode to get_init_times
+
 ## v0.28.0 (2026-06-03)
 
 ### Feat
