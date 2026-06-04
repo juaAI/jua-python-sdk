@@ -131,8 +131,21 @@ class PowerForecast:
         zone_key: str | list[str] | None = None,
         psr_type: str | list[str] | None = None,
         limit: int = 96,
+        *,
+        start_time: datetime | None = None,
+        end_time: datetime | None = None,
     ) -> list[InitTimeInfo]:
         """Get available forecast init times.
+
+        Two selection modes are supported:
+
+        **Count mode** (default): returns the most recent ``limit`` init times
+        (the server caps ``limit`` at 1000).
+
+        **Time-window mode** (``start_time`` and/or ``end_time`` given): returns
+        *all* init times whose ``init_time`` falls in ``[start_time, end_time)``,
+        regardless of count. ``limit`` is ignored in this mode, so windows
+        containing more than 1000 runs are returned in full.
 
         Args:
             zone_key: Optional zone code(s) to filter by. When multiple
@@ -140,7 +153,12 @@ class PowerForecast:
                 returned (intersection semantics).
             psr_type: Optional PSR type(s) to filter by. When multiple are
                 given, only init times available for all of them are returned.
-            limit: Maximum number of init times to return (default 96).
+            limit: Maximum number of init times to return in count mode
+                (default 96). Ignored when ``start_time``/``end_time`` is set.
+            start_time: Inclusive lower bound on ``init_time``. Enables
+                time-window mode.
+            end_time: Exclusive upper bound on ``init_time``. Enables
+                time-window mode.
 
         Returns:
             List of :class:`InitTimeInfo` objects sorted newest-first.
@@ -149,13 +167,31 @@ class PowerForecast:
             RuntimeError: If the API request fails.
 
         Examples:
+            >>> # Count mode: 10 most recent runs
             >>> init_times = client.power_forecast.get_init_times(
             ...     zone_key="DE", limit=10
             ... )
-            >>> for it in init_times:
-            ...     print(it.init_time, it.max_prediction_timedelta)
+            >>>
+            >>> # Time-window mode: every run in a date range (can exceed 1000)
+            >>> from datetime import datetime, timezone
+            >>> init_times = client.power_forecast.get_init_times(
+            ...     zone_key="DE",
+            ...     start_time=datetime(2025, 1, 1, tzinfo=timezone.utc),
+            ...     end_time=datetime(2025, 2, 1, tzinfo=timezone.utc),
+            ... )
         """
-        params: dict = {"limit": limit}
+        params: dict = {}
+        # Time-window mode: filter by init_time range and let the server return
+        # the full window. We omit ``limit`` because the endpoint caps it at
+        # 1000, which would silently truncate long ranges.
+        if start_time is not None or end_time is not None:
+            if start_time is not None:
+                params["start_time"] = start_time.isoformat()
+            if end_time is not None:
+                params["end_time"] = end_time.isoformat()
+        else:
+            params["limit"] = limit
+
         if zone_key is not None:
             params["zone_key"] = zone_key
         if psr_type is not None:
