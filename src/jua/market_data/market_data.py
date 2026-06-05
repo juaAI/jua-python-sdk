@@ -159,9 +159,9 @@ class MarketData:
         result = pd.concat(frames, ignore_index=True)
         if result.empty:
             return pd.DataFrame(columns=UNIFIED_COLUMNS)
-        return result.sort_values(
-            ["market_zone", "variable", "time"]
-        ).reset_index(drop=True)
+        return result.sort_values(["market_zone", "variable", "time"]).reset_index(
+            drop=True
+        )
 
     def _fetch_zone(
         self,
@@ -174,9 +174,9 @@ class MarketData:
     ) -> list[pd.DataFrame]:
         """Resolve a single zone's variables and dispatch to the backends."""
         if variables is None:
-            requested = [MarketVariable(v) for v in _mapping.supported_variables(
-                market_zone
-            )]
+            requested = [
+                MarketVariable(v) for v in _mapping.supported_variables(market_zone)
+            ]
         else:
             requested = [_mapping._normalize_variable(v) for v in variables]
 

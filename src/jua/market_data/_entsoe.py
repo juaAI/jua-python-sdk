@@ -125,9 +125,7 @@ class _EntsoeBackend:
 
         unit = _first_unit(df)
         # Sum across PSR types per timestamp (identity for single-PSR / non-PSR).
-        summed = (
-            df.groupby("time", as_index=False, sort=True)["value"].sum(min_count=1)
-        )
+        summed = df.groupby("time", as_index=False, sort=True)["value"].sum(min_count=1)
         summed["market_zone"] = market_zone.upper()
         summed["variable"] = variable.value
         summed["unit"] = unit

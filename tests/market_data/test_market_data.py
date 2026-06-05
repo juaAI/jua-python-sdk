@@ -143,9 +143,7 @@ def test_entsoe_wind_sums_onshore_and_offshore(monkeypatch):
 def test_gb_splits_between_backends(monkeypatch):
     md = JuaClient().market_data
 
-    entsoe_rec = _patch_entsoe(
-        monkeypatch, md, lambda body: _prices_payload("GB")
-    )
+    entsoe_rec = _patch_entsoe(monkeypatch, md, lambda body: _prices_payload("GB"))
     uk_rec = _patch_uk(monkeypatch, md, lambda body: _uk_payload())
 
     df = md.get_data(

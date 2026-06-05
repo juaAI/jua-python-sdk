@@ -175,8 +175,7 @@ def _normalize_zone(market_zone: str) -> str:
     if zone not in CAPABILITY_MATRIX:
         available = ", ".join(supported_zones())
         raise ValueError(
-            f"Unsupported market zone '{market_zone}'. "
-            f"Available zones: {available}."
+            f"Unsupported market zone '{market_zone}'. Available zones: {available}."
         )
     return zone
 
@@ -188,8 +187,7 @@ def _normalize_variable(variable: str) -> MarketVariable:
     except ValueError as exc:
         available = ", ".join(sorted(v.value for v in MarketVariable))
         raise ValueError(
-            f"Unknown market variable '{variable}'. "
-            f"Available variables: {available}."
+            f"Unknown market variable '{variable}'. Available variables: {available}."
         ) from exc
 
 
