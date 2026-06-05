@@ -36,7 +36,9 @@ class TestMetadata:
     def test_get_variables_for_zone(self, md):
         gb_vars = md.get_variables(market_zone="GB")
         assert "solar" in gb_vars
-        assert "day_ahead_prices" in gb_vars
+        # GB prices/load_forecast are not served and must not be advertised.
+        assert "day_ahead_prices" not in gb_vars
+        assert "load_forecast" not in gb_vars
 
 
 class TestGetData:
@@ -80,18 +82,22 @@ class TestGetData:
         assert not df.empty
         assert set(df["market_zone"]) == {"GB"}
 
-    def test_gb_day_ahead_prices_via_entsoe(self, md):
-        """GB prices are served from ENTSOE's GB zone (uk-power has none)."""
+    def test_gb_prices_not_supported(self, md):
+        """GB prices/load forecast are not served: raise a clear error."""
         start, end = self._window()
-        df = md.get_data(
-            market_zone="GB",
-            variables=["day_ahead_prices"],
-            start_time=start,
-            end_time=end,
-        )
-        if df.empty:
-            pytest.skip("ENTSOE GB day-ahead prices unavailable for this window")
-        assert set(df["variable"]) == {"day_ahead_prices"}
+        for variable in [
+            "day_ahead_prices",
+            "imbalance_price_long",
+            "imbalance_price_short",
+            "load_forecast",
+        ]:
+            with pytest.raises(ValueError, match="not supported for zone 'GB'"):
+                md.get_data(
+                    market_zone="GB",
+                    variables=[variable],
+                    start_time=start,
+                    end_time=end,
+                )
 
     def test_time_zone_returns_tz_aware(self, md):
         import pandas as pd

@@ -56,6 +56,30 @@ def _prices_payload(zone_key: str):
     }
 
 
+def _imbalance_payload(zone_key="DE"):
+    """ENTSOE imbalance_prices rows: two timestamps, each with Long + Short.
+
+    Long != Short (dual-pricing-like) so summing would be detectable, and t0
+    carries a duplicate "Long" revision row (identical value) so de-duplication
+    can be distinguished from summing.
+    """
+    return {
+        "time": [
+            "2025-12-01T00:00:00Z",  # Long
+            "2025-12-01T00:00:00Z",  # Long (revision duplicate, same value)
+            "2025-12-01T00:00:00Z",  # Short
+            "2025-12-01T01:00:00Z",  # Long
+            "2025-12-01T01:00:00Z",  # Short
+        ],
+        "variable_name": ["imbalance_prices"] * 5,
+        "zone_key": [zone_key] * 5,
+        "psr_type": [""] * 5,
+        "other_type": ["Long", "Long", "Short", "Long", "Short"],
+        "value": [10.0, 10.0, 99.0, -5.0, 20.0],
+        "unit": ["EUR/MWh"] * 5,
+    }
+
+
 def _uk_payload():
     times = ["2025-12-01T00:00:00Z", "2025-12-01T01:00:00Z"]
     return {
@@ -140,7 +164,7 @@ def test_entsoe_wind_sums_onshore_and_offshore(monkeypatch):
     assert wind["value"].tolist() == [150.0, 170.0]
 
 
-def test_gb_splits_between_backends(monkeypatch):
+def test_gb_renewables_route_to_uk_power(monkeypatch):
     md = JuaClient().market_data
 
     entsoe_rec = _patch_entsoe(monkeypatch, md, lambda body: _prices_payload("GB"))
@@ -148,25 +172,104 @@ def test_gb_splits_between_backends(monkeypatch):
 
     df = md.get_data(
         market_zone="GB",
-        variables=["solar", "wind", "day_ahead_prices"],
+        variables=["solar", "wind"],
         start_time=_START,
         end_time=_END,
     )
 
-    # Renewables -> uk-power; prices -> entsoe GB.
+    # GB renewables come from uk-power; ENTSOE is not involved for GB.
     assert len(uk_rec.calls) == 1
     assert uk_rec.calls[0]["path"] == "uk-power/data"
     assert set(uk_rec.calls[0]["body"]["variables"]) == {"solar", "wind"}
+    assert len(entsoe_rec.calls) == 0
 
-    assert len(entsoe_rec.calls) == 1
-    assert entsoe_rec.calls[0]["path"] == "entsoe/data"
-    assert entsoe_rec.calls[0]["body"]["zone_keys"] == ["GB"]
-    assert entsoe_rec.calls[0]["body"]["variables"] == ["day_ahead_prices"]
-
-    assert set(df["variable"]) == {"solar", "wind", "day_ahead_prices"}
+    assert set(df["variable"]) == {"solar", "wind"}
     assert set(df["market_zone"]) == {"GB"}
-    prices = df[df["variable"] == "day_ahead_prices"]
-    assert set(prices["unit"]) == {"EUR/MWh"}
+
+
+def test_gb_prices_not_supported_raises(monkeypatch):
+    md = JuaClient().market_data
+    entsoe_rec = _patch_entsoe(monkeypatch, md, lambda body: _prices_payload("GB"))
+    uk_rec = _patch_uk(monkeypatch, md, lambda body: _uk_payload())
+
+    # GB prices/load_forecast are not served: fail clearly, hit no backend.
+    for variable in [
+        "day_ahead_prices",
+        "imbalance_price_long",
+        "imbalance_price_short",
+        "load_forecast",
+    ]:
+        with pytest.raises(ValueError, match="not supported for zone 'GB'"):
+            md.get_data(
+                market_zone="GB",
+                variables=[variable],
+                start_time=_START,
+                end_time=_END,
+            )
+
+    assert len(entsoe_rec.calls) == 0
+    assert len(uk_rec.calls) == 0
+
+
+def test_imbalance_long_filters_dedups_and_uses_de_zone(monkeypatch):
+    md = JuaClient().market_data
+    rec = _patch_entsoe(monkeypatch, md, lambda body: _imbalance_payload("DE"))
+
+    df = md.get_data(
+        market_zone="DE",
+        variables=["imbalance_price_long"],
+        start_time=_START,
+        end_time=_END,
+    )
+
+    # DE imbalance is published under control area "DE", not the DE_LU bidding
+    # zone used for everything else.
+    body = rec.calls[0]["body"]
+    assert body["zone_keys"] == ["DE"]
+    assert body["variables"] == ["imbalance_prices"]
+
+    out = df.sort_values("time")
+    # Long only, with the duplicate t0 row collapsed (10.0, NOT 20.0), and the
+    # Short rows (99.0/20.0) excluded entirely. Never summed with Short.
+    assert out["value"].tolist() == [10.0, -5.0]
+    assert set(out["variable"]) == {"imbalance_price_long"}
+    assert set(out["unit"]) == {"EUR/MWh"}
+
+
+def test_imbalance_short_returns_short_side(monkeypatch):
+    md = JuaClient().market_data
+    _patch_entsoe(monkeypatch, md, lambda body: _imbalance_payload("DE"))
+
+    df = md.get_data(
+        market_zone="DE",
+        variables=["imbalance_price_short"],
+        start_time=_START,
+        end_time=_END,
+    )
+    out = df.sort_values("time")
+    assert out["value"].tolist() == [99.0, 20.0]
+
+
+def test_imbalance_long_and_short_single_fetch_split(monkeypatch):
+    md = JuaClient().market_data
+    rec = _patch_entsoe(monkeypatch, md, lambda body: _imbalance_payload("DE"))
+
+    df = md.get_data(
+        market_zone="DE",
+        variables=["imbalance_price_long", "imbalance_price_short"],
+        start_time=_START,
+        end_time=_END,
+    )
+
+    # Both directions share one native variable + zone, so a single request is
+    # issued and split locally into two distinct series.
+    assert len(rec.calls) == 1
+    long = df[df["variable"] == "imbalance_price_long"].sort_values("time")
+    short = df[df["variable"] == "imbalance_price_short"].sort_values("time")
+    assert long["value"].tolist() == [10.0, -5.0]
+    assert short["value"].tolist() == [99.0, 20.0]
+    # The two series must not be identical (proves no accidental collapse).
+    assert long["value"].tolist() != short["value"].tolist()
 
 
 def test_multi_zone_fan_out_and_concat(monkeypatch):

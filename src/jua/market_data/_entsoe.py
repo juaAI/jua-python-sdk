@@ -47,22 +47,25 @@ class _EntsoeBackend:
         Returns:
             DataFrame with the unified columns, or empty if no data.
         """
-        zone = _mapping.entsoe_zone(market_zone)
+        default_zone = _mapping.entsoe_zone(market_zone)
 
-        # Group unified variables by their native ENTSOE variable so each
-        # native variable is requested at most once.
-        groups: dict[str, list[_mapping.MarketVariable]] = {}
+        # Group unified variables by (native ENTSOE variable, effective zone)
+        # so each native query is issued at most once. Most variables use the
+        # zone's default code, but some are published under a different
+        # control-area code (e.g. DE imbalance prices live under "DE").
+        groups: dict[tuple[str, str], list[_mapping.MarketVariable]] = {}
         for variable in variables:
             binding = _mapping.resolve(market_zone, variable.value).entsoe
             assert binding is not None  # routed here, so always set
-            groups.setdefault(binding.variable, []).append(variable)
+            effective_zone = binding.zone_override or default_zone
+            groups.setdefault((binding.variable, effective_zone), []).append(variable)
 
         frames: list[pd.DataFrame] = []
-        for native_variable, unified_vars in groups.items():
+        for (native_variable, effective_zone), unified_vars in groups.items():
             raw = self._fetch_native(
                 native_variable=native_variable,
                 unified_vars=unified_vars,
-                entsoe_zone=zone,
+                entsoe_zone=effective_zone,
                 start_time=start_time,
                 end_time=end_time,
                 time_zone=time_zone,
@@ -114,22 +117,39 @@ class _EntsoeBackend:
         market_zone: str,
         variable: _mapping.MarketVariable,
     ) -> pd.DataFrame:
-        """Filter, sum PSR rows, and rename to the unified schema."""
+        """Filter to the variable's components and rename to the unified schema.
+
+        PSR-based variables (wind = onshore + offshore) are summed per
+        timestamp. Direction-split variables (imbalance Long/Short) are filtered
+        to a single ``other_type`` so prices are never summed together.
+        """
         binding = _mapping._ENTSOE_BINDINGS[variable]
 
         df = raw
         if binding.psr_types and "psr_type" in df.columns:
             df = df[df["psr_type"].isin(binding.psr_types)]
+        if binding.other_type is not None and "other_type" in df.columns:
+            df = df[df["other_type"] == binding.other_type]
         if df.empty:
             return pd.DataFrame(columns=UNIFIED_COLUMNS)
 
         unit = _first_unit(df)
-        # Sum across PSR types per timestamp (identity for single-PSR / non-PSR).
-        summed = df.groupby("time", as_index=False, sort=True)["value"].sum(min_count=1)
-        summed["market_zone"] = market_zone.upper()
-        summed["variable"] = variable.value
-        summed["unit"] = unit
-        return summed[UNIFIED_COLUMNS]
+        if binding.psr_types:
+            # PSR-based variables aggregate their components per timestamp
+            # (e.g. wind = onshore + offshore).
+            agg = df.groupby("time", as_index=False, sort=True)["value"].sum(
+                min_count=1
+            )
+        else:
+            # Non-PSR variables (load, prices) carry exactly one value per
+            # timestamp once any other_type filter is applied. ENTSO-E can
+            # publish revision duplicates, so collapse to the last row rather
+            # than summing them, which would otherwise multiply the price.
+            agg = df.groupby("time", as_index=False, sort=True)["value"].last()
+        agg["market_zone"] = market_zone.upper()
+        agg["variable"] = variable.value
+        agg["unit"] = unit
+        return agg[UNIFIED_COLUMNS]
 
     # ------------------------------------------------------------------
     # Discovery passthrough (used to validate / surface availability)

@@ -34,12 +34,18 @@ class MarketData:
     - ``load`` - actual demand (MW)
     - ``solar_forecast`` / ``wind_forecast`` - day-ahead generation forecast (MW)
     - ``load_forecast`` - day-ahead demand forecast (MW)
-    - ``day_ahead_prices`` - day-ahead market price (EUR/MWh, GBP/MWh for GB)
-    - ``imbalance_prices`` - imbalance settlement price
+    - ``day_ahead_prices`` - day-ahead market price (EUR/MWh)
+    - ``imbalance_price_long`` / ``imbalance_price_short`` - imbalance
+      settlement price per direction (equal in single-price markets like
+      DE/BE; different in dual-pricing markets like FR/NL)
 
     ``wind`` is the total of all wind sub-types (onshore + offshore). The
     underlying data sources differ by zone and variable, but that is an
-    implementation detail - the same call works everywhere.
+    implementation detail - the same call works everywhere. Not every variable
+    is served in every zone; use :meth:`get_variables` to see what a zone
+    supports. Requesting an unsupported ``(zone, variable)`` raises a clear
+    error (e.g. GB currently serves renewables and load only, not prices or
+    load forecast).
 
     Examples:
         >>> from datetime import datetime, timezone
@@ -51,11 +57,10 @@ class MarketData:
         >>> md.get_zones()
         ['BE', 'DE', 'FR', 'GB', 'NL']
         >>> md.get_variables(market_zone="GB")
-        ['day_ahead_prices', 'imbalance_prices', 'load', 'load_forecast',
-         'solar', 'solar_forecast', 'wind', 'wind_forecast']
+        ['load', 'solar', 'solar_forecast', 'wind', 'wind_forecast']
         >>>
         >>> df = md.get_data(
-        ...     market_zone=["DE", "GB"],
+        ...     market_zone="DE",
         ...     variables=["solar", "wind", "day_ahead_prices"],
         ...     start_time=datetime(2025, 12, 1, tzinfo=timezone.utc),
         ...     end_time=datetime(2025, 12, 3, tzinfo=timezone.utc),

@@ -38,7 +38,12 @@ class MarketVariable(StrEnum):
     WIND_FORECAST = "wind_forecast"
     LOAD_FORECAST = "load_forecast"
     DAY_AHEAD_PRICES = "day_ahead_prices"
-    IMBALANCE_PRICES = "imbalance_prices"
+    # ENTSO-E publishes imbalance prices per direction ("Long" = surplus,
+    # "Short" = shortfall). They are equal in single-price markets (e.g. DE, BE)
+    # and differ in dual-pricing markets (e.g. FR, NL), so we expose both
+    # rather than collapsing them, which would be lossy or simply wrong.
+    IMBALANCE_PRICE_LONG = "imbalance_price_long"
+    IMBALANCE_PRICE_SHORT = "imbalance_price_short"
 
 
 # Market zone -> ENTSOE bidding/control zone code. Most market zones use the
@@ -66,10 +71,20 @@ class EntsoeBinding:
         variable: Native ``EntsoeVariable`` name (e.g. ``"generation_actual"``).
         psr_types: PSR types to request and sum into the unified value.
             Empty for non-PSR variables (load, prices).
+        zone_override: ENTSOE zone code to use instead of the market zone's
+            default (see :data:`MARKET_ZONE_TO_ENTSOE`). Needed when a single
+            variable is published under a different control-area code than the
+            rest of the zone (e.g. DE imbalance prices live under ``"DE"``,
+            not the ``"DE_LU"`` bidding zone).
+        other_type: Value of the ENTSOE ``other_type`` column to select (e.g.
+            ``"Long"`` / ``"Short"`` for imbalance prices). When set, rows are
+            filtered to this single component instead of being summed.
     """
 
     variable: str
     psr_types: tuple[str, ...] = ()
+    zone_override: str | None = None
+    other_type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -99,7 +114,12 @@ _ENTSOE_BINDINGS: dict[MarketVariable, EntsoeBinding] = {
     MarketVariable.LOAD: EntsoeBinding("load_actual"),
     MarketVariable.LOAD_FORECAST: EntsoeBinding("load_forecast_da"),
     MarketVariable.DAY_AHEAD_PRICES: EntsoeBinding("day_ahead_prices"),
-    MarketVariable.IMBALANCE_PRICES: EntsoeBinding("imbalance_prices"),
+    MarketVariable.IMBALANCE_PRICE_LONG: EntsoeBinding(
+        "imbalance_prices", other_type="Long"
+    ),
+    MarketVariable.IMBALANCE_PRICE_SHORT: EntsoeBinding(
+        "imbalance_prices", other_type="Short"
+    ),
 }
 
 
@@ -113,9 +133,12 @@ _EU_CAPABILITIES: dict[MarketVariable, Capability] = {
 }
 
 # GB serves renewables + load actual + renewable day-ahead forecasts from the
-# richer UK-power feed (Elexon / PV_Live / NESO), and falls back to ENTSOE's
-# GB zone for load_forecast and prices (the /v1/uk-power endpoint exposes no
-# prices or load forecast).
+# richer UK-power feed (Elexon / PV_Live / NESO). GB prices and load forecast
+# are intentionally not advertised: the /v1/uk-power endpoint exposes neither,
+# and ENTSOE's GB zone has no usable price/load-forecast feed, so requesting
+# them raises a clear "not supported" error instead of returning empty data.
+# (GB day-ahead/imbalance prices will be re-added once exposed by the Query
+# Engine.)
 _GB_CAPABILITIES: dict[MarketVariable, Capability] = {
     MarketVariable.SOLAR: Capability(MarketBackend.UK_POWER, uk_power_variable="solar"),
     MarketVariable.WIND: Capability(MarketBackend.UK_POWER, uk_power_variable="wind"),
@@ -126,18 +149,26 @@ _GB_CAPABILITIES: dict[MarketVariable, Capability] = {
     MarketVariable.WIND_FORECAST: Capability(
         MarketBackend.UK_POWER, uk_power_variable="wind_forecast"
     ),
-    MarketVariable.LOAD_FORECAST: _entsoe_capability(MarketVariable.LOAD_FORECAST),
-    MarketVariable.DAY_AHEAD_PRICES: _entsoe_capability(
-        MarketVariable.DAY_AHEAD_PRICES
-    ),
-    MarketVariable.IMBALANCE_PRICES: _entsoe_capability(
-        MarketVariable.IMBALANCE_PRICES
-    ),
 }
+
+# DE mirrors the EU defaults except for imbalance prices, which ENTSO-E
+# publishes under the "DE" control area rather than the "DE_LU" bidding zone
+# used for the rest of Germany's data.
+_DE_CAPABILITIES: dict[MarketVariable, Capability] = dict(_EU_CAPABILITIES)
+for _imb_var, _imb_dir in (
+    (MarketVariable.IMBALANCE_PRICE_LONG, "Long"),
+    (MarketVariable.IMBALANCE_PRICE_SHORT, "Short"),
+):
+    _DE_CAPABILITIES[_imb_var] = Capability(
+        backend=MarketBackend.ENTSOE,
+        entsoe=EntsoeBinding(
+            "imbalance_prices", zone_override="DE", other_type=_imb_dir
+        ),
+    )
 
 # market_zone -> {unified variable -> capability}
 CAPABILITY_MATRIX: dict[str, dict[MarketVariable, Capability]] = {
-    "DE": dict(_EU_CAPABILITIES),
+    "DE": _DE_CAPABILITIES,
     "FR": dict(_EU_CAPABILITIES),
     "NL": dict(_EU_CAPABILITIES),
     "BE": dict(_EU_CAPABILITIES),
@@ -212,8 +243,8 @@ def resolve(market_zone: str, variable: str) -> Capability:
     if market_variable not in zone_caps:
         available = ", ".join(sorted(v.value for v in zone_caps))
         raise ValueError(
-            f"Variable '{variable}' is not available for zone '{zone}'. "
-            f"Available for {zone}: {available}."
+            f"Variable '{variable}' is not supported for zone '{zone}'. "
+            f"Supported for {zone}: {available}."
         )
     return zone_caps[market_variable]
 
