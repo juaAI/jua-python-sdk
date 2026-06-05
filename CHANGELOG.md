@@ -1,3 +1,14 @@
+## v0.31.0 (2026-06-05)
+
+### Feat
+
+- **market_data**: add zone-addressed market data (ENTSOE + UK power)
+
+### Fix
+
+- **market_data**: correct imbalance prices and unavailable-variable handling
+- **power_forecast**: handle DST mixed-offset timestamps in day-ahead stitching
+
 ## v0.30.0 (2026-06-05)
 
 ### Feat
