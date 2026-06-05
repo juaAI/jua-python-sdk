@@ -220,6 +220,87 @@ def test_to_dataset_parses_mixed_offsets_across_dst():
     assert ((valid["time"] - valid["init_time"]) == pd.Timedelta(hours=15)).all()
 
 
+def test_to_dataset_timezone_invariant_values():
+    """The requested ``time_zone`` only relabels instants - never the values.
+
+    Guards the failure mode where a tz/DST bug would shift the data so a
+    forecast lines up against the wrong hour's actual. The same raw payload
+    parsed in two zones must describe identical instants and identical values.
+    """
+    data = {
+        "zone_key": ["DE", "DE"],
+        "psr_type": ["Solar", "Solar"],
+        "init_time": ["2026-06-01T00:00:00Z", "2026-06-01T00:00:00Z"],
+        "time": ["2026-06-01T10:00:00Z", "2026-06-01T11:00:00Z"],
+        "value": [100.0, 200.0],
+    }
+
+    du = (
+        PowerForecast._to_dataset(data, time_zone="UTC")
+        .to_dataframe()
+        .reset_index()
+        .dropna(subset=["value"])
+    )
+    db = (
+        PowerForecast._to_dataset(data, time_zone="Europe/Berlin")
+        .to_dataframe()
+        .reset_index()
+        .dropna(subset=["value"])
+    )
+
+    assert str(db["time"].dt.tz) == "Europe/Berlin"
+    du["utc"] = du["time"].dt.tz_convert("UTC")
+    db["utc"] = db["time"].dt.tz_convert("UTC")
+    merged = du.merge(db, on=["zone_key", "psr_type", "utc"], suffixes=("_u", "_b"))
+    assert len(merged) == len(du) == len(db)
+    assert (merged["value_u"] == merged["value_b"]).all()
+
+
+def test_day_ahead_stitch_value_comes_from_correct_init_and_lead(monkeypatch):
+    """Stitched values must come from the right run at the right lead.
+
+    With ``value = init_index * 1000 + lead_hours`` per the synthetic dataset,
+    the day-ahead window for ``init_hour=9`` starts 15h after each init, so the
+    first valid hour of the first stitched day must equal ``0 * 1000 + 15``.
+    Guards against off-by-one lead selection / picking the wrong init.
+    """
+    client = JuaClient()
+    pf = client.power_forecast
+
+    zone, psr = "DE", "Solar"
+    t1 = datetime(2025, 1, 1, 9, 0, tzinfo=timezone.utc)
+    t2 = datetime(2025, 1, 2, 9, 0, tzinfo=timezone.utc)
+    init_infos = [
+        InitTimeInfo(init_time=t1, max_prediction_timedelta=40 * 60),
+        InitTimeInfo(init_time=t2, max_prediction_timedelta=40 * 60),
+    ]
+    monkeypatch.setattr(
+        pf,
+        "get_init_times",
+        lambda zone_key=None, psr_type=None, limit=96: init_infos,
+    )
+    monkeypatch.setattr(pf, "get_data", lambda **kwargs: _make_ds(zone, psr, [t1, t2]))
+
+    stitched = pf.get_day_ahead_timeseries(
+        zone_keys=[zone],
+        psr_types=[psr],
+        init_hour=9,
+        time_zone="UTC",
+        max_init_times=10,
+    )
+
+    df = stitched.to_dataframe().reset_index().dropna(subset=["value"])
+    df = df.sort_values("time")
+    # First stitched valid hour is 2025-01-02 00:00 from the 2025-01-01 09:00
+    # run at +15h lead -> value 0*1000 + 15 = 15.
+    assert float(df.iloc[0]["value"]) == 15.0
+    # Day two starts from the second init (index 1) at +15h -> 1015.
+    day2 = df[
+        pd.to_datetime(df["time"]).dt.tz_localize(None) >= datetime(2025, 1, 3, 0, 0)
+    ]
+    assert float(day2.iloc[0]["value"]) == 1015.0
+
+
 def test_to_dataset_defaults_to_utc_for_mixed_offsets():
     """Without a ``time_zone`` the frame is normalized to tz-aware UTC."""
     data = {
