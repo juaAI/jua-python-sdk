@@ -76,6 +76,29 @@ class TestMetadata:
             "Intersection of multiple PSR types should not exceed a single type"
         )
 
+    def test_get_init_times_time_window(self, pf):
+        """Time-window mode returns init times bounded by start/end and is not
+        capped at the 1000-item count limit."""
+        from datetime import datetime, timedelta, timezone
+
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=30)
+
+        init_times = pf.get_init_times(
+            zone_key="DE", psr_type="Solar", start_time=start, end_time=end
+        )
+
+        assert isinstance(init_times, list)
+        assert len(init_times) > 0
+
+        def _as_utc(dt):
+            # The endpoint may return naive datetimes; treat them as UTC.
+            return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+        assert all(start <= _as_utc(it.init_time) < end for it in init_times)
+        # A 30-day window exceeds the legacy 1000-item count cap.
+        assert len(init_times) > 1000
+
 
 class TestGetData:
     """Tests for power forecast data retrieval."""

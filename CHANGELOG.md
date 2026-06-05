@@ -1,3 +1,20 @@
+## v0.29.0 (2026-06-04)
+
+### Feat
+
+- **power_forecast**: add time-window mode to get_init_times
+
+## v0.28.0 (2026-06-03)
+
+### Feat
+
+- **power_forecast**: add date range to get_day_ahead_timeseries
+- **power_forecast**: add get_day_ahead_timeseries() to stitch day-ahead window by init-hour; include unit test covering 09:00 -> 15..39h selection
+
+### Refactor
+
+- **power_forecast**: drop redundant UTC conversions in day-ahead clip
+
 ## v0.27.0 (2026-06-02)
 
 ### Feat
