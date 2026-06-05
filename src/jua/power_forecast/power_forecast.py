@@ -325,7 +325,7 @@ class PowerForecast:
                 requires_auth=True,
             )
             data = response.json()
-            return self._to_dataset(data)
+            return self._to_dataset(data, time_zone=time_zone)
         except Exception as e:
             raise RuntimeError(f"Failed to fetch power forecast data: {e}") from e
 
@@ -777,14 +777,28 @@ class PowerForecast:
         return remove_none_from_dict(body)
 
     @staticmethod
-    def _to_dataset(data: dict) -> xr.Dataset:
-        """Convert columnar JSON response to an xarray Dataset."""
+    def _to_dataset(data: dict, time_zone: str | None = None) -> xr.Dataset:
+        """Convert columnar JSON response to an xarray Dataset.
+
+        Timestamps are parsed DST-safely: the server emits ISO-8601 strings
+        whose UTC offset changes across a daylight-saving transition, so we
+        always normalize through UTC first (avoiding an ``object`` column of
+        mixed offsets) and then convert to ``time_zone`` when requested. This
+        keeps ``time`` / ``init_time`` as proper datetime dtypes so downstream
+        arithmetic (e.g. the day-ahead stitching lead computation) works for
+        ranges that span a DST boundary.
+        """
         if not data or all(len(v) == 0 for v in data.values()):
             return xr.Dataset(attrs={"unit": "MW"})
 
         df = pd.DataFrame(data)
-        df["time"] = pd.to_datetime(df["time"])
-        df["init_time"] = pd.to_datetime(df["init_time"])
+        for column in ("time", "init_time"):
+            if column not in df.columns:
+                continue
+            parsed = pd.to_datetime(df[column], utc=True, format="ISO8601")
+            if time_zone is not None:
+                parsed = parsed.dt.tz_convert(ZoneInfo(time_zone))
+            df[column] = parsed
 
         index_cols = ["zone_key", "psr_type", "init_time", "time"]
         present_cols = [c for c in index_cols if c in df.columns]
