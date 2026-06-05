@@ -1,3 +1,24 @@
+## v0.30.0 (2026-06-05)
+
+### Feat
+
+- **models**: support sub-hourly temporal resolution for Helios
+- add example for helios
+- **models**: add EPT2_HELIOS and EPT2_EUROPA with meta; feat(variables): add 30min ssrd/fdir variables; docs: note 30min resolution for Helios in meta
+
+### Fix
+
+- **models**: correct Helios/Europa forecast hours and update frequency
+- **models**: simplify Helios/Europa meta to match HRRR pattern
+- **tests**: exclude solar-only Helios from generic forecast tests
+- **ci**: handle force push in commit message check
+- resolve merge conflict in CHANGELOG.md
+- fix models name
+
+### Refactor
+
+- **examples**: replace Helios grid example with point comparison
+
 ## v0.29.0 (2026-06-04)
 
 ### Feat
