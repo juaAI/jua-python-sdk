@@ -14,6 +14,8 @@ class JuaClient:
         settings: Configuration settings for the API client.
         weather: Property that provides access to weather data services.
         market_aggregates: Property that provides access to market aggregate services.
+        market_data: Property that provides access to zone-addressed market data
+            (renewable generation, load, day-ahead forecasts, and prices).
 
     Examples:
         >>> from jua import JuaClient
@@ -21,7 +23,9 @@ class JuaClient:
         >>> # Access weather services
         >>> forecast_model = client.weather.get_model(...)
         >>> # Access market aggregates
-        >>> market_data = client.market_aggregates.compare_runs(...)
+        >>> aggregates = client.market_aggregates.compare_runs(...)
+        >>> # Access market data by zone
+        >>> df = client.market_data.get_data(market_zone="DE", ...)
     """
 
     @validate_call
@@ -45,6 +49,7 @@ class JuaClient:
         self._weather = None
         self._market_aggregates = None
         self._power_forecast = None
+        self._market_data = None
 
         if jua_log_level is not None:
             logging.getLogger("jua").setLevel(jua_log_level)
@@ -88,6 +93,20 @@ class JuaClient:
 
             self._power_forecast = PowerForecast(self)
         return self._power_forecast
+
+    @property
+    def market_data(self):
+        """Access to Jua's zone-addressed market data services.
+
+        Returns:
+            MarketData client interface for querying renewable generation,
+            load, day-ahead forecasts, and prices by market zone.
+        """
+        if self._market_data is None:
+            from jua.market_data import MarketData
+
+            self._market_data = MarketData(self)
+        return self._market_data
 
     def __enter__(self):
         return self
