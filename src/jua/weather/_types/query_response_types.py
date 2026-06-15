@@ -1,4 +1,4 @@
-from datetime import datetime, time
+from datetime import datetime, time, timedelta
 from typing import Callable
 
 from pydantic import BaseModel, Field, field_validator
@@ -169,8 +169,70 @@ class RunDefinition(BaseModel):
     )
     dissemination_time: time | None = Field(
         default=None,
-        description="The time of day at which this run is fully disseminated",
+        description=(
+            "Wall-clock *time of day* at which this run is published by "
+            "the upstream data provider. Combined with "
+            "``dissemination_day_offset`` and the init_time to get the "
+            "absolute availability datetime — use "
+            ":meth:`expected_dissemination_datetime` rather than "
+            "interpreting this field in isolation."
+        ),
     )
+    dissemination_day_offset: int | None = Field(
+        default=None,
+        description=(
+            "Days after the init date when this run is published. "
+            "``None`` means 'same day as init, with an implicit +1 day "
+            "rollover if ``dissemination_time`` is earlier than the "
+            "init's time of day' — the convention used by every "
+            "existing NWP model (e.g. ECMWF 18Z init disseminating at "
+            "03:00 rolls to the next day). An explicit integer is "
+            "absolute (no rollover): e.g. ``5`` for ECMWF SEAS5, which "
+            "publishes on day-1 + 5 = the 6th of every month."
+        ),
+    )
+
+    def expected_dissemination_datetime(
+        self, init_datetime: datetime, init_time_of_day: time
+    ) -> datetime | None:
+        """Return the wall-clock datetime when this run is expected to be
+        available, given the init datetime it was generated from.
+
+        ``None`` is returned when ``dissemination_time`` is unknown.
+
+        Args:
+            init_datetime: The initialization datetime of this run
+                (e.g. ``datetime(2026, 5, 1, 0, 0)`` for a 00Z run).
+            init_time_of_day: The init's time of day (e.g. ``time(0, 0)``
+                for a 00Z run) — used to decide whether the implicit
+                ``<1 day`` rollover should fire when
+                ``dissemination_day_offset`` is ``None``.
+
+        Example::
+
+            # ECMWF SEAS5: init on 2026-05-01 00:00 UTC, dissem_time=12:00,
+            # dissem_day_offset=5 → available 2026-05-06 12:00 UTC.
+            run.expected_dissemination_datetime(
+                datetime(2026, 5, 1, 0, 0), time(0, 0)
+            )
+            # → datetime(2026, 5, 6, 12, 0)
+        """
+        if self.dissemination_time is None:
+            return None
+        dt = init_datetime.replace(
+            hour=self.dissemination_time.hour,
+            minute=self.dissemination_time.minute,
+            second=0,
+            microsecond=0,
+        )
+        if self.dissemination_day_offset is not None:
+            dt += timedelta(days=self.dissemination_day_offset)
+        elif self.dissemination_time < init_time_of_day:
+            # Legacy implicit rollover for models that disseminate on the
+            # same calendar day at a time earlier than the init — e.g.
+            # ECMWF 18Z run disseminating at 03:00 next-day UTC.
+            dt += timedelta(days=1)
+        return dt
 
 
 class GridBounds(BaseModel):
