@@ -37,6 +37,14 @@ class MarketVariable(StrEnum):
     SOLAR_FORECAST = "solar_forecast"
     WIND_FORECAST = "wind_forecast"
     LOAD_FORECAST = "load_forecast"
+    # GB-only wind sub-types. The GB grid distinguishes transmission-connected
+    # wind (metered by Elexon) from distribution-embedded wind (estimated by
+    # NESO); ``wind`` is their total. ENTSO-E zones split wind by onshore /
+    # offshore instead, so these resolve only for GB.
+    WIND_EMBEDDED = "wind_embedded"
+    WIND_TRANSMISSION = "wind_transmission"
+    WIND_EMBEDDED_FORECAST = "wind_embedded_forecast"
+    WIND_TRANSMISSION_FORECAST = "wind_transmission_forecast"
     DAY_AHEAD_PRICES = "day_ahead_prices"
     # ENTSO-E publishes imbalance prices per direction ("Long" = surplus,
     # "Short" = shortfall). They are equal in single-price markets (e.g. DE, BE)
@@ -127,27 +135,43 @@ def _entsoe_capability(variable: MarketVariable) -> Capability:
     return Capability(backend=MarketBackend.ENTSOE, entsoe=_ENTSOE_BINDINGS[variable])
 
 
-# Every unified variable is available for EU zones via ENTSOE.
+# Every ENTSOE-backed variable is available for EU zones. Variables without an
+# ENTSOE binding (e.g. the GB-only wind sub-types) are intentionally absent and
+# resolve only where their backend serves them.
 _EU_CAPABILITIES: dict[MarketVariable, Capability] = {
-    variable: _entsoe_capability(variable) for variable in MarketVariable
+    variable: _entsoe_capability(variable) for variable in _ENTSOE_BINDINGS
 }
 
 # GB serves renewables + load actual + renewable day-ahead forecasts from the
-# richer UK-power feed (Elexon / PV_Live / NESO). GB prices and load forecast
-# are intentionally not advertised: the /v1/uk-power endpoint exposes neither,
-# and ENTSOE's GB zone has no usable price/load-forecast feed, so requesting
-# them raises a clear "not supported" error instead of returning empty data.
-# (GB day-ahead/imbalance prices will be re-added once exposed by the Query
-# Engine.)
+# richer UK-power feed (Elexon / PV_Live / NESO), including the GB-specific
+# split of wind into transmission-connected (Elexon FUELHH) and
+# distribution-embedded (NESO Gen Mix) generation, for both actuals and
+# day-ahead forecasts. GB prices and load forecast are intentionally not
+# advertised: the /v1/uk-power endpoint exposes neither, and ENTSOE's GB zone
+# has no usable price/load-forecast feed, so requesting them raises a clear
+# "not supported" error instead of returning empty data. (GB day-ahead/imbalance
+# prices will be re-added once exposed by the Query Engine.)
 _GB_CAPABILITIES: dict[MarketVariable, Capability] = {
     MarketVariable.SOLAR: Capability(MarketBackend.UK_POWER, uk_power_variable="solar"),
     MarketVariable.WIND: Capability(MarketBackend.UK_POWER, uk_power_variable="wind"),
+    MarketVariable.WIND_EMBEDDED: Capability(
+        MarketBackend.UK_POWER, uk_power_variable="wind_embedded"
+    ),
+    MarketVariable.WIND_TRANSMISSION: Capability(
+        MarketBackend.UK_POWER, uk_power_variable="wind_transmission"
+    ),
     MarketVariable.LOAD: Capability(MarketBackend.UK_POWER, uk_power_variable="load"),
     MarketVariable.SOLAR_FORECAST: Capability(
         MarketBackend.UK_POWER, uk_power_variable="solar_forecast"
     ),
     MarketVariable.WIND_FORECAST: Capability(
         MarketBackend.UK_POWER, uk_power_variable="wind_forecast"
+    ),
+    MarketVariable.WIND_EMBEDDED_FORECAST: Capability(
+        MarketBackend.UK_POWER, uk_power_variable="wind_embedded_forecast"
+    ),
+    MarketVariable.WIND_TRANSMISSION_FORECAST: Capability(
+        MarketBackend.UK_POWER, uk_power_variable="wind_transmission_forecast"
     ),
 }
 

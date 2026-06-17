@@ -90,6 +90,41 @@ def _uk_payload():
     }
 
 
+# Canned per-variable values for the uk-power feed, used to build payloads that
+# reflect exactly which native variables a given request asked for.
+_UK_VALUES = {
+    "solar": [5.0, 8.0],
+    "wind": [200.0, 210.0],
+    "wind_embedded": [40.0, 45.0],
+    "wind_transmission": [160.0, 165.0],
+    "load": [30000.0, 31000.0],
+    "wind_forecast": [205.0, 212.0],
+    "wind_embedded_forecast": [42.0, 46.0],
+    "wind_transmission_forecast": [158.0, 167.0],
+}
+
+
+def _uk_payload_for(body):
+    """Build a uk-power payload echoing only the variables in ``body``.
+
+    This lets tests assert how the backend batches requests: each call's
+    response contains rows solely for that request's native variables.
+    """
+    times = ["2025-12-01T00:00:00Z", "2025-12-01T01:00:00Z"]
+    rows_time, rows_var, rows_val = [], [], []
+    for native in body["variables"]:
+        for i, t in enumerate(times):
+            rows_time.append(t)
+            rows_var.append(native)
+            rows_val.append(_UK_VALUES[native][i])
+    return {
+        "time": rows_time,
+        "variable_name": rows_var,
+        "value": rows_val,
+        "unit": ["MW"] * len(rows_time),
+    }
+
+
 class _Recorder:
     """Captures posts and returns canned payloads keyed by native variable."""
 
@@ -185,6 +220,139 @@ def test_gb_renewables_route_to_uk_power(monkeypatch):
 
     assert set(df["variable"]) == {"solar", "wind"}
     assert set(df["market_zone"]) == {"GB"}
+
+
+def test_gb_wind_split_actuals_and_forecasts(monkeypatch):
+    md = JuaClient().market_data
+    uk_rec = _patch_uk(monkeypatch, md, _uk_payload_for)
+
+    df = md.get_data(
+        market_zone="GB",
+        variables=[
+            "wind_embedded",
+            "wind_transmission",
+            "wind_embedded_forecast",
+            "wind_transmission_forecast",
+        ],
+        start_time=_START,
+        end_time=_END,
+    )
+
+    # No wind total requested -> a single batched uk-power request.
+    assert len(uk_rec.calls) == 1
+    assert set(df["variable"]) == {
+        "wind_embedded",
+        "wind_transmission",
+        "wind_embedded_forecast",
+        "wind_transmission_forecast",
+    }
+    embedded = df[df["variable"] == "wind_embedded"].sort_values("time")
+    assert embedded["value"].tolist() == [40.0, 45.0]
+
+
+def test_gb_wind_total_split_from_components(monkeypatch):
+    md = JuaClient().market_data
+    uk_rec = _patch_uk(monkeypatch, md, _uk_payload_for)
+
+    df = md.get_data(
+        market_zone="GB",
+        variables=["wind", "wind_embedded", "wind_transmission", "load"],
+        start_time=_START,
+        end_time=_END,
+    )
+
+    # The composite "wind" actual cannot share a request with its components
+    # (server 500s), so the backend issues two requests: wind alone, rest
+    # together.
+    assert len(uk_rec.calls) == 2
+    batches = sorted(tuple(sorted(c["body"]["variables"])) for c in uk_rec.calls)
+    assert batches == [
+        ("load", "wind_embedded", "wind_transmission"),
+        ("wind",),
+    ]
+
+    # All four series still come back, correctly assembled across the two calls.
+    assert set(df["variable"]) == {"wind", "wind_embedded", "wind_transmission", "load"}
+    total = df[df["variable"] == "wind"].sort_values("time")
+    assert total["value"].tolist() == [200.0, 210.0]
+
+
+def test_gb_wind_total_with_forecast_components_single_request(monkeypatch):
+    md = JuaClient().market_data
+    uk_rec = _patch_uk(monkeypatch, md, _uk_payload_for)
+
+    # The actual wind total only collides with the *actual* components, not the
+    # forecast ones, so these can share one request.
+    md.get_data(
+        market_zone="GB",
+        variables=["wind", "wind_embedded_forecast", "wind_transmission_forecast"],
+        start_time=_START,
+        end_time=_END,
+    )
+    assert len(uk_rec.calls) == 1
+
+
+def test_gb_wind_forecast_total_split_from_forecast_components(monkeypatch):
+    md = JuaClient().market_data
+    uk_rec = _patch_uk(monkeypatch, md, _uk_payload_for)
+
+    # wind_forecast (total day-ahead) collides with its forecast components the
+    # same way the actual total does, so it is isolated into its own request.
+    md.get_data(
+        market_zone="GB",
+        variables=["wind_forecast", "wind_embedded_forecast"],
+        start_time=_START,
+        end_time=_END,
+    )
+    assert len(uk_rec.calls) == 2
+    batches = sorted(tuple(sorted(c["body"]["variables"])) for c in uk_rec.calls)
+    assert batches == [("wind_embedded_forecast",), ("wind_forecast",)]
+
+
+def test_gb_both_totals_split_independently(monkeypatch):
+    md = JuaClient().market_data
+    uk_rec = _patch_uk(monkeypatch, md, _uk_payload_for)
+
+    # Both totals requested with both component sets: each total is isolated and
+    # the remaining components/extras share one batch (3 requests total).
+    df = md.get_data(
+        market_zone="GB",
+        variables=[
+            "wind",
+            "wind_forecast",
+            "wind_embedded",
+            "wind_transmission",
+            "wind_embedded_forecast",
+            "wind_transmission_forecast",
+            "load",
+        ],
+        start_time=_START,
+        end_time=_END,
+    )
+
+    assert len(uk_rec.calls) == 3
+    batches = sorted(tuple(sorted(c["body"]["variables"])) for c in uk_rec.calls)
+    assert batches == [
+        (
+            "load",
+            "wind_embedded",
+            "wind_embedded_forecast",
+            "wind_transmission",
+            "wind_transmission_forecast",
+        ),
+        ("wind",),
+        ("wind_forecast",),
+    ]
+    # Every requested variable comes back, assembled across the three calls.
+    assert set(df["variable"]) == {
+        "wind",
+        "wind_forecast",
+        "wind_embedded",
+        "wind_transmission",
+        "wind_embedded_forecast",
+        "wind_transmission_forecast",
+        "load",
+    }
 
 
 def test_gb_prices_not_supported_raises(monkeypatch):

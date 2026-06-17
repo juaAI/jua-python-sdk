@@ -36,6 +36,11 @@ class TestMetadata:
     def test_get_variables_for_zone(self, md):
         gb_vars = md.get_variables(market_zone="GB")
         assert "solar" in gb_vars
+        # GB exposes the transmission/embedded wind split (actual + forecast).
+        assert "wind_transmission" in gb_vars
+        assert "wind_embedded" in gb_vars
+        assert "wind_transmission_forecast" in gb_vars
+        assert "wind_embedded_forecast" in gb_vars
         # GB prices/load_forecast are not served and must not be advertised.
         assert "day_ahead_prices" not in gb_vars
         assert "load_forecast" not in gb_vars
@@ -81,6 +86,51 @@ class TestGetData:
         )
         assert not df.empty
         assert set(df["market_zone"]) == {"GB"}
+
+    def test_gb_wind_split_totals_match_components(self, md):
+        """The wind total and its components are served in one SDK call (the
+        backend can't return them together, so the SDK splits the request) and
+        the components must sum to the total at every timestamp."""
+        start, end = self._window()
+        df = md.get_data(
+            market_zone="GB",
+            variables=["wind", "wind_transmission", "wind_embedded"],
+            start_time=start,
+            end_time=end,
+        )
+        assert not df.empty
+        assert set(df["variable"]) == {"wind", "wind_transmission", "wind_embedded"}
+
+        wide = df.pivot_table(index="time", columns="variable", values="value")
+        wide = wide.dropna(subset=["wind", "wind_transmission", "wind_embedded"])
+        if wide.empty:
+            pytest.skip("No overlapping wind data for this window")
+        residual = (
+            wide["wind"] - wide["wind_transmission"] - wide["wind_embedded"]
+        ).abs()
+        # Allow a small tolerance for rounding in the published feeds.
+        assert residual.max() <= 1.0
+
+    def test_gb_wind_forecast_split(self, md):
+        """The day-ahead wind total and its forecast components also come back
+        from a single SDK call despite the same backend batching limit."""
+        start, end = self._window()
+        df = md.get_data(
+            market_zone="GB",
+            variables=[
+                "wind_forecast",
+                "wind_transmission_forecast",
+                "wind_embedded_forecast",
+            ],
+            start_time=start,
+            end_time=end,
+        )
+        assert not df.empty
+        assert set(df["variable"]) == {
+            "wind_forecast",
+            "wind_transmission_forecast",
+            "wind_embedded_forecast",
+        }
 
     def test_gb_prices_not_supported(self, md):
         """GB prices/load forecast are not served: raise a clear error."""

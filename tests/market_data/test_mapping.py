@@ -18,14 +18,19 @@ def test_supported_variables_full_vocabulary():
 
 def test_supported_variables_for_zone():
     gb_vars = _mapping.supported_variables(market_zone="GB")
-    # GB exposes renewables + load actual + renewable day-ahead forecasts.
+    # GB exposes renewables + load actual + renewable day-ahead forecasts, plus
+    # the GB-only wind transmission/embedded split (actuals and forecasts).
     # Prices and load_forecast are intentionally not advertised (not served).
     assert set(gb_vars) == {
         "solar",
         "wind",
+        "wind_embedded",
+        "wind_transmission",
         "load",
         "solar_forecast",
         "wind_forecast",
+        "wind_embedded_forecast",
+        "wind_transmission_forecast",
     }
 
 
@@ -59,10 +64,36 @@ def test_eu_wind_sums_onshore_and_offshore():
 
 
 def test_gb_renewables_route_to_uk_power():
-    for variable in ["solar", "wind", "load", "solar_forecast", "wind_forecast"]:
+    for variable in [
+        "solar",
+        "wind",
+        "wind_embedded",
+        "wind_transmission",
+        "load",
+        "solar_forecast",
+        "wind_forecast",
+        "wind_embedded_forecast",
+        "wind_transmission_forecast",
+    ]:
         cap = _mapping.resolve("GB", variable)
         assert cap.backend == MarketBackend.UK_POWER, variable
         assert cap.uk_power_variable is not None
+        # The native name matches the unified name for GB wind sub-types.
+        assert cap.uk_power_variable == variable
+
+
+def test_wind_split_is_gb_only():
+    # The transmission/embedded split is a GB grid concept; ENTSO-E zones split
+    # wind by onshore/offshore instead, so these must not resolve for DE/FR/etc.
+    for variable in [
+        "wind_embedded",
+        "wind_transmission",
+        "wind_embedded_forecast",
+        "wind_transmission_forecast",
+    ]:
+        for zone in ["DE", "FR", "NL", "BE"]:
+            with pytest.raises(ValueError, match=f"not supported for zone '{zone}'"):
+                _mapping.resolve(zone, variable)
 
 
 def test_gb_prices_and_load_forecast_not_supported():
