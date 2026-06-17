@@ -221,17 +221,22 @@ class EnergyMarket:
     ) -> xr.Dataset:
         """Compare multiple model runs with output in MW.
 
-        Like :meth:`compare_runs`, but applies power curves and returns
-        predicted megawatt (MW) values instead of raw weather variables.
+        Like :meth:`compare_runs`, but applies power curves (generation) or a
+        demand model (load) and returns predicted megawatt (MW) values instead
+        of raw weather variables.
 
         The response columns depend on the weighting:
 
         - ``"wind_capacity"`` -> ``wind_onshore_mw``, ``wind_offshore_mw``
         - ``"solar_capacity"`` -> ``solar_mw``
+        - ``"population"`` -> ``load_mw`` (predicted electricity demand)
 
         Args:
-            weighting: Capacity weighting scheme. Must be
-                ``"wind_capacity"`` or ``"solar_capacity"``.
+            weighting: MW output scheme. ``"wind_capacity"`` /
+                ``"solar_capacity"`` apply generation power curves;
+                ``"population"`` applies a demand model and returns predicted
+                load. Use :meth:`MarketAggregates.get_mw_zones` to see which
+                zones support each output.
 
             model_runs: List of ModelRuns instances specifying which model
                 forecasts to query.
@@ -271,6 +276,13 @@ class EnergyMarket:
             >>> ds = germany.compare_runs_mw(
             ...     weighting="wind_capacity",
             ...     model_runs=[ModelRuns(Models.EPT2, [0, 1])],
+            ...     max_lead_time=48,
+            ... )
+            >>>
+            >>> # Predicted electricity demand (load_mw)
+            >>> ds_load = germany.compare_runs_mw(
+            ...     weighting="population",
+            ...     model_runs=[ModelRuns(Models.EPT2, 0)],
             ...     max_lead_time=48,
             ... )
             >>>
