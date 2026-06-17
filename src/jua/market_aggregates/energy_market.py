@@ -439,7 +439,16 @@ class EnergyMarket:
         init_time_per_run = df.groupby("model_run")["init_time"].first()
         df_for_ds = df.drop(columns=["model", "init_time"])
 
-        ds = xr.Dataset.from_dataframe(df_for_ds.set_index(["model_run", "time"]))
+        # MW responses are per-zone (a ``market_zone`` column with one row per
+        # zone and timestamp), so it must be part of the index to stay unique
+        # when several zones are requested. Weather responses are a single
+        # combined series with no ``market_zone`` column, so the index falls
+        # back to (model_run, time).
+        index_cols = ["model_run", "time"]
+        if "market_zone" in df_for_ds.columns:
+            index_cols = ["model_run", "market_zone", "time"]
+
+        ds = xr.Dataset.from_dataframe(df_for_ds.set_index(index_cols))
         ds = ds.assign_attrs(**attrs)
         ds.coords["model"] = ("model_run", model_per_run.values)
         ds.coords["init_time"] = ("model_run", init_time_per_run.values)
