@@ -1,3 +1,15 @@
+## v0.32.0 (2026-06-17)
+
+### Feat
+
+- **power_forecast**: validate PSR types with actionable demand hint
+- **market_aggregates**: add demand (load) MW output
+- **market_data**: add GB transmission/embedded wind split
+
+### Fix
+
+- **market_aggregates**: support multi-zone MW output
+
 ## v0.31.0 (2026-06-05)
 
 ### Feat
