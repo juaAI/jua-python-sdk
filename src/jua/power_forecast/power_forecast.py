@@ -73,6 +73,10 @@ class PowerForecast:
     def __init__(self, client: JuaClient) -> None:
         self._client = client
         self._api = QueryEngineAPI(jua_client=self._client)
+        # Per-zone PSR-type cache, used to validate requests and produce
+        # actionable errors without repeating the (cheap, unauthenticated)
+        # psr-types lookup on every call.
+        self._psr_types_cache: dict[str, list[str]] = {}
 
     def get_zones(self) -> list[str]:
         """Get the list of available power forecast zones.
@@ -125,6 +129,48 @@ class PowerForecast:
             return data["psr_types"]
         except Exception as e:
             raise RuntimeError(f"Failed to fetch power forecast PSR types: {e}") from e
+
+    def _available_psr_types(self, zone_key: str) -> list[str]:
+        """Return (and cache) the PSR types served for a zone."""
+        if zone_key not in self._psr_types_cache:
+            self._psr_types_cache[zone_key] = self.get_psr_types(zone_key=zone_key)
+        return self._psr_types_cache[zone_key]
+
+    def _validate_psr_types(self, zone_keys: list[str], psr_types: list[str]) -> None:
+        """Validate requested PSR types per zone, with actionable hints.
+
+        ``power_forecast`` serves Jua-model generation by PSR type (and load
+        for the zones that have a fitted demand model). When a requested type
+        isn't served for a zone, raise a clear error that lists what *is*
+        available and, for demand (``"Load"``), points to the complementary
+        Jua product: ``market_aggregates`` exposes predicted demand as
+        ``load_mw`` (population weighting) for many more zones.
+
+        Raises:
+            ValueError: If any requested PSR type is not available for a zone.
+        """
+        for zone in zone_keys:
+            try:
+                available = self._available_psr_types(zone)
+            except RuntimeError:
+                # Don't block on a metadata lookup failure; let the data call
+                # surface the underlying error instead.
+                continue
+            missing = [p for p in psr_types if p not in available]
+            if not missing:
+                continue
+            message = (
+                f"PSR type(s) {missing} not available from power_forecast for "
+                f"zone '{zone}'. Available: {available}."
+            )
+            if "Load" in missing:
+                message += (
+                    " For predicted demand, market_aggregates exposes load_mw "
+                    "via the population weighting: "
+                    f"client.market_aggregates.get_market('{zone}')"
+                    ".compare_runs_mw(weighting='population')."
+                )
+            raise ValueError(message)
 
     def get_init_times(
         self,
@@ -301,6 +347,9 @@ class PowerForecast:
                 "Must specify either horizon mode (init_time) "
                 "or time range mode (start_time/end_time)."
             )
+
+        if psr_types is not None and zone_keys:
+            self._validate_psr_types(zone_keys, psr_types)
 
         resolved_init_time = init_time
         if init_time is not None:

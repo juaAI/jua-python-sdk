@@ -42,16 +42,33 @@ def main():
     print(de.head())
     print()
 
-    # --- Great Britain: renewables (served from the UK power feed) ---
-    print("GB solar/wind:")
+    # --- Germany: actual demand vs day-ahead load forecast ---
+    # load_forecast is served for ENTSO-E zones (DE/FR/NL/BE) but not GB.
+    print("DE load vs day-ahead load forecast:")
+    de_load = md.get_data(
+        market_zone="DE",
+        variables=["load", "load_forecast"],
+        start_time=start,
+        end_time=end,
+        time_zone="Europe/Berlin",
+    )
+    print(de_load.groupby("variable")["value"].mean().round(1))
+    print()
+
+    # --- Great Britain: renewables + the GB-only wind split ---
+    # GB additionally exposes wind broken into transmission-connected and
+    # distribution-embedded generation (actuals and day-ahead forecasts); the
+    # SDK fetches the total and its components in one call even though the
+    # backend cannot return them together.
+    print("GB solar/wind + transmission/embedded split:")
     gb = md.get_data(
         market_zone="GB",
-        variables=["solar", "wind"],
+        variables=["solar", "wind", "wind_transmission", "wind_embedded"],
         start_time=start,
         end_time=end,
         time_zone="Europe/London",
     )
-    print(gb.head())
+    print(gb.groupby("variable")["value"].mean().round(1))
     print()
 
     # --- Combined request across zones in one call ---

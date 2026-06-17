@@ -71,14 +71,18 @@ class MarketAggregates:
         return EnergyMarket(client=self._client, market_zone=market_zone)
 
     def get_mw_zones(self) -> dict[str, list[str]]:
-        """Get market zones capable of MW output.
+        """Get market zones capable of MW output, by output type.
 
-        Returns zones that have both installed capacity data and fitted
-        power curves, broken down by energy type (wind and solar).
+        Returns the zones that can produce predicted MW for each output, i.e.
+        the zones that have the data and fitted models required. Generation
+        outputs (``"wind"`` / ``"solar"``) need installed capacity and power
+        curves; demand (``"load"``) needs a fitted demand model.
 
         Returns:
-            Dictionary with ``"wind"`` and ``"solar"`` keys, each mapping
-            to a list of zone codes.
+            Dictionary mapping each output type to a list of zone codes. Always
+            includes ``"wind"``, ``"solar"`` and ``"load"``; the API may also
+            return finer-grained wind keys (e.g. ``"wind_combined"``,
+            ``"wind_onshore_only"``), which are passed through when present.
 
         Raises:
             RuntimeError: If the API request fails.
@@ -87,6 +91,7 @@ class MarketAggregates:
             >>> mw_zones = client.market_aggregates.get_mw_zones()
             >>> print(mw_zones["wind"])   # ["AT", "BE", "DE", "FR", ...]
             >>> print(mw_zones["solar"])  # ["AT", "BE", "DE", "FR", ...]
+            >>> print(mw_zones["load"])   # ["AL", "AT", "BE", "DE", "FR", ...]
         """
         try:
             response = self._query_engine_api.get(
@@ -94,6 +99,12 @@ class MarketAggregates:
                 requires_auth=False,
             )
             data = response.json()
-            return {"wind": data["wind"], "solar": data["solar"]}
         except Exception as e:
             raise RuntimeError(f"Failed to fetch MW-capable market zones: {e}") from e
+
+        # Pass through every output type the API reports, guaranteeing the
+        # documented keys exist even if a future response omits one.
+        result = {key: list(values) for key, values in data.items()}
+        for key in ("wind", "solar", "load"):
+            result.setdefault(key, [])
+        return result

@@ -38,14 +38,21 @@ class MarketData:
     - ``imbalance_price_long`` / ``imbalance_price_short`` - imbalance
       settlement price per direction (equal in single-price markets like
       DE/BE; different in dual-pricing markets like FR/NL)
+    - ``wind_embedded`` / ``wind_transmission`` - GB-only split of wind into
+      distribution-embedded and transmission-connected generation (MW)
+    - ``wind_embedded_forecast`` / ``wind_transmission_forecast`` - GB-only
+      day-ahead forecast of the embedded / transmission wind split (MW)
 
-    ``wind`` is the total of all wind sub-types (onshore + offshore). The
-    underlying data sources differ by zone and variable, but that is an
-    implementation detail - the same call works everywhere. Not every variable
-    is served in every zone; use :meth:`get_variables` to see what a zone
-    supports. Requesting an unsupported ``(zone, variable)`` raises a clear
-    error (e.g. GB currently serves renewables and load only, not prices or
-    load forecast).
+    ``wind`` is the total of all wind sub-types. For ENTSO-E zones that means
+    onshore + offshore; for GB it means transmission + embedded, and GB
+    additionally exposes those two components (and their day-ahead forecasts)
+    as ``wind_transmission`` / ``wind_embedded``. The underlying data sources
+    differ by zone and variable, but that is an implementation detail - the
+    same call works everywhere. Not every variable is served in every zone;
+    use :meth:`get_variables` to see what a zone supports. Requesting an
+    unsupported ``(zone, variable)`` raises a clear error (e.g. GB serves
+    renewables, the wind split, and load, but not prices or load forecast;
+    the wind split is GB-only and is not available for ENTSO-E zones).
 
     Examples:
         >>> from datetime import datetime, timezone
@@ -57,7 +64,9 @@ class MarketData:
         >>> md.get_zones()
         ['BE', 'DE', 'FR', 'GB', 'NL']
         >>> md.get_variables(market_zone="GB")
-        ['load', 'solar', 'solar_forecast', 'wind', 'wind_forecast']
+        ['load', 'solar', 'solar_forecast', 'wind', 'wind_embedded',
+         'wind_embedded_forecast', 'wind_forecast', 'wind_transmission',
+         'wind_transmission_forecast']
         >>>
         >>> df = md.get_data(
         ...     market_zone="DE",

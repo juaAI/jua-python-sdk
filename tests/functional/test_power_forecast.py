@@ -213,3 +213,31 @@ class TestGetData:
                 max_prediction_timedelta=120,
                 start_time=datetime.now(timezone.utc),
             )
+
+    def test_get_data_unavailable_load_hints_market_aggregates(self, pf):
+        """Requesting Load for a zone without a demand model raises a clear
+        error that points to market_aggregates' population-weighted load_mw.
+
+        Only DE exposes a Load PSR type today; other zones (e.g. FR) should
+        get an actionable hint instead of a cryptic init-time error.
+        """
+        if "Load" in pf.get_psr_types(zone_key="FR"):
+            pytest.skip("FR unexpectedly exposes a Load PSR type")
+
+        with pytest.raises(ValueError, match="market_aggregates"):
+            pf.get_data(
+                zone_keys=["FR"],
+                psr_types=["Load"],
+                init_time="latest",
+                max_prediction_timedelta=120,
+            )
+
+    def test_get_data_unavailable_psr_type_lists_available(self, pf):
+        """An unavailable PSR type error lists what the zone does serve."""
+        with pytest.raises(ValueError, match="not available from power_forecast"):
+            pf.get_data(
+                zone_keys=["FR"],
+                psr_types=["Not A Real Type"],
+                init_time="latest",
+                max_prediction_timedelta=120,
+            )

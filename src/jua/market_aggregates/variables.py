@@ -4,7 +4,10 @@ from typing import Literal
 
 from jua.weather.variables import Variables
 
-MWWeighting = Literal["wind_capacity", "solar_capacity"]
+# MW-output weighting schemes. "population" applies a demand model and returns
+# predicted load (``load_mw``); the capacity schemes apply generation power
+# curves (wind -> wind_onshore_mw/wind_offshore_mw, solar -> solar_mw).
+MWWeighting = Literal["wind_capacity", "solar_capacity", "population"]
 
 
 class Weighting(StrEnum):
