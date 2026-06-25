@@ -38,6 +38,7 @@ class Models(str, Enum):
     NOAA_GFS_SINGLE = "noaa_gfs_single"
 
     # Without Grid Access
+    ECMWF_AIFS_ENSEMBLE = "ecmwf_aifs025_ensemble"
     ECMWF_IFS_ENSEMBLE = "ecmwf_ens"
     GFS_GLOBAL_ENSEMBLE = "gfs_global_ensemble"
     GFS_GLOBAL_SINGLE = "gfs_global_single"

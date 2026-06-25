@@ -1,9 +1,10 @@
 """Regression tests for the hosted AIFS ENS model metadata.
 
-AIFS ENS replaced the retired open-meteo ``ecmwf_aifs025_ensemble``. Unlike the
-old point-only open-meteo model, the hosted ClickHouse model exposes full grid
-access plus ensemble statistics, so it must not regress back into the
-"point queries only" behaviour gated by ``has_grid_access``.
+The hosted ClickHouse ``aifs_ens`` model is added alongside the existing
+open-meteo ``ecmwf_aifs025_ensemble`` (additive / expand phase). Unlike the
+point-only open-meteo model, the hosted model exposes full grid access plus
+ensemble statistics, so it must not regress into the "point queries only"
+behaviour gated by ``has_grid_access``.
 """
 
 from jua.weather._model_meta import get_model_meta_info
@@ -20,8 +21,3 @@ def test_aifs_ens_is_fully_accessible() -> None:
     assert (meta.num_lats, meta.num_lons) == (720, 1440)
     # 0-360h forecast horizon.
     assert meta.full_forecasted_hours == 360
-
-
-def test_retired_open_meteo_aifs_ensemble_is_removed() -> None:
-    assert not hasattr(Models, "ECMWF_AIFS_ENSEMBLE")
-    assert "ecmwf_aifs025_ensemble" not in {m.value for m in Models}
