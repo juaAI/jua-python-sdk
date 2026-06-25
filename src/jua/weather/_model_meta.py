@@ -234,11 +234,13 @@ _MODEL_META_INFO[Models.ICON_GLOBAL] = ModelMetaInfo(
         special=((1, 0, 78),),
     ),
 )
-_MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
-    forecast_name_mapping="ecmwf_aifs025_ensemble",
+_MODEL_META_INFO[Models.AIFS_ENS] = ModelMetaInfo(
+    has_grid_access=True,
     full_forecasted_hours=360,
-    has_forecast_file_access=False,
     has_statistics=True,
+    # 0.25 degree grid (1440x720 after south-pole drop) — matches the default
+    # num_lats=720 / num_lons=1440, so no override needed.
+    temporal_resolution=TemporalResolution(base=6),
 )
 _MODEL_META_INFO[Models.ECMWF_IFS_ENSEMBLE] = ModelMetaInfo(
     full_forecasted_hours=360,
