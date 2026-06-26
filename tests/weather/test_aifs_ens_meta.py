@@ -1,10 +1,9 @@
 """Regression tests for the hosted AIFS ENS model metadata.
 
-The hosted ClickHouse ``aifs_ens`` model is added alongside the existing
-open-meteo ``ecmwf_aifs025_ensemble`` (additive / expand phase). Unlike the
-point-only open-meteo model, the hosted model exposes full grid access plus
-ensemble statistics, so it must not regress into the "point queries only"
-behaviour gated by ``has_grid_access``.
+The hosted ClickHouse ``aifs_ens`` model replaced the retired open-meteo
+``ecmwf_aifs025_ensemble``. Unlike that point-only open-meteo model, the hosted
+model exposes full grid access plus ensemble statistics, so it must not regress
+into the "point queries only" behaviour gated by ``has_grid_access``.
 """
 
 from jua.weather._model_meta import get_model_meta_info
