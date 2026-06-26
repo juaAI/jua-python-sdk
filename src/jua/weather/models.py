@@ -30,6 +30,7 @@ class Models(str, Enum):
     EPT2_HELIOS = "ept2_1_helios"
     EPT2_EUROPA = "ept2_1_europa"
     AIFS = "aifs"
+    AIFS_ENS = "aifs_ens"
     AURORA = "aurora"
     ECMWF_IFS_SINGLE = "ecmwf_ifs_single"
     ICON_EU = "icon_eu"

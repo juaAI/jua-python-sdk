@@ -36,6 +36,10 @@ DEFAULT_FORECAST_DATE = datetime(2025, 10, 20, 0, 0, 0)
 MODEL_SPECIFIC_FORECAST_DATES = {
     Models.EPT2_REASONING: datetime(2025, 11, 23, 0, 0, 0),
     Models.ICON_EU: datetime(2026, 2, 9, 0, 0, 0),
+    # AIFS ENS (ECMWF Open Data) backfill starts mid-2025 and is sparse at the
+    # edges; the default 2025-10-20 isn't present. Use a verified mid-history
+    # init time.
+    Models.AIFS_ENS: datetime(2026, 3, 3, 0, 0, 0),
 }
 
 SOLAR_ONLY_MODELS = {Models.EPT2_HELIOS}
