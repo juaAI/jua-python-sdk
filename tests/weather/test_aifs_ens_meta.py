@@ -20,3 +20,10 @@ def test_aifs_ens_is_fully_accessible() -> None:
     assert (meta.num_lats, meta.num_lons) == (720, 1440)
     # 0-360h forecast horizon.
     assert meta.full_forecasted_hours == 360
+
+
+def test_retired_open_meteo_aifs_ensemble_is_removed() -> None:
+    # The open-meteo ecmwf_aifs025_ensemble was retired; only the hosted
+    # aifs_ens remains. Guard against the enum member being reintroduced.
+    assert not hasattr(Models, "ECMWF_AIFS_ENSEMBLE")
+    assert "ecmwf_aifs025_ensemble" not in {m.value for m in Models}
