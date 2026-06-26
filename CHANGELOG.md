@@ -1,3 +1,13 @@
+## v0.33.0 (2026-06-26)
+
+### Feat
+
+- **models**: replace ecmwf_aifs025_ensemble with hosted aifs_ens
+
+### Refactor
+
+- **models**: keep ecmwf_aifs025_ensemble; add aifs_ens additively
+
 ## v0.32.0 (2026-06-17)
 
 ### Feat
