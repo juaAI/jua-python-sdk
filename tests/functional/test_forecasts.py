@@ -180,7 +180,7 @@ def test_latest_forecast(client: JuaClient, model: Models):
         )
 
 
-@pytest.mark.parametrize("model", [Models.EPT2_E])
+@pytest.mark.parametrize("model", [Models.EPT2_E, Models.EPT2_HRRR, Models.EPT2_EUROPA])
 def test_latest_forecast_with_stats(client: JuaClient, model: Models):
     """Test retrieving the latest forecast with statistics.
 
