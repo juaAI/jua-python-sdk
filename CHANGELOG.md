@@ -1,3 +1,9 @@
+## v0.34.0 (2026-07-10)
+
+### Feat
+
+- **models**: enable ensemble statistics for EPT2_HRRR and EPT2_EUROPA
+
 ## v0.33.0 (2026-06-26)
 
 ### Feat
