@@ -8,6 +8,21 @@ from jua import JuaClient
 from jua.power_forecast.power_forecast import InitTimeInfo, PowerForecast
 
 
+def _stub_init_times(init_infos: list[InitTimeInfo]):
+    """Return a get_init_times stub that accepts optional version kwargs."""
+
+    def _stub(
+        zone_key=None,
+        psr_type=None,
+        limit=96,
+        version=None,
+        **kwargs,
+    ):
+        return init_infos
+
+    return _stub
+
+
 def _make_ds(zone: str, psr: str, init_times: list[datetime]) -> xr.Dataset:
     """Create a simple dataset with 40 hours of horizon per init."""
     rows = []
@@ -42,9 +57,7 @@ def test_get_day_ahead_timeseries_stitches_across_days(monkeypatch):
     ]
 
     # Patch network methods
-    monkeypatch.setattr(
-        pf, "get_init_times", lambda zone_key=None, psr_type=None, limit=96: init_infos
-    )
+    monkeypatch.setattr(pf, "get_init_times", _stub_init_times(init_infos))
     monkeypatch.setattr(pf, "get_data", lambda **kwargs: _make_ds(zone, psr, [t1, t2]))
 
     stitched = pf.get_day_ahead_timeseries(
@@ -103,11 +116,7 @@ def test_get_day_ahead_timeseries_dedupes_overlapping_runs(monkeypatch):
         InitTimeInfo(init_time=t_early, max_prediction_timedelta=40 * 60),
     ]
 
-    monkeypatch.setattr(
-        pf,
-        "get_init_times",
-        lambda zone_key=None, psr_type=None, limit=96: init_infos,
-    )
+    monkeypatch.setattr(pf, "get_init_times", _stub_init_times(init_infos))
     monkeypatch.setattr(
         pf,
         "get_data",
@@ -274,11 +283,7 @@ def test_day_ahead_stitch_value_comes_from_correct_init_and_lead(monkeypatch):
         InitTimeInfo(init_time=t1, max_prediction_timedelta=40 * 60),
         InitTimeInfo(init_time=t2, max_prediction_timedelta=40 * 60),
     ]
-    monkeypatch.setattr(
-        pf,
-        "get_init_times",
-        lambda zone_key=None, psr_type=None, limit=96: init_infos,
-    )
+    monkeypatch.setattr(pf, "get_init_times", _stub_init_times(init_infos))
     monkeypatch.setattr(pf, "get_data", lambda **kwargs: _make_ds(zone, psr, [t1, t2]))
 
     stitched = pf.get_day_ahead_timeseries(

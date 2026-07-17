@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -20,7 +20,13 @@ if TYPE_CHECKING:
 
 InitTimeSpec = str | int | datetime | list[str | int | datetime]
 
+# Serving alias or concrete run id from GET /power-forecast/versions.
+VersionSpec = str
+# Per-(zone, psr) override: {"zone_key": "DE", "psr_type": "Solar", "version": "..."}.
+VersionPinSpec = Mapping[str, str]
+
 _LATEST_RE = re.compile(r"^latest(-(\d+))?$")
+_INTERNAL_CHANNEL_NAMES = frozenset({"live", "preview"})
 
 
 @dataclass(frozen=True)
@@ -34,6 +40,29 @@ class InitTimeInfo:
 
     init_time: datetime
     max_prediction_timedelta: int
+
+
+@dataclass(frozen=True)
+class VersionInfo:
+    """One model version available for a (zone_key, psr_type) cell.
+
+    Attributes:
+        model_version: Concrete run id that can be passed as ``version``.
+        zone_key: Market zone code (e.g. ``"DE"``).
+        psr_type: Production source type (e.g. ``"Solar"``).
+        is_stable: True when this run id is the packaged ``stable`` pointer.
+        is_latest: True when this run id is the packaged ``latest`` pointer.
+        earliest_init_time: Earliest init time with predictions for this version.
+        latest_init_time: Latest init time with predictions for this version.
+    """
+
+    model_version: str
+    zone_key: str
+    psr_type: str
+    is_stable: bool
+    is_latest: bool
+    earliest_init_time: datetime
+    latest_init_time: datetime
 
 
 class PowerForecast:
@@ -54,12 +83,20 @@ class PowerForecast:
         >>> zones = pf.get_zones()
         >>> psr_types = pf.get_psr_types(zone_key="DE")
         >>>
-        >>> # Horizon mode: latest forecast for German solar
+        >>> # Horizon mode: latest forecast for German solar (stable serving)
         >>> ds = pf.get_data(
         ...     zone_keys=["DE"],
         ...     psr_types=["Solar"],
         ...     init_time="latest",
         ...     max_prediction_timedelta=2880,
+        ... )
+        >>>
+        >>> # Same query against the packaged latest (preview) pointers
+        >>> ds = pf.get_data(
+        ...     zone_keys=["DE"],
+        ...     psr_types=["Solar"],
+        ...     init_time="latest",
+        ...     version="latest",
         ... )
         >>>
         >>> # Time range mode
@@ -180,6 +217,7 @@ class PowerForecast:
         *,
         start_time: datetime | None = None,
         end_time: datetime | None = None,
+        version: VersionSpec | None = None,
     ) -> list[InitTimeInfo]:
         """Get available forecast init times.
 
@@ -205,11 +243,16 @@ class PowerForecast:
                 time-window mode.
             end_time: Exclusive upper bound on ``init_time``. Enables
                 time-window mode.
+            version: Serving selection: ``"stable"`` (default when omitted),
+                ``"latest"``, or a concrete run id from :meth:`get_versions`.
+                Filters init times to that model version.
 
         Returns:
             List of :class:`InitTimeInfo` objects sorted newest-first.
 
         Raises:
+            ValueError: If ``version`` is an internal channel name
+                (``live`` / ``preview``).
             RuntimeError: If the API request fails.
 
         Examples:
@@ -226,6 +269,7 @@ class PowerForecast:
             ...     end_time=datetime(2025, 2, 1, tzinfo=timezone.utc),
             ... )
         """
+        self._validate_version(version)
         params: dict = {}
         # Time-window mode: filter by init_time range and let the server return
         # the full window. We omit ``limit`` because the endpoint caps it at
@@ -244,6 +288,8 @@ class PowerForecast:
             if isinstance(psr_type, str):
                 psr_type = [psr_type]
             params["psr_type"] = psr_type
+        if version is not None:
+            params["version"] = version
 
         try:
             response = self._api.get(
@@ -264,6 +310,75 @@ class PowerForecast:
         except Exception as e:
             raise RuntimeError(f"Failed to fetch power forecast init times: {e}") from e
 
+    def get_versions(
+        self,
+        zone_key: str | list[str] | None = None,
+        psr_type: str | list[str] | None = None,
+    ) -> list[VersionInfo]:
+        """List pin-able model versions for power forecasts.
+
+        Returns the catalog of concrete run ids per (zone, PSR) cell, with
+        ``is_stable`` / ``is_latest`` flags matching the packaged serving
+        pointers (``serving.yaml`` on the query-engine). Use a run id from
+        this catalog as ``version`` (or in ``version_pins``) to freeze a
+        checkpoint; aliases ``stable`` / ``latest`` follow live pointer updates.
+
+        Args:
+            zone_key: Optional zone code(s) to filter by.
+            psr_type: Optional PSR type(s) to filter by.
+
+        Returns:
+            List of :class:`VersionInfo` rows.
+
+        Raises:
+            RuntimeError: If the API request fails.
+
+        Examples:
+            >>> versions = client.power_forecast.get_versions(
+            ...     zone_key="DE", psr_type="Solar"
+            ... )
+            >>> stable = next(v for v in versions if v.is_stable)
+            >>> ds = client.power_forecast.get_data(
+            ...     zone_keys=["DE"],
+            ...     psr_types=["Solar"],
+            ...     init_time="latest",
+            ...     version=stable.model_version,
+            ... )
+        """
+        params: dict = {}
+        if zone_key is not None:
+            params["zone_key"] = zone_key
+        if psr_type is not None:
+            if isinstance(psr_type, str):
+                psr_type = [psr_type]
+            params["psr_type"] = psr_type
+
+        try:
+            response = self._api.get(
+                "power-forecast/versions",
+                params=params or None,
+                requires_auth=True,
+            )
+            data = response.json()
+            return [
+                VersionInfo(
+                    model_version=item["model_version"],
+                    zone_key=item["zone_key"],
+                    psr_type=item["psr_type"],
+                    is_stable=bool(item.get("is_stable", False)),
+                    is_latest=bool(item.get("is_latest", False)),
+                    earliest_init_time=datetime.fromisoformat(
+                        item["earliest_init_time"].replace("Z", "+00:00")
+                    ),
+                    latest_init_time=datetime.fromisoformat(
+                        item["latest_init_time"].replace("Z", "+00:00")
+                    ),
+                )
+                for item in data["versions"]
+            ]
+        except Exception as e:
+            raise RuntimeError(f"Failed to fetch power forecast versions: {e}") from e
+
     def get_data(
         self,
         zone_keys: list[str] | None = None,
@@ -274,6 +389,8 @@ class PowerForecast:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         time_zone: str | None = None,
+        version: VersionSpec | None = None,
+        version_pins: Sequence[VersionPinSpec] | None = None,
     ) -> xr.Dataset:
         """Query power forecast data in MW.
 
@@ -285,10 +402,10 @@ class PowerForecast:
             limit the forecast horizon with ``max_prediction_timedelta``.
 
             Relative tokens and integer offsets are resolved by querying
-            available init times filtered by ``zone_keys`` and
-            ``psr_types``, so ``"latest"`` always refers to the most
-            recent run where *all* requested zone/PSR-type combinations
-            have data.
+            available init times filtered by ``zone_keys``,
+            ``psr_types``, and ``version``, so ``"latest"`` always refers
+            to the most recent run where *all* requested zone/PSR-type
+            combinations have data for that serving selection.
 
         **Time range mode** (time-centric):
             Specify ``start_time`` and/or ``end_time`` to filter by the
@@ -308,6 +425,13 @@ class PowerForecast:
             end_time: End of time range, exclusive (time range mode).
             time_zone: IANA time zone name for time formatting
                 (e.g. ``"Europe/Berlin"``).
+            version: Default model version for all (zone, psr) cells:
+                ``"stable"`` (API default when omitted), ``"latest"``, or a
+                concrete run id from :meth:`get_versions`. Overridden per
+                cell by ``version_pins``.
+            version_pins: Optional per-(zone_key, psr_type) overrides. Each
+                mapping must include ``zone_key``, ``psr_type``, and
+                ``version`` (alias or run id).
 
         Returns:
             ``xarray.Dataset`` with dimensions ``(zone_key, psr_type, time)``
@@ -315,15 +439,24 @@ class PowerForecast:
 
         Raises:
             ValueError: If both horizon and time-range parameters are given,
-                or if neither mode is specified.
+                if neither mode is specified, or if ``version`` /
+                ``version_pins`` use internal channel names.
             RuntimeError: If the API request fails.
 
         Examples:
-            >>> # Latest solar forecast for Germany
+            >>> # Latest solar forecast for Germany (stable serving)
             >>> ds = client.power_forecast.get_data(
             ...     zone_keys=["DE"],
             ...     psr_types=["Solar"],
             ...     init_time="latest",
+            ... )
+            >>>
+            >>> # Preview / latest serving pointers
+            >>> ds = client.power_forecast.get_data(
+            ...     zone_keys=["DE"],
+            ...     psr_types=["Solar"],
+            ...     init_time="latest",
+            ...     version="latest",
             ... )
             >>>
             >>> # Time range query
@@ -348,13 +481,19 @@ class PowerForecast:
                 "or time range mode (start_time/end_time)."
             )
 
+        self._validate_version(version)
+        normalized_pins = self._normalize_version_pins(version_pins)
+
         if psr_types is not None and zone_keys:
             self._validate_psr_types(zone_keys, psr_types)
 
         resolved_init_time = init_time
         if init_time is not None:
             resolved_init_time = self._resolve_init_time(
-                init_time, zone_keys, psr_types
+                init_time,
+                zone_keys,
+                psr_types,
+                version=version,
             )
 
         body = self._build_query_body(
@@ -365,6 +504,8 @@ class PowerForecast:
             start_time=start_time,
             end_time=end_time,
             time_zone=time_zone,
+            version=version,
+            version_pins=normalized_pins,
         )
 
         try:
@@ -391,6 +532,8 @@ class PowerForecast:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         max_init_times: int = 365,
+        version: VersionSpec | None = None,
+        version_pins: Sequence[VersionPinSpec] | None = None,
     ) -> xr.Dataset:
         """Return a continuous day-ahead time series stitched across runs.
 
@@ -434,6 +577,10 @@ class PowerForecast:
             max_init_times: Upper bound on how many matching init times are
                 requested from the server in latest mode (controls history
                 depth).
+            version: Serving selection forwarded to :meth:`get_data` /
+                :meth:`get_init_times` (``stable`` / ``latest`` / run id).
+            version_pins: Optional per-(zone, psr) overrides forwarded to
+                :meth:`get_data`.
 
         Returns:
             ``xarray.Dataset`` with dims ``(zone_key, psr_type, time)`` and
@@ -461,6 +608,8 @@ class PowerForecast:
                 start_date=start_date,
                 end_date=end_date,
                 end_lead_minutes=end_lead_minutes,
+                version=version,
+                version_pins=version_pins,
             )
         else:
             df = self._fetch_day_ahead_latest(
@@ -471,6 +620,8 @@ class PowerForecast:
                 time_zone=time_zone,
                 end_lead_minutes=end_lead_minutes,
                 max_init_times=max_init_times,
+                version=version,
+                version_pins=version_pins,
             )
 
         return self._stitch_day_ahead(
@@ -492,10 +643,15 @@ class PowerForecast:
         time_zone: str,
         end_lead_minutes: int,
         max_init_times: int,
+        version: VersionSpec | None = None,
+        version_pins: Sequence[VersionPinSpec] | None = None,
     ) -> pd.DataFrame:
         """Fetch day-ahead data for the most recent matching runs."""
         init_infos = self.get_init_times(
-            zone_key=zone_keys, psr_type=psr_types, limit=max_init_times
+            zone_key=zone_keys,
+            psr_type=psr_types,
+            limit=max_init_times,
+            version=version,
         )
         matching_inits: list[str | int | datetime] = []
         for info in init_infos:
@@ -517,6 +673,8 @@ class PowerForecast:
             init_time=matching_inits,
             max_prediction_timedelta=end_lead_minutes,
             time_zone=time_zone,
+            version=version,
+            version_pins=version_pins,
         )
         if "value" not in ds:
             return pd.DataFrame()
@@ -533,6 +691,8 @@ class PowerForecast:
         start_date: datetime | None,
         end_date: datetime | None,
         end_lead_minutes: int,
+        version: VersionSpec | None = None,
+        version_pins: Sequence[VersionPinSpec] | None = None,
     ) -> pd.DataFrame:
         """Fetch day-ahead data by constructing daily init runs over a range.
 
@@ -556,6 +716,8 @@ class PowerForecast:
             init_time=init_times,
             max_prediction_timedelta=end_lead_minutes,
             time_zone=time_zone,
+            version=version,
+            version_pins=version_pins,
         )
         if "value" not in ds:
             return pd.DataFrame()
@@ -693,12 +855,14 @@ class PowerForecast:
         spec: InitTimeSpec,
         zone_keys: list[str] | None,
         psr_types: list[str] | None,
+        *,
+        version: VersionSpec | None = None,
     ) -> InitTimeSpec:
         """Resolve relative init_time tokens against available init times.
 
-        Queries ``GET /init-times`` filtered by the requested zones and
-        PSR types so that ``"latest"`` maps to the newest run where all
-        selected combinations have completed data.
+        Queries ``GET /init-times`` filtered by the requested zones,
+        PSR types, and serving ``version`` so that ``"latest"`` maps to the
+        newest run where all selected combinations have completed data.
         """
         items = spec if isinstance(spec, list) else [spec]
 
@@ -713,7 +877,7 @@ class PowerForecast:
                 max_offset = offset
 
         available = self._fetch_available_init_times(
-            zone_keys, psr_types, limit=max_offset + 1
+            zone_keys, psr_types, limit=max_offset + 1, version=version
         )
 
         resolved = [self._resolve_single(v, available) for v in items]
@@ -727,6 +891,8 @@ class PowerForecast:
         zone_keys: list[str] | None,
         psr_types: list[str] | None,
         limit: int,
+        *,
+        version: VersionSpec | None = None,
     ) -> list[datetime]:
         """Get available init times filtered by zone and PSR types.
 
@@ -737,6 +903,7 @@ class PowerForecast:
             zone_key=zone_keys,
             psr_type=psr_types,
             limit=limit,
+            version=version,
         )
         return [info.init_time for info in infos]
 
@@ -796,6 +963,45 @@ class PowerForecast:
         return value
 
     @staticmethod
+    def _validate_version(version: VersionSpec | None) -> None:
+        if version in _INTERNAL_CHANNEL_NAMES:
+            raise ValueError("use 'stable' or 'latest', not internal channel names")
+
+    @staticmethod
+    def _normalize_version_pins(
+        version_pins: Sequence[VersionPinSpec] | None,
+    ) -> list[dict[str, str]] | None:
+        if version_pins is None:
+            return None
+
+        normalized: list[dict[str, str]] = []
+        for pin in version_pins:
+            try:
+                zone_key = pin["zone_key"]
+                psr_type = pin["psr_type"]
+                version = pin["version"]
+            except KeyError as exc:
+                raise ValueError(
+                    "Each version_pins entry must include "
+                    "'zone_key', 'psr_type', and 'version'"
+                ) from exc
+            if not isinstance(zone_key, str) or not zone_key:
+                raise ValueError("version_pins.zone_key must be a non-empty string")
+            if not isinstance(psr_type, str) or not psr_type:
+                raise ValueError("version_pins.psr_type must be a non-empty string")
+            if not isinstance(version, str) or not version:
+                raise ValueError("version_pins.version must be a non-empty string")
+            PowerForecast._validate_version(version)
+            normalized.append(
+                {
+                    "zone_key": zone_key,
+                    "psr_type": psr_type,
+                    "version": version,
+                }
+            )
+        return normalized
+
+    @staticmethod
     def _build_query_body(
         zone_keys: list[str] | None,
         psr_types: list[str] | None,
@@ -804,6 +1010,8 @@ class PowerForecast:
         start_time: datetime | None,
         end_time: datetime | None,
         time_zone: str | None,
+        version: VersionSpec | None = None,
+        version_pins: list[dict[str, str]] | None = None,
     ) -> dict:
         body: dict = {}
         if zone_keys is not None:
@@ -822,6 +1030,10 @@ class PowerForecast:
             body["end_time"] = end_time.isoformat()
         if time_zone is not None:
             body["time_zone"] = time_zone
+        if version is not None:
+            body["version"] = version
+        if version_pins is not None:
+            body["version_pins"] = version_pins
 
         return remove_none_from_dict(body)
 

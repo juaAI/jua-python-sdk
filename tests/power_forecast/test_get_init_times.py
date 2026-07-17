@@ -45,6 +45,7 @@ def test_count_mode_sends_limit(monkeypatch):
     assert "end_time" not in captured["params"]
     assert captured["params"]["zone_key"] == "DE"
     assert captured["params"]["psr_type"] == ["Solar"]
+    assert "version" not in captured["params"]
     assert all(isinstance(it, InitTimeInfo) for it in result)
 
 
