@@ -38,9 +38,66 @@ def main():
             print(f"  {it.init_time}  (max horizon: {it.max_prediction_timedelta} min)")
         print()
 
+    # --- Serving versions (stable / latest / pin a run id) ---
+    #
+    # Omitting ``version`` (or passing ``version="stable"``) follows the
+    # production fleet. ``version="latest"`` follows the preview pointers.
+    # To freeze today's stable checkpoint so a later promote does not change
+    # your query, take ``model_version`` where ``is_stable`` is true.
+
+    print("Serving catalog for DE Solar:")
+    versions = pf.get_versions(zone_key="DE", psr_type="Solar")
+    for v in versions:
+        flags = []
+        if v.is_stable:
+            flags.append("stable")
+        if v.is_latest:
+            flags.append("latest")
+        label = f" [{', '.join(flags)}]" if flags else ""
+        print(f"  {v.model_version}{label}")
+    print()
+
+    stable = next((v for v in versions if v.is_stable), None)
+    if stable is not None:
+        print(f"Pinned stable run id for DE Solar: {stable.model_version}")
+        ds_pinned = pf.get_data(
+            zone_keys=["DE"],
+            psr_types=["Solar"],
+            init_time="latest",
+            max_prediction_timedelta=2880,
+            version=stable.model_version,
+        )
+        print(ds_pinned)
+        print()
+
+    print("Preview pointers: version='latest' for DE Solar")
+    ds_latest = pf.get_data(
+        zone_keys=["DE"],
+        psr_types=["Solar"],
+        init_time="latest",
+        max_prediction_timedelta=2880,
+        version="latest",
+    )
+    print(ds_latest)
+    print()
+
+    print("Per-cell pins: DE Solar on latest, DE Load on stable")
+    ds_pins = pf.get_data(
+        zone_keys=["DE"],
+        psr_types=["Solar", "Load"],
+        init_time="latest",
+        max_prediction_timedelta=1440,
+        version="stable",
+        version_pins=[
+            {"zone_key": "DE", "psr_type": "Solar", "version": "latest"},
+        ],
+    )
+    print(ds_pins)
+    print()
+
     # --- Horizon mode: latest forecast ---
 
-    print("Horizon mode: latest forecast for all zones, Solar")
+    print("Horizon mode: latest forecast for all zones, Solar (stable default)")
     ds = pf.get_data(
         zone_keys=zones,
         psr_types=["Solar"],
