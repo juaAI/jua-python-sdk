@@ -256,9 +256,14 @@ class PowerForecast:
             RuntimeError: If the API request fails.
 
         Examples:
-            >>> # Count mode: 10 most recent runs
+            >>> # Count mode: 10 most recent runs (stable serving)
             >>> init_times = client.power_forecast.get_init_times(
             ...     zone_key="DE", limit=10
+            ... )
+            >>>
+            >>> # Same listing against the latest/preview pointers
+            >>> init_times = client.power_forecast.get_init_times(
+            ...     zone_key="DE", limit=10, version="latest"
             ... )
             >>>
             >>> # Time-window mode: every run in a date range (can exceed 1000)
@@ -457,6 +462,29 @@ class PowerForecast:
             ...     psr_types=["Solar"],
             ...     init_time="latest",
             ...     version="latest",
+            ... )
+            >>>
+            >>> # Freeze today's stable run id (promote-safe)
+            >>> versions = client.power_forecast.get_versions(
+            ...     zone_key="DE", psr_type="Solar"
+            ... )
+            >>> stable = next(v for v in versions if v.is_stable)
+            >>> ds = client.power_forecast.get_data(
+            ...     zone_keys=["DE"],
+            ...     psr_types=["Solar"],
+            ...     init_time="latest",
+            ...     version=stable.model_version,
+            ... )
+            >>>
+            >>> # Mix aliases per cell
+            >>> ds = client.power_forecast.get_data(
+            ...     zone_keys=["DE"],
+            ...     psr_types=["Solar", "Load"],
+            ...     init_time="latest",
+            ...     version="stable",
+            ...     version_pins=[
+            ...         {"zone_key": "DE", "psr_type": "Solar", "version": "latest"},
+            ...     ],
             ... )
             >>>
             >>> # Time range query
