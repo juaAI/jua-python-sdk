@@ -1,3 +1,9 @@
+## v0.35.0 (2026-07-17)
+
+### Feat
+
+- **power_forecast**: expose stable/latest serving version selection
+
 ## v0.34.0 (2026-07-10)
 
 ### Feat
