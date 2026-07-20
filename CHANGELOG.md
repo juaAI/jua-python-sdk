@@ -1,3 +1,9 @@
+## v0.37.0 (2026-07-20)
+
+### Feat
+
+- **power_forecast**: support exact minute-level day-ahead init times
+
 ## v0.36.0 (2026-07-20)
 
 ### BREAKING CHANGE
