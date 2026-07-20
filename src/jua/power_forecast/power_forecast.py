@@ -556,6 +556,7 @@ class PowerForecast:
         zone_keys: list[str],
         psr_types: list[str] | None = None,
         init_hour: int,
+        init_minute: int = 0,
         time_zone: str = "UTC",
         start_date: datetime | None = None,
         end_date: datetime | None = None,
@@ -565,25 +566,26 @@ class PowerForecast:
     ) -> xr.Dataset:
         """Return a continuous day-ahead time series stitched across runs.
 
-        This helper selects the forecast runs whose local init-time hour matches
-        ``init_hour`` (interpreted in ``time_zone``), takes from each run the
-        day-ahead window, and concatenates the results into a single continuous
-        ``time`` axis.
+        This helper selects forecast runs at a local time of day (interpreted in
+        ``time_zone``), takes from each run the day-ahead window, and
+        concatenates the results into a single continuous ``time`` axis.
 
         The day-ahead window is defined by the forecast lead range:
-        ``[(24 - init_hour), (24 - init_hour) + 24)`` hours from the init time.
+        ``[time until local midnight, +24 hours)`` from the init time.
         For example, for ``init_hour = 9`` the selected window is
         ``[15h, 39h]`` from each init (i.e., 00:00..23:00 of D when the run is
-        at D-1 09:00).
+        at D-1 09:00). For an init time at 13:45, it is
+        ``[10h15m, 34h15m]``.
 
         Two selection modes are supported:
 
         **Date-range mode** (``start_date`` and/or ``end_date`` given):
-            The daily ``init_hour`` runs spanning the range are constructed
-            directly and fetched in a single request. This bypasses the
-            init-times listing limit, so arbitrarily long histories (e.g. a full
-            year) can be stitched. ``start_date``/``end_date`` bound the
-            resulting *valid time* axis.
+            The daily runs at the selected time of day spanning the range are
+            constructed directly and fetched in a single request. This bypasses
+            the init-times listing limit, so arbitrarily long histories (e.g. a
+            full year) can be stitched. ``start_date``/``end_date`` bound the
+            resulting *valid time* axis. Matching is exact; a missing daily run
+            raises ``ValueError`` rather than returning a partial series.
 
         **Latest mode** (no dates):
             The most recent matching runs are discovered via the init-times
@@ -593,9 +595,11 @@ class PowerForecast:
             zone_keys: Zone codes to query (e.g. ``["DE"]``).
             psr_types: Optional PSR types to include
                 (e.g. ``["Solar"]``). If ``None``, returns all available types.
-            init_hour: Local hour-of-day (0..23) of the runs to stitch together.
-            time_zone: IANA time zone used to interpret ``init_hour`` when
-                matching runs (default ``"UTC"``).
+            init_hour: Local hour (0..23) of the runs to stitch.
+            init_minute: Local minute (0..59) of the runs to stitch
+                (default ``0``).
+            time_zone: IANA time zone used to interpret the selected run time
+                (default ``"UTC"``).
             start_date: Inclusive lower bound on the valid-time axis. Enables
                 date-range mode. Naive datetimes are interpreted in
                 ``time_zone``.
@@ -613,24 +617,38 @@ class PowerForecast:
         Returns:
             ``xarray.Dataset`` with dims ``(zone_key, psr_type, time)`` and
             variable ``value`` (MW). The series is continuous across days.
+
+        Examples:
+            >>> ds = client.power_forecast.get_day_ahead_timeseries(
+            ...     zone_keys=["DE"],
+            ...     psr_types=["Solar"],
+            ...     init_hour=13,
+            ...     init_minute=45,
+            ...     start_date=datetime(2026, 7, 1),
+            ...     end_date=datetime(2026, 7, 8),
+            ...     time_zone="Europe/Berlin",
+            ... )
         """
-        if not (0 <= init_hour <= 23):
-            raise ValueError("init_hour must be in the range 0..23")
         if not zone_keys or not isinstance(zone_keys, list):
             raise ValueError("zone_keys must be a non-empty list of zone codes")
-
-        # Compute lead range in minutes for the day-ahead slice
-        start_lead_hours = (24 - init_hour) % 24
-        end_lead_hours = start_lead_hours + 24
-        end_lead_minutes = int(end_lead_hours * 60)
+        if not isinstance(init_hour, int) or not 0 <= init_hour <= 23:
+            raise ValueError("init_hour must be in the range 0..23")
+        if not isinstance(init_minute, int) or not 0 <= init_minute <= 59:
+            raise ValueError("init_minute must be in the range 0..59")
 
         tz = ZoneInfo(time_zone)
+
+        # Compute lead range in minutes for the day-ahead slice
+        init_minutes = init_hour * 60 + init_minute
+        start_lead_minutes = (24 * 60 - init_minutes) % (24 * 60)
+        end_lead_minutes = start_lead_minutes + 24 * 60
 
         if start_date is not None or end_date is not None:
             df = self._fetch_day_ahead_by_date_range(
                 zone_keys=zone_keys,
                 psr_types=psr_types,
                 init_hour=init_hour,
+                init_minute=init_minute,
                 tz=tz,
                 time_zone=time_zone,
                 start_date=start_date,
@@ -644,6 +662,7 @@ class PowerForecast:
                 zone_keys=zone_keys,
                 psr_types=psr_types,
                 init_hour=init_hour,
+                init_minute=init_minute,
                 tz=tz,
                 time_zone=time_zone,
                 end_lead_minutes=end_lead_minutes,
@@ -654,8 +673,8 @@ class PowerForecast:
 
         return self._stitch_day_ahead(
             df,
-            start_lead_hours=start_lead_hours,
-            end_lead_hours=end_lead_hours,
+            start_lead_minutes=start_lead_minutes,
+            end_lead_minutes=end_lead_minutes,
             tz=tz,
             start_date=start_date,
             end_date=end_date,
@@ -667,6 +686,7 @@ class PowerForecast:
         zone_keys: list[str],
         psr_types: list[str] | None,
         init_hour: int,
+        init_minute: int,
         tz: ZoneInfo,
         time_zone: str,
         end_lead_minutes: int,
@@ -684,16 +704,18 @@ class PowerForecast:
         matching_inits: list[str | int | datetime] = []
         for info in init_infos:
             it = info.init_time
-            local_hour = (
-                (it if it.tzinfo else it.replace(tzinfo=ZoneInfo("UTC")))
-                .astimezone(tz)
-                .hour
-            )
-            if local_hour == init_hour:
+            local_init = (
+                it if it.tzinfo else it.replace(tzinfo=ZoneInfo("UTC"))
+            ).astimezone(tz)
+            if (local_init.hour, local_init.minute) == (init_hour, init_minute):
                 matching_inits.append(it)
 
         if not matching_inits:
-            return pd.DataFrame()
+            raise ValueError(
+                "No power forecast runs found at "
+                f"{init_hour:02d}:{init_minute:02d} in {time_zone}. "
+                "Use get_init_times() to inspect available runs."
+            )
 
         ds = self.get_data(
             zone_keys=zone_keys,
@@ -714,6 +736,7 @@ class PowerForecast:
         zone_keys: list[str],
         psr_types: list[str] | None,
         init_hour: int,
+        init_minute: int,
         tz: ZoneInfo,
         time_zone: str,
         start_date: datetime | None,
@@ -725,12 +748,13 @@ class PowerForecast:
         """Fetch day-ahead data by constructing daily init runs over a range.
 
         The day-ahead run for valid day ``D`` is issued on ``D - 1`` at
-        ``init_hour``. We therefore build one init datetime per day from
-        ``start_date - 1`` through ``end_date`` and fetch them in a single
-        request.
+        ``init_hour`` (except a midnight run, which covers its own day). We
+        build exactly the runs whose windows intersect the requested range and
+        fetch them in a single request.
         """
         init_times = self._build_day_ahead_inits(
             init_hour=init_hour,
+            init_minute=init_minute,
             tz=tz,
             start_date=start_date,
             end_date=end_date,
@@ -748,21 +772,82 @@ class PowerForecast:
             version_pins=version_pins,
         )
         if "value" not in ds:
-            return pd.DataFrame()
-        return ds.to_dataframe().reset_index()
+            raise ValueError(
+                "No power forecast runs found at "
+                f"{init_hour:02d}:{init_minute:02d} in {time_zone} for the "
+                "requested date range. Use get_init_times() to inspect "
+                "available runs."
+            )
+
+        df = ds.to_dataframe().reset_index()
+        populated = df.dropna(subset=["value"])
+        populated = populated.assign(
+            _init_time_utc=pd.to_datetime(populated["init_time"], utc=True)
+        )
+        returned_inits = set(populated["_init_time_utc"])
+        requested_inits = set(pd.to_datetime(init_times, utc=True))
+        missing_inits = sorted(requested_inits - returned_inits)
+        if missing_inits:
+            missing_local = ", ".join(
+                init.astimezone(tz).isoformat() for init in missing_inits[:5]
+            )
+            if len(missing_inits) > 5:
+                missing_local += f", ... ({len(missing_inits)} total)"
+            raise ValueError(
+                "No power forecast run found for exact init time(s): "
+                f"{missing_local}. Use get_init_times() to inspect available runs."
+            )
+
+        if {"zone_key", "psr_type"}.issubset(populated.columns):
+            if psr_types is not None:
+                expected_cells = {
+                    (zone_key, psr_type)
+                    for zone_key in zone_keys
+                    for psr_type in psr_types
+                }
+            else:
+                expected_cells = set(
+                    populated[["zone_key", "psr_type"]].itertuples(
+                        index=False, name=None
+                    )
+                )
+            returned = set(
+                populated[["zone_key", "psr_type", "_init_time_utc"]].itertuples(
+                    index=False, name=None
+                )
+            )
+            missing = sorted(
+                (zone_key, psr_type, init)
+                for zone_key, psr_type in expected_cells
+                for init in requested_inits
+                if (zone_key, psr_type, init) not in returned
+            )
+            if missing:
+                details = ", ".join(
+                    f"{zone_key}/{psr_type}@{init.astimezone(tz).isoformat()}"
+                    for zone_key, psr_type, init in missing[:5]
+                )
+                if len(missing) > 5:
+                    details += f", ... ({len(missing)} total)"
+                raise ValueError(
+                    "No power forecast run found for exact zone/PSR/init "
+                    f"selection(s): {details}. Use get_init_times() to inspect "
+                    "available runs."
+                )
+        return df
 
     @staticmethod
     def _build_day_ahead_inits(
         *,
         init_hour: int,
+        init_minute: int,
         tz: ZoneInfo,
         start_date: datetime | None,
         end_date: datetime | None,
     ) -> list[str | int | datetime]:
         """Construct one ``init_hour`` init datetime per day spanning the range.
 
-        ``start_date``/``end_date`` bound the valid-time axis; the day-ahead run
-        for valid day ``D`` is issued the previous day. Naive bounds are
+        ``start_date``/``end_date`` bound the valid-time axis. Naive bounds are
         interpreted in ``tz``. Returned datetimes are timezone-aware (UTC).
         """
         utc = ZoneInfo("UTC")
@@ -781,14 +866,28 @@ class PowerForecast:
         else:
             start_local = _localize(start_date).astimezone(tz)
 
-        # Runs issued from (start_date - 1 day) cover valid times from start_date
-        first_init_day = (start_local - timedelta(days=1)).date()
-        last_init_day = end_local.date()
+        # A non-midnight run produces the following local day's day-ahead
+        # window; a midnight run produces its own day. Build only runs whose
+        # window intersects [start_date, end_date), avoiding unused boundary
+        # requests that could be unavailable.
+        init_day_offset = timedelta(
+            days=0 if init_hour == 0 and init_minute == 0 else 1
+        )
+        first_init_day = start_local.date() - init_day_offset
+        last_valid_day = (end_local - timedelta(microseconds=1)).date()
+        last_init_day = last_valid_day - init_day_offset
 
         inits: list[str | int | datetime] = []
         day = first_init_day
         while day <= last_init_day:
-            local_init = datetime(day.year, day.month, day.day, init_hour, tzinfo=tz)
+            local_init = datetime(
+                day.year,
+                day.month,
+                day.day,
+                init_hour,
+                init_minute,
+                tzinfo=tz,
+            )
             inits.append(local_init.astimezone(utc))
             day = day + timedelta(days=1)
         return inits
@@ -797,8 +896,8 @@ class PowerForecast:
     def _stitch_day_ahead(
         df: pd.DataFrame,
         *,
-        start_lead_hours: int,
-        end_lead_hours: int,
+        start_lead_minutes: int,
+        end_lead_minutes: int,
         tz: ZoneInfo,
         start_date: datetime | None,
         end_date: datetime | None,
@@ -811,11 +910,11 @@ class PowerForecast:
         if df.empty:
             return xr.Dataset(attrs={"unit": "MW"})
 
-        df["lead_hours"] = (df["time"] - df["init_time"]) / pd.Timedelta(hours=1)
-        mask = (df["lead_hours"] >= start_lead_hours) & (
-            df["lead_hours"] < end_lead_hours
+        df["lead_minutes"] = (df["time"] - df["init_time"]) / pd.Timedelta(minutes=1)
+        mask = (df["lead_minutes"] >= start_lead_minutes) & (
+            df["lead_minutes"] < end_lead_minutes
         )
-        df = df.loc[mask].drop(columns=["lead_hours"])
+        df = df.loc[mask].drop(columns=["lead_minutes"])
 
         if df.empty:
             return xr.Dataset(attrs={"unit": "MW"})
