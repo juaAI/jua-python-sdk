@@ -617,6 +617,17 @@ class PowerForecast:
         Returns:
             ``xarray.Dataset`` with dims ``(zone_key, psr_type, time)`` and
             variable ``value`` (MW). The series is continuous across days.
+
+        Examples:
+            >>> ds = client.power_forecast.get_day_ahead_timeseries(
+            ...     zone_keys=["DE"],
+            ...     psr_types=["Solar"],
+            ...     init_hour=13,
+            ...     init_minute=45,
+            ...     start_date=datetime(2026, 7, 1),
+            ...     end_date=datetime(2026, 7, 8),
+            ...     time_zone="Europe/Berlin",
+            ... )
         """
         if not zone_keys or not isinstance(zone_keys, list):
             raise ValueError("zone_keys must be a non-empty list of zone codes")
