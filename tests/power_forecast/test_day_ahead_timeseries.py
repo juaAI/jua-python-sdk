@@ -2,6 +2,7 @@ from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
 import pandas as pd
+import pytest
 import xarray as xr
 
 from jua import JuaClient
@@ -170,9 +171,8 @@ def test_get_day_ahead_timeseries_date_range_builds_inits_and_clips(monkeypatch)
         end_date=end,
     )
 
-    # Single request with daily inits from (start-1) through end (12 days). The
-    # final init's window falls outside [start, end) and is clipped away.
-    assert calls["n_inits"] == [12]
+    # One request containing exactly one init for each requested valid day.
+    assert calls["n_inits"] == [10]
 
     times = pd.to_datetime(ds.time.values)
     assert len(times) == len(set(times)), "time index must be unique"
@@ -185,6 +185,112 @@ def test_get_day_ahead_timeseries_date_range_builds_inits_and_clips(monkeypatch)
     tmin = tmin.tz_localize("UTC") if tmin.tzinfo is None else tmin
     tmax = tmax.tz_localize("UTC") if tmax.tzinfo is None else tmax
     assert tmin >= lo and tmax < hi
+
+
+def test_get_day_ahead_timeseries_date_range_accepts_minute_level_init(
+    monkeypatch,
+):
+    """A sub-hourly daily run is constructed and fetched in one request."""
+    pf = JuaClient().power_forecast
+    zone, psr = "DE", "Solar"
+    tz = ZoneInfo("Europe/Berlin")
+    captured: list[list[datetime]] = []
+
+    def fake_get_data(**kwargs):
+        inits = list(kwargs["init_time"])
+        captured.append(inits)
+        return _make_ds_15min(zone, psr, inits)
+
+    def fail_init_times(*args, **kwargs):
+        raise AssertionError("date-range mode must not list init times")
+
+    monkeypatch.setattr(pf, "get_data", fake_get_data)
+    monkeypatch.setattr(pf, "get_init_times", fail_init_times)
+
+    start = datetime(2025, 6, 1, tzinfo=tz)
+    end = datetime(2025, 6, 3, tzinfo=tz)
+    ds = pf.get_day_ahead_timeseries(
+        zone_keys=[zone],
+        psr_types=[psr],
+        init_hour=13,
+        init_minute=45,
+        time_zone="Europe/Berlin",
+        start_date=start,
+        end_date=end,
+    )
+
+    assert len(captured) == 1
+    assert len(captured[0]) == 2
+    assert all(
+        init.astimezone(tz).hour == 13 and init.astimezone(tz).minute == 45
+        for init in captured[0]
+    )
+    assert ds.sizes["time"] == 2 * 96
+
+
+def test_get_day_ahead_timeseries_validates_init_minute():
+    pf = JuaClient().power_forecast
+
+    with pytest.raises(ValueError, match="init_minute must be in the range 0..59"):
+        pf.get_day_ahead_timeseries(
+            zone_keys=["DE"],
+            init_hour=13,
+            init_minute=60,
+        )
+
+
+def test_get_day_ahead_timeseries_reports_unavailable_date_range_init(monkeypatch):
+    pf = JuaClient().power_forecast
+    monkeypatch.setattr(pf, "get_data", lambda **kwargs: xr.Dataset())
+
+    with pytest.raises(ValueError, match=r"13:46 in UTC.*get_init_times"):
+        pf.get_day_ahead_timeseries(
+            zone_keys=["DE"],
+            psr_types=["Solar"],
+            init_hour=13,
+            init_minute=46,
+            start_date=datetime(2025, 6, 1),
+            end_date=datetime(2025, 6, 2),
+        )
+
+
+def test_get_day_ahead_timeseries_rejects_partially_missing_inits(monkeypatch):
+    pf = JuaClient().power_forecast
+
+    def fake_get_data(**kwargs):
+        requested = list(kwargs["init_time"])
+        return _make_ds_15min("DE", "Solar", requested[:-1])
+
+    monkeypatch.setattr(pf, "get_data", fake_get_data)
+
+    with pytest.raises(ValueError, match="exact init time"):
+        pf.get_day_ahead_timeseries(
+            zone_keys=["DE"],
+            psr_types=["Solar"],
+            init_hour=13,
+            init_minute=45,
+            start_date=datetime(2025, 6, 1),
+            end_date=datetime(2025, 6, 3),
+        )
+
+
+def test_get_day_ahead_timeseries_rejects_missing_zone_psr_cell(monkeypatch):
+    pf = JuaClient().power_forecast
+
+    def fake_get_data(**kwargs):
+        return _make_ds_15min("DE", "Solar", list(kwargs["init_time"]))
+
+    monkeypatch.setattr(pf, "get_data", fake_get_data)
+
+    with pytest.raises(ValueError, match=r"FR/Solar@"):
+        pf.get_day_ahead_timeseries(
+            zone_keys=["DE", "FR"],
+            psr_types=["Solar"],
+            init_hour=13,
+            init_minute=45,
+            start_date=datetime(2025, 6, 1),
+            end_date=datetime(2025, 6, 2),
+        )
 
 
 # ----------------------------------------------------------------------
