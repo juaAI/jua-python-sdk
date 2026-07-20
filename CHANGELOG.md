@@ -1,3 +1,14 @@
+## v0.36.0 (2026-07-20)
+
+### BREAKING CHANGE
+
+- Models.ECMWF_AIFS_ENSEMBLE is removed. Use Models.AIFS_ENS
+(hosted, grid access) instead. Note aifs_ens does not serve 500hPa geopotential.
+
+### Feat
+
+- **models**: remove retired ecmwf_aifs025_ensemble
+
 ## v0.35.0 (2026-07-17)
 
 ### Feat
