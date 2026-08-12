@@ -396,6 +396,7 @@ class PowerForecast:
         time_zone: str | None = None,
         version: VersionSpec | None = None,
         version_pins: Sequence[VersionPinSpec] | None = None,
+        debias: bool = False,
     ) -> xr.Dataset:
         """Query power forecast data in MW.
 
@@ -437,6 +438,10 @@ class PowerForecast:
             version_pins: Optional per-(zone_key, psr_type) overrides. Each
                 mapping must include ``zone_key``, ``psr_type``, and
                 ``version`` (alias or run id).
+            debias: Apply leakage-safe walk-forward additive MW debiasing.
+                Wind uses an eight-week fitting window and solar uses four
+                weeks; both retain a seven-day exclusion gap. Defaults to
+                ``False`` so raw predictions remain unchanged.
 
         Returns:
             ``xarray.Dataset`` with dimensions ``(zone_key, psr_type, time)``
@@ -534,6 +539,7 @@ class PowerForecast:
             time_zone=time_zone,
             version=version,
             version_pins=normalized_pins,
+            debias=debias,
         )
 
         try:
@@ -563,6 +569,7 @@ class PowerForecast:
         max_init_times: int = 365,
         version: VersionSpec | None = None,
         version_pins: Sequence[VersionPinSpec] | None = None,
+        debias: bool = False,
     ) -> xr.Dataset:
         """Return a continuous day-ahead time series stitched across runs.
 
@@ -613,6 +620,8 @@ class PowerForecast:
                 :meth:`get_init_times` (``stable`` / ``latest`` / run id).
             version_pins: Optional per-(zone, psr) overrides forwarded to
                 :meth:`get_data`.
+            debias: Apply leakage-safe walk-forward additive MW debiasing to
+                every fetched run. Defaults to ``False``.
 
         Returns:
             ``xarray.Dataset`` with dims ``(zone_key, psr_type, time)`` and
@@ -656,6 +665,7 @@ class PowerForecast:
                 end_lead_minutes=end_lead_minutes,
                 version=version,
                 version_pins=version_pins,
+                debias=debias,
             )
         else:
             df = self._fetch_day_ahead_latest(
@@ -669,6 +679,7 @@ class PowerForecast:
                 max_init_times=max_init_times,
                 version=version,
                 version_pins=version_pins,
+                debias=debias,
             )
 
         return self._stitch_day_ahead(
@@ -693,6 +704,7 @@ class PowerForecast:
         max_init_times: int,
         version: VersionSpec | None = None,
         version_pins: Sequence[VersionPinSpec] | None = None,
+        debias: bool = False,
     ) -> pd.DataFrame:
         """Fetch day-ahead data for the most recent matching runs."""
         init_infos = self.get_init_times(
@@ -725,6 +737,7 @@ class PowerForecast:
             time_zone=time_zone,
             version=version,
             version_pins=version_pins,
+            debias=debias,
         )
         if "value" not in ds:
             return pd.DataFrame()
@@ -744,6 +757,7 @@ class PowerForecast:
         end_lead_minutes: int,
         version: VersionSpec | None = None,
         version_pins: Sequence[VersionPinSpec] | None = None,
+        debias: bool = False,
     ) -> pd.DataFrame:
         """Fetch day-ahead data by constructing daily init runs over a range.
 
@@ -770,6 +784,7 @@ class PowerForecast:
             time_zone=time_zone,
             version=version,
             version_pins=version_pins,
+            debias=debias,
         )
         if "value" not in ds:
             raise ValueError(
@@ -1139,6 +1154,7 @@ class PowerForecast:
         time_zone: str | None,
         version: VersionSpec | None = None,
         version_pins: list[dict[str, str]] | None = None,
+        debias: bool = False,
     ) -> dict:
         body: dict = {}
         if zone_keys is not None:
@@ -1161,6 +1177,8 @@ class PowerForecast:
             body["version"] = version
         if version_pins is not None:
             body["version_pins"] = version_pins
+        if debias:
+            body["debias"] = True
 
         return remove_none_from_dict(body)
 
