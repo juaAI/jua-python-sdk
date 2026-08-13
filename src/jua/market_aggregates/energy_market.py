@@ -252,10 +252,11 @@ class EnergyMarket:
                 specified frequency (e.g. daily) using the chosen method
                 (e.g. mean, sum). Applied client-side after fetching data.
 
-            debias: Apply leakage-safe walk-forward MW debiasing. Wind uses an
-                eight-week fitting window and solar uses four weeks; both
-                retain a seven-day exclusion gap. Defaults to ``False`` so raw
-                MW remains unchanged.
+            debias: Apply walk-forward MW debiasing. Wind uses eight weeks of
+                history and solar uses four weeks to estimate the bias for
+                each init time and lead; that bias is subtracted from the
+                current forecast, then the window moves ahead. Defaults to
+                ``False`` so raw MW remains unchanged.
 
         Returns:
             ``xarray.Dataset`` with ``model_run`` and ``time`` dimensions

@@ -438,10 +438,12 @@ class PowerForecast:
             version_pins: Optional per-(zone_key, psr_type) overrides. Each
                 mapping must include ``zone_key``, ``psr_type``, and
                 ``version`` (alias or run id).
-            debias: Apply leakage-safe walk-forward additive MW debiasing.
-                Wind uses an eight-week fitting window and solar uses four
-                weeks; both retain a seven-day exclusion gap. Defaults to
-                ``False`` so raw predictions remain unchanged.
+            debias: Apply walk-forward additive MW debiasing. Wind uses
+                eight weeks of history and solar uses four weeks to
+                estimate the bias for each init time and lead; that bias
+                is subtracted from the current forecast, then the window
+                moves ahead. Defaults to ``False`` so raw predictions
+                remain unchanged.
 
         Returns:
             ``xarray.Dataset`` with dimensions ``(zone_key, psr_type, time)``
@@ -620,8 +622,11 @@ class PowerForecast:
                 :meth:`get_init_times` (``stable`` / ``latest`` / run id).
             version_pins: Optional per-(zone, psr) overrides forwarded to
                 :meth:`get_data`.
-            debias: Apply leakage-safe walk-forward additive MW debiasing to
-                every fetched run. Defaults to ``False``.
+            debias: Apply walk-forward additive MW debiasing to every
+                fetched run. Wind uses eight weeks of history and solar
+                uses four weeks to estimate the bias; that bias is
+                subtracted from the current forecast, then the window
+                moves ahead. Defaults to ``False``.
 
         Returns:
             ``xarray.Dataset`` with dims ``(zone_key, psr_type, time)`` and
