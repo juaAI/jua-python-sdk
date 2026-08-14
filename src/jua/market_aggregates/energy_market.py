@@ -284,6 +284,7 @@ class EnergyMarket:
             ...     weighting="wind_capacity",
             ...     model_runs=[ModelRuns(Models.EPT2, [0, 1])],
             ...     max_lead_time=48,
+            ...     debias=True,
             ... )
             >>>
             >>> # Predicted electricity demand (load_mw)
@@ -291,6 +292,7 @@ class EnergyMarket:
             ...     weighting="population",
             ...     model_runs=[ModelRuns(Models.EPT2, 0)],
             ...     max_lead_time=48,
+            ...     debias=True,
             ... )
             >>>
             >>> # Daily mean MW data
@@ -301,6 +303,7 @@ class EnergyMarket:
             ...     temporal_aggregation=TemporalAggregation(
             ...         AggregationFrequency.DAILY,
             ...     ),
+            ...     debias=True,
             ... )
         """
         attrs = {

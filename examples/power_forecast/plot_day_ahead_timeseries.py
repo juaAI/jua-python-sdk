@@ -52,6 +52,7 @@ def plot_yearly_day_ahead(pf, zone: str) -> None:
         time_zone="UTC",
         start_date=start,
         end_date=end,
+        debias=True,
     )
     df = _to_frame(ds)
     if df is None or df.empty:
@@ -109,6 +110,7 @@ def plot_init_hour_comparison(pf, zone: str) -> None:
             time_zone="UTC",
             start_date=start,
             end_date=end,
+            debias=True,
         )
         df = _to_frame(ds)
         if df is None or df.empty:

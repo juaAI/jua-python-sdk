@@ -66,6 +66,7 @@ def main():
             init_time="latest",
             max_prediction_timedelta=2880,
             version=stable.model_version,
+            debias=True,
         )
         print(ds_pinned)
         print()
@@ -77,6 +78,7 @@ def main():
         init_time="latest",
         max_prediction_timedelta=2880,
         version="latest",
+        debias=True,
     )
     print(ds_latest)
     print()
@@ -91,6 +93,7 @@ def main():
         version_pins=[
             {"zone_key": "DE", "psr_type": "Solar", "version": "latest"},
         ],
+        debias=True,
     )
     print(ds_pins)
     print()
@@ -103,6 +106,7 @@ def main():
         psr_types=["Solar"],
         init_time="latest",
         max_prediction_timedelta=2880,
+        debias=True,
     )
     print(ds)
     print()
@@ -115,6 +119,7 @@ def main():
             zone_keys=[zones[0]],
             init_time=[0, 1],
             max_prediction_timedelta=1440,
+            debias=True,
         )
         print(ds2)
         print()
@@ -127,6 +132,7 @@ def main():
         zone_keys=zones,
         start_time=now.replace(hour=0, minute=0, second=0, microsecond=0),
         end_time=now,
+        debias=True,
     )
     print(ds3)
     print()
@@ -140,6 +146,7 @@ def main():
             init_hour=9,  # e.g. D-1 09:00
             time_zone="UTC",
             max_init_times=10,  # stitch up to 10 matching days
+            debias=True,
         )
         print(ds4)
 
