@@ -1,3 +1,9 @@
+## v0.38.0 (2026-08-14)
+
+### Feat
+
+- **power**: expose opt-in MW debiasing
+
 ## v0.37.0 (2026-07-20)
 
 ### Feat
