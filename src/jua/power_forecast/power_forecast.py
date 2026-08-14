@@ -89,6 +89,7 @@ class PowerForecast:
         ...     psr_types=["Solar"],
         ...     init_time="latest",
         ...     max_prediction_timedelta=2880,
+        ...     debias=True,
         ... )
         >>>
         >>> # Same query against the packaged latest (preview) pointers
@@ -97,6 +98,7 @@ class PowerForecast:
         ...     psr_types=["Solar"],
         ...     init_time="latest",
         ...     version="latest",
+        ...     debias=True,
         ... )
         >>>
         >>> # Time range mode
@@ -104,6 +106,7 @@ class PowerForecast:
         ...     zone_keys=["DE", "FR"],
         ...     start_time=datetime(2025, 12, 1),
         ...     end_time=datetime(2025, 12, 3),
+        ...     debias=True,
         ... )
     """
 
@@ -348,6 +351,7 @@ class PowerForecast:
             ...     psr_types=["Solar"],
             ...     init_time="latest",
             ...     version=stable.model_version,
+            ...     debias=True,
             ... )
         """
         params: dict = {}
@@ -461,6 +465,7 @@ class PowerForecast:
             ...     zone_keys=["DE"],
             ...     psr_types=["Solar"],
             ...     init_time="latest",
+            ...     debias=True,
             ... )
             >>>
             >>> # Preview / latest serving pointers
@@ -469,6 +474,7 @@ class PowerForecast:
             ...     psr_types=["Solar"],
             ...     init_time="latest",
             ...     version="latest",
+            ...     debias=True,
             ... )
             >>>
             >>> # Freeze today's stable run id (promote-safe)
@@ -481,6 +487,7 @@ class PowerForecast:
             ...     psr_types=["Solar"],
             ...     init_time="latest",
             ...     version=stable.model_version,
+            ...     debias=True,
             ... )
             >>>
             >>> # Mix aliases per cell
@@ -492,6 +499,7 @@ class PowerForecast:
             ...     version_pins=[
             ...         {"zone_key": "DE", "psr_type": "Solar", "version": "latest"},
             ...     ],
+            ...     debias=True,
             ... )
             >>>
             >>> # Time range query
@@ -500,6 +508,7 @@ class PowerForecast:
             ...     zone_keys=["DE"],
             ...     start_time=datetime(2025, 12, 1),
             ...     end_time=datetime(2025, 12, 3),
+            ...     debias=True,
             ... )
         """
         has_horizon = init_time is not None or max_prediction_timedelta is not None
@@ -641,6 +650,7 @@ class PowerForecast:
             ...     start_date=datetime(2026, 7, 1),
             ...     end_date=datetime(2026, 7, 8),
             ...     time_zone="Europe/Berlin",
+            ...     debias=True,
             ... )
         """
         if not zone_keys or not isinstance(zone_keys, list):

@@ -129,6 +129,7 @@ def main():
         weighting="wind_capacity",
         model_runs=[ModelRuns(Models.EPT2, [0, 1])],
         max_lead_time=48,
+        debias=True,
     )
     print(f"MW dataset:\n{mw_data}")
 
@@ -137,6 +138,7 @@ def main():
         weighting="solar_capacity",
         model_runs=[ModelRuns(Models.EPT2, 0)],
         max_lead_time=24,
+        debias=True,
     )
     print(f"Solar MW dataset:\n{solar_mw}")
 
@@ -150,6 +152,7 @@ def main():
         weighting="population",
         model_runs=[ModelRuns(Models.EPT2, 0)],
         max_lead_time=48,
+        debias=True,
     )
     print(f"Load (demand) MW dataset:\n{load_mw}")
 
