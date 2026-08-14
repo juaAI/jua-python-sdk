@@ -56,10 +56,15 @@ def test_get_day_ahead_timeseries_stitches_across_days(monkeypatch):
         InitTimeInfo(init_time=t1, max_prediction_timedelta=40 * 60),
         InitTimeInfo(init_time=t2, max_prediction_timedelta=40 * 60),
     ]
+    captured: dict = {}
+
+    def fake_get_data(**kwargs):
+        captured.update(kwargs)
+        return _make_ds(zone, psr, [t1, t2])
 
     # Patch network methods
     monkeypatch.setattr(pf, "get_init_times", _stub_init_times(init_infos))
-    monkeypatch.setattr(pf, "get_data", lambda **kwargs: _make_ds(zone, psr, [t1, t2]))
+    monkeypatch.setattr(pf, "get_data", fake_get_data)
 
     stitched = pf.get_day_ahead_timeseries(
         zone_keys=[zone],
@@ -67,6 +72,7 @@ def test_get_day_ahead_timeseries_stitches_across_days(monkeypatch):
         init_hour=9,
         time_zone="UTC",
         max_init_times=10,
+        debias=True,
     )
 
     assert "time" in stitched.dims
@@ -76,6 +82,7 @@ def test_get_day_ahead_timeseries_stitches_across_days(monkeypatch):
     last_time = pd.Timestamp(datetime(2025, 1, 3, 23, 0)).tz_localize(None)
     assert pd.Timestamp(stitched.time.values[0]) == first_time
     assert pd.Timestamp(stitched.time.values[-1]) == last_time
+    assert captured["debias"] is True
 
 
 def _make_ds_15min(zone: str, psr: str, init_times: list[datetime]) -> xr.Dataset:
@@ -145,11 +152,12 @@ def test_get_day_ahead_timeseries_date_range_builds_inits_and_clips(monkeypatch)
     zone, psr = "DE", "Solar"
     init_hour = 9
 
-    calls = {"n_inits": []}
+    calls = {"n_inits": [], "debias": []}
 
     def fake_get_data(**kwargs):
         inits = kwargs["init_time"]
         calls["n_inits"].append(len(inits))
+        calls["debias"].append(kwargs["debias"])
         return _make_ds_15min(zone, psr, list(inits))
 
     # get_init_times must NOT be used in date-range mode.
@@ -169,10 +177,12 @@ def test_get_day_ahead_timeseries_date_range_builds_inits_and_clips(monkeypatch)
         time_zone="UTC",
         start_date=start,
         end_date=end,
+        debias=True,
     )
 
     # One request containing exactly one init for each requested valid day.
     assert calls["n_inits"] == [10]
+    assert calls["debias"] == [True]
 
     times = pd.to_datetime(ds.time.values)
     assert len(times) == len(set(times)), "time index must be unique"

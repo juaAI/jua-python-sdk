@@ -218,6 +218,7 @@ class EnergyMarket:
         min_lead_time: int = 0,
         max_lead_time: int | None = None,
         temporal_aggregation: TemporalAggregation | None = None,
+        debias: bool = False,
     ) -> xr.Dataset:
         """Compare multiple model runs with output in MW.
 
@@ -250,6 +251,12 @@ class EnergyMarket:
                 When provided, the ``time`` dimension is resampled to the
                 specified frequency (e.g. daily) using the chosen method
                 (e.g. mean, sum). Applied client-side after fetching data.
+
+            debias: Apply walk-forward MW debiasing. Wind uses eight weeks of
+                history and solar uses four weeks to estimate the bias for
+                each init time and lead; that bias is subtracted from the
+                current forecast, then the window moves ahead. Defaults to
+                ``False`` so raw MW remains unchanged.
 
         Returns:
             ``xarray.Dataset`` with ``model_run`` and ``time`` dimensions
@@ -317,6 +324,8 @@ class EnergyMarket:
                 params["min_prediction_timedelta"] = min_lead_time
             if max_lead_time is not None:
                 params["max_prediction_timedelta"] = max_lead_time
+            if debias:
+                params["debias"] = True
             return params
 
         all_dataframes = self._fetch_dataframes(

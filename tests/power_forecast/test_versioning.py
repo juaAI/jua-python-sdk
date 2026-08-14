@@ -126,6 +126,36 @@ def test_get_data_body_includes_version_and_pins(monkeypatch):
     assert captured["data"]["version_pins"] == [
         {"zone_key": "DE", "psr_type": "Solar", "version": "rv7orbtm"}
     ]
+    assert "debias" not in captured["data"]
+
+
+def test_get_data_body_includes_debias_when_enabled(monkeypatch):
+    client = JuaClient()
+    pf = client.power_forecast
+    captured: dict = {}
+
+    def fake_post(path, data=None, requires_auth=True):
+        captured["data"] = data
+        return _FakeResponse(
+            {
+                "zone_key": [],
+                "psr_type": [],
+                "init_time": [],
+                "time": [],
+                "value": [],
+            }
+        )
+
+    monkeypatch.setattr(pf._api, "post", fake_post)
+
+    pf.get_data(
+        zone_keys=["DE"],
+        psr_types=["Solar"],
+        init_time="2026-07-16T00:00:00+00:00",
+        debias=True,
+    )
+
+    assert captured["data"]["debias"] is True
 
 
 def test_get_data_rejects_internal_channel_names():
