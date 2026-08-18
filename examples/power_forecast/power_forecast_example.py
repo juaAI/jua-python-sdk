@@ -53,6 +53,10 @@ def main():
             flags.append("stable")
         if v.is_latest:
             flags.append("latest")
+        if v.is_stable_uncurtailed:
+            flags.append("stable-uncurtailed")
+        if v.is_latest_uncurtailed:
+            flags.append("latest-uncurtailed")
         label = f" [{', '.join(flags)}]" if flags else ""
         print(f"  {v.model_version}{label}")
     print()
@@ -81,6 +85,17 @@ def main():
         debias=True,
     )
     print(ds_latest)
+    print()
+
+    print("Uncurtailed (potential) DE Solar: regime='uncurtailed'")
+    ds_uncurtailed = pf.get_data(
+        zone_keys=["DE"],
+        psr_types=["Solar"],
+        init_time="latest",
+        max_prediction_timedelta=2880,
+        regime="uncurtailed",
+    )
+    print(ds_uncurtailed)
     print()
 
     print("Per-cell pins: DE Solar on latest, DE Load on stable")
