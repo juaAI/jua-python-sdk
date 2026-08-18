@@ -75,6 +75,9 @@ def lazy_dataset(mock_query_engine, mock_coordinates):
 class TestLazyLoadingIndexing:
     """Test various indexing operations on lazy-loaded dataset."""
 
+    def test_init_time_resolution_is_milliseconds(self, lazy_dataset):
+        assert str(lazy_dataset.init_time.dtype) == "datetime64[ms]"
+
     @pytest.mark.parametrize(
         "lat_slice,lon_slice",
         [

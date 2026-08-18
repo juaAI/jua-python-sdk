@@ -1,6 +1,6 @@
 """Functional tests for Model.get_forecasts() with mocked API responses."""
 
-from datetime import datetime
+from datetime import UTC, datetime, timedelta
 from unittest.mock import patch
 
 import pandas as pd
@@ -94,6 +94,45 @@ def test_single_point_query(ept2_model, stream, print_progress):
     assert wind_data.shape == (1, 1, 7)
     assert 0.0 <= wind_data.min()
     assert wind_data.max() < 30.0
+
+
+@pytest.mark.parametrize("source_unit", ["ns", "us", "ms", "s"])
+def test_single_point_query_normalizes_datetime_resolution(ept2_model, source_unit):
+    init_time = datetime(2024, 1, 15, tzinfo=UTC)
+    df = create_point_dataframe(
+        num_points=1,
+        num_hours=1,
+        init_time=init_time,
+    )
+    df["time"] = [
+        init_time + timedelta(minutes=minutes) for minutes in df["prediction_timedelta"]
+    ]
+    mock_response = create_mock_arrow_response(
+        df,
+        timestamp_units={"init_time": source_unit, "time": source_unit},
+    )
+
+    with patch.object(
+        ept2_model._query_engine._api, "post", return_value=mock_response
+    ):
+        result = ept2_model.get_forecasts(
+            points=LatLon(lat=50.0, lon=8.0),
+            max_lead_time=1,
+            variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
+            stream=True,
+            print_progress=False,
+        )
+
+    ds = result.to_xarray()
+
+    assert ds.sizes["points"] == 1
+    assert ds.sizes["init_time"] == 1
+    assert ds.sizes["prediction_timedelta"] == 2
+    assert str(ds.init_time.dtype) == "datetime64[ms]"
+    assert ds.init_time.encoding["units"] == "milliseconds since 1970-01-01T00:00:00"
+    assert pd.Timestamp(ds.init_time.values[0]).to_pydatetime() == init_time.replace(
+        tzinfo=None
+    )
 
 
 @pytest.mark.parametrize("stream", [True, False])

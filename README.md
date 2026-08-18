@@ -30,6 +30,13 @@ uv init && uv add jua
 Simply run `jua auth` to authenticate via your web browser. Make sure you are already logged in the [developer portal](https://developer.jua.ai).
 Alternatively, generate an API key from the [Jua dashboard](https://developer.jua.ai/api-keys) and save it to `~/.jua/default/api-key.json`.
 
+### Datetime resolution
+
+Forecast datetime values are normalized to millisecond resolution.
+Applications requiring another resolution must explicitly convert datetime
+values before further processing or persistence. Timestamp instants and
+timezone semantics remain unchanged.
+
 ## Examples
 
 ### Obtaining the metadata for a model
