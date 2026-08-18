@@ -1,3 +1,9 @@
+## v0.39.0 (2026-08-18)
+
+### Feat
+
+- **weather**: normalize forecast datetimes to milliseconds
+
 ## v0.38.0 (2026-08-14)
 
 ### Feat
