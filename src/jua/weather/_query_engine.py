@@ -39,6 +39,13 @@ from jua.weather.variables import Variables
 logger = getLogger(__name__)
 
 
+def _normalize_datetime_columns_to_milliseconds(df: pd.DataFrame) -> None:
+    """Normalize forecast datetime columns to the SDK's millisecond contract."""
+    for column in df.columns:
+        if pd.api.types.is_datetime64_any_dtype(df[column].dtype):
+            df[column] = df[column].dt.as_unit("ms")
+
+
 class QueryEngine:
     """Internal API client for Jua's weather services.
 
@@ -435,9 +442,9 @@ class QueryEngine:
         if df.empty:
             raise ValueError("No data available for the given parameters.")
 
-        # Parse times to correct units, enforce correct encoding
-        init_time = pd.to_datetime(df["init_time"], utc=True).dt.tz_localize(None)
-        df["init_time"] = init_time
+        # Parse times to correct units and enforce correct encoding
+        df["init_time"] = pd.to_datetime(df["init_time"], utc=True).dt.tz_localize(None)
+        _normalize_datetime_columns_to_milliseconds(df)
         df["prediction_timedelta"] = pd.to_timedelta(
             df["prediction_timedelta"], unit="m"
         )
@@ -502,7 +509,7 @@ class QueryEngine:
 
         Note:
             - All data variables are converted to float32 for memory efficiency
-            - Init time encoding is set to nanoseconds since epoch
+            - Init time encoding is set to milliseconds since epoch
         """
         # Set the correct index
         if points is not None:
@@ -574,7 +581,7 @@ class QueryEngine:
         # Set the correct init_time encoding
         ds.init_time.encoding = {
             "dtype": "int64",
-            "units": "nanoseconds since 1970-01-01T00:00:00",
+            "units": "milliseconds since 1970-01-01T00:00:00",
         }
 
         # obtain statistics from the DataVars if they were requested

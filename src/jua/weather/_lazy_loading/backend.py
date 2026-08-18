@@ -135,7 +135,7 @@ class JuaQueryEngineBackend(BackendEntrypoint):
         init_times = (
             pd.to_datetime(index_result["init_time"], utc=True)
             .tz_localize(None)
-            .to_numpy()
+            .to_numpy(dtype="datetime64[ms]")
         )
         prediction_timedeltas = np.array(index_result["prediction_timedelta"])
         latitudes = np.array(index_result["latitude"], dtype="float32")
