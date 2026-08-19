@@ -1,3 +1,9 @@
+## v0.40.0 (2026-08-19)
+
+### Feat
+
+- **power_forecast**: add serving regime selection
+
 ## v0.39.0 (2026-08-18)
 
 ### Feat
