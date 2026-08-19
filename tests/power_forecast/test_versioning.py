@@ -34,6 +34,8 @@ def test_get_versions_parses_catalog(monkeypatch):
                         "psr_type": "Solar",
                         "is_stable": True,
                         "is_latest": False,
+                        "is_stable_uncurtailed": False,
+                        "is_latest_uncurtailed": False,
                         "earliest_init_time": "2025-05-31T23:45:00Z",
                         "latest_init_time": "2026-07-11T08:30:00Z",
                     },
@@ -43,8 +45,21 @@ def test_get_versions_parses_catalog(monkeypatch):
                         "psr_type": "Solar",
                         "is_stable": False,
                         "is_latest": True,
+                        "is_stable_uncurtailed": False,
+                        "is_latest_uncurtailed": False,
                         "earliest_init_time": "2026-07-01T00:00:00Z",
                         "latest_init_time": "2026-07-11T08:30:00Z",
+                    },
+                    {
+                        "model_version": "hcrgsy3v",
+                        "zone_key": "DE",
+                        "psr_type": "Solar",
+                        "is_stable": False,
+                        "is_latest": False,
+                        "is_stable_uncurtailed": True,
+                        "is_latest_uncurtailed": True,
+                        "earliest_init_time": "2026-08-01T00:00:00Z",
+                        "latest_init_time": "2026-08-18T00:00:00Z",
                     },
                 ]
             }
@@ -58,12 +73,16 @@ def test_get_versions_parses_catalog(monkeypatch):
     assert captured["requires_auth"] is True
     assert captured["params"]["zone_key"] == "DE"
     assert captured["params"]["psr_type"] == ["Solar"]
-    assert len(rows) == 2
+    assert len(rows) == 3
     assert all(isinstance(row, VersionInfo) for row in rows)
     assert rows[0].is_stable is True
     assert rows[0].is_latest is False
+    assert rows[0].is_stable_uncurtailed is False
     assert rows[1].model_version == "rv7orbtm"
     assert rows[1].is_latest is True
+    assert rows[2].model_version == "hcrgsy3v"
+    assert rows[2].is_stable_uncurtailed is True
+    assert rows[2].is_latest_uncurtailed is True
 
 
 def test_get_init_times_forwards_version(monkeypatch):
@@ -89,6 +108,35 @@ def test_get_init_times_forwards_version(monkeypatch):
     pf.get_init_times(zone_key="DE", psr_type="Solar", version="latest")
 
     assert captured["params"]["version"] == "latest"
+    assert "regime" not in captured["params"]
+
+
+def test_get_init_times_forwards_regime(monkeypatch):
+    client = JuaClient()
+    pf = client.power_forecast
+    captured: dict = {}
+
+    def fake_get(path, params=None, requires_auth=True):
+        captured["params"] = params
+        return _FakeResponse(
+            {
+                "init_times": [
+                    {
+                        "init_time": "2026-07-16T00:00:00Z",
+                        "max_prediction_timedelta": 2400,
+                    }
+                ]
+            }
+        )
+
+    monkeypatch.setattr(pf._api, "get", fake_get)
+
+    pf.get_init_times(
+        zone_key="DE", psr_type="Solar", version="stable", regime="uncurtailed"
+    )
+
+    assert captured["params"]["version"] == "stable"
+    assert captured["params"]["regime"] == "uncurtailed"
 
 
 def test_get_data_body_includes_version_and_pins(monkeypatch):
@@ -126,7 +174,54 @@ def test_get_data_body_includes_version_and_pins(monkeypatch):
     assert captured["data"]["version_pins"] == [
         {"zone_key": "DE", "psr_type": "Solar", "version": "rv7orbtm"}
     ]
+    assert "regime" not in captured["data"]
     assert "debias" not in captured["data"]
+
+
+def test_get_data_body_includes_regime_and_pin_regime(monkeypatch):
+    client = JuaClient()
+    pf = client.power_forecast
+    captured: dict = {}
+
+    def fake_post(path, data=None, requires_auth=True):
+        captured["data"] = data
+        return _FakeResponse(
+            {
+                "zone_key": [],
+                "psr_type": [],
+                "init_time": [],
+                "time": [],
+                "value": [],
+            }
+        )
+
+    monkeypatch.setattr(pf._api, "post", fake_post)
+
+    pf.get_data(
+        zone_keys=["DE"],
+        psr_types=["Solar"],
+        init_time="2026-07-16T00:00:00+00:00",
+        version="stable",
+        regime="uncurtailed",
+        version_pins=[
+            {
+                "zone_key": "DE",
+                "psr_type": "Solar",
+                "version": "latest",
+                "regime": "uncurtailed",
+            },
+        ],
+    )
+
+    assert captured["data"]["regime"] == "uncurtailed"
+    assert captured["data"]["version_pins"] == [
+        {
+            "zone_key": "DE",
+            "psr_type": "Solar",
+            "version": "latest",
+            "regime": "uncurtailed",
+        }
+    ]
 
 
 def test_get_data_body_includes_debias_when_enabled(monkeypatch):
@@ -156,6 +251,69 @@ def test_get_data_body_includes_debias_when_enabled(monkeypatch):
     )
 
     assert captured["data"]["debias"] is True
+
+
+def test_get_data_rejects_debias_with_uncurtailed_regime():
+    client = JuaClient()
+    pf = client.power_forecast
+
+    with pytest.raises(ValueError, match="debias cannot be combined"):
+        pf.get_data(
+            zone_keys=["DE"],
+            psr_types=["Solar"],
+            init_time="2026-07-16T00:00:00+00:00",
+            regime="uncurtailed",
+            debias=True,
+        )
+
+
+def test_get_data_rejects_debias_with_uncurtailed_pin():
+    client = JuaClient()
+    pf = client.power_forecast
+
+    with pytest.raises(ValueError, match="debias cannot be combined"):
+        pf.get_data(
+            zone_keys=["DE"],
+            psr_types=["Solar"],
+            init_time="2026-07-16T00:00:00+00:00",
+            version="stable",
+            version_pins=[
+                {
+                    "zone_key": "DE",
+                    "psr_type": "Solar",
+                    "version": "stable",
+                    "regime": "uncurtailed",
+                }
+            ],
+            debias=True,
+        )
+
+
+def test_get_day_ahead_rejects_debias_with_uncurtailed_regime():
+    client = JuaClient()
+    pf = client.power_forecast
+
+    with pytest.raises(ValueError, match="debias cannot be combined"):
+        pf.get_day_ahead_timeseries(
+            zone_keys=["DE"],
+            psr_types=["Solar"],
+            init_hour=9,
+            regime="uncurtailed",
+            debias=True,
+        )
+
+
+def test_get_data_rejects_invalid_regime():
+    client = JuaClient()
+    pf = client.power_forecast
+
+    with pytest.raises(ValueError, match="curtailed.*uncurtailed"):
+        pf.get_data(
+            zone_keys=["DE"],
+            psr_types=["Solar"],
+            init_time="2026-07-16T00:00:00+00:00",
+            regime="potential",  # type: ignore[arg-type]
+        )
 
 
 def test_get_data_rejects_internal_channel_names():
@@ -209,9 +367,12 @@ def test_resolve_init_time_passes_version_to_init_times(monkeypatch):
         psr_types=["Solar"],
         init_time="latest",
         version="latest",
+        regime="uncurtailed",
     )
 
     assert captured["params"]["version"] == "latest"
+    assert captured["params"]["regime"] == "uncurtailed"
     assert captured["data"]["version"] == "latest"
+    assert captured["data"]["regime"] == "uncurtailed"
     # Relative token resolved to concrete ISO init from the versioned listing.
     assert captured["data"]["init_time"].startswith("2026-07-16T12:00:00")

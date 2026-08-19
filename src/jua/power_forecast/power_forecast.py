@@ -5,7 +5,7 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass
 from datetime import datetime, timedelta
-from typing import TYPE_CHECKING, Mapping, Sequence
+from typing import TYPE_CHECKING, Literal, Mapping, Sequence
 from zoneinfo import ZoneInfo
 
 import pandas as pd
@@ -22,11 +22,15 @@ InitTimeSpec = str | int | datetime | list[str | int | datetime]
 
 # Serving alias or concrete run id from GET /power-forecast/versions.
 VersionSpec = str
+# Packaged product those aliases resolve against. A concrete run id ignores this.
+RegimeSpec = Literal["curtailed", "uncurtailed"]
 # Per-(zone, psr) override: {"zone_key": "DE", "psr_type": "Solar", "version": "..."}.
+# Optional ``regime`` overrides the request regime for that cell's alias lookup.
 VersionPinSpec = Mapping[str, str]
 
 _LATEST_RE = re.compile(r"^latest(-(\d+))?$")
 _INTERNAL_CHANNEL_NAMES = frozenset({"live", "preview"})
+_VALID_REGIMES = frozenset({"curtailed", "uncurtailed"})
 
 
 @dataclass(frozen=True)
@@ -50,8 +54,14 @@ class VersionInfo:
         model_version: Concrete run id that can be passed as ``version``.
         zone_key: Market zone code (e.g. ``"DE"``).
         psr_type: Production source type (e.g. ``"Solar"``).
-        is_stable: True when this run id is the packaged ``stable`` pointer.
-        is_latest: True when this run id is the packaged ``latest`` pointer.
+        is_stable: True when this run id is the packaged curtailed ``stable``
+            pointer.
+        is_latest: True when this run id is the packaged curtailed ``latest``
+            pointer.
+        is_stable_uncurtailed: True when this run id is the packaged
+            uncurtailed ``stable`` pointer.
+        is_latest_uncurtailed: True when this run id is the packaged
+            uncurtailed ``latest`` pointer.
         earliest_init_time: Earliest init time with predictions for this version.
         latest_init_time: Latest init time with predictions for this version.
     """
@@ -61,6 +71,8 @@ class VersionInfo:
     psr_type: str
     is_stable: bool
     is_latest: bool
+    is_stable_uncurtailed: bool
+    is_latest_uncurtailed: bool
     earliest_init_time: datetime
     latest_init_time: datetime
 
@@ -99,6 +111,14 @@ class PowerForecast:
         ...     init_time="latest",
         ...     version="latest",
         ...     debias=True,
+        ... )
+        >>>
+        >>> # Uncurtailed (potential) product on cells that serve it
+        >>> ds = pf.get_data(
+        ...     zone_keys=["DE"],
+        ...     psr_types=["Solar"],
+        ...     init_time="latest",
+        ...     regime="uncurtailed",
         ... )
         >>>
         >>> # Time range mode
@@ -221,6 +241,7 @@ class PowerForecast:
         start_time: datetime | None = None,
         end_time: datetime | None = None,
         version: VersionSpec | None = None,
+        regime: RegimeSpec | None = None,
     ) -> list[InitTimeInfo]:
         """Get available forecast init times.
 
@@ -248,14 +269,19 @@ class PowerForecast:
                 time-window mode.
             version: Serving selection: ``"stable"`` (default when omitted),
                 ``"latest"``, or a concrete run id from :meth:`get_versions`.
-                Filters init times to that model version.
+                Filters init times to that model version. Aliases resolve
+                against ``regime``.
+            regime: Product those aliases resolve against: ``"curtailed"``
+                (actual production, API default) or ``"uncurtailed"``
+                (potential). A concrete run id ignores ``regime``.
 
         Returns:
             List of :class:`InitTimeInfo` objects sorted newest-first.
 
         Raises:
             ValueError: If ``version`` is an internal channel name
-                (``live`` / ``preview``).
+                (``live`` / ``preview``), or if ``regime`` is not
+                ``curtailed`` / ``uncurtailed``.
             RuntimeError: If the API request fails.
 
         Examples:
@@ -269,6 +295,11 @@ class PowerForecast:
             ...     zone_key="DE", limit=10, version="latest"
             ... )
             >>>
+            >>> # Uncurtailed aliases (sparse; only cells that serve potential)
+            >>> init_times = client.power_forecast.get_init_times(
+            ...     zone_key="DE", psr_type="Solar", regime="uncurtailed"
+            ... )
+            >>>
             >>> # Time-window mode: every run in a date range (can exceed 1000)
             >>> from datetime import datetime, timezone
             >>> init_times = client.power_forecast.get_init_times(
@@ -278,6 +309,7 @@ class PowerForecast:
             ... )
         """
         self._validate_version(version)
+        self._validate_regime(regime)
         params: dict = {}
         # Time-window mode: filter by init_time range and let the server return
         # the full window. We omit ``limit`` because the endpoint caps it at
@@ -298,6 +330,8 @@ class PowerForecast:
             params["psr_type"] = psr_type
         if version is not None:
             params["version"] = version
+        if regime is not None:
+            params["regime"] = regime
 
         try:
             response = self._api.get(
@@ -326,10 +360,11 @@ class PowerForecast:
         """List pin-able model versions for power forecasts.
 
         Returns the catalog of concrete run ids per (zone, PSR) cell, with
-        ``is_stable`` / ``is_latest`` flags matching the packaged serving
-        pointers (``serving.yaml`` on the query-engine). Use a run id from
-        this catalog as ``version`` (or in ``version_pins``) to freeze a
-        checkpoint; aliases ``stable`` / ``latest`` follow live pointer updates.
+        ``is_stable`` / ``is_latest`` flags for the curtailed product and
+        ``is_stable_uncurtailed`` / ``is_latest_uncurtailed`` for the
+        potential product. Use a run id from this catalog as ``version``
+        (or in ``version_pins``) to freeze a checkpoint; aliases
+        ``stable`` / ``latest`` follow live pointer updates for ``regime``.
 
         Args:
             zone_key: Optional zone code(s) to filter by.
@@ -376,6 +411,12 @@ class PowerForecast:
                     psr_type=item["psr_type"],
                     is_stable=bool(item.get("is_stable", False)),
                     is_latest=bool(item.get("is_latest", False)),
+                    is_stable_uncurtailed=bool(
+                        item.get("is_stable_uncurtailed", False)
+                    ),
+                    is_latest_uncurtailed=bool(
+                        item.get("is_latest_uncurtailed", False)
+                    ),
                     earliest_init_time=datetime.fromisoformat(
                         item["earliest_init_time"].replace("Z", "+00:00")
                     ),
@@ -399,6 +440,7 @@ class PowerForecast:
         end_time: datetime | None = None,
         time_zone: str | None = None,
         version: VersionSpec | None = None,
+        regime: RegimeSpec | None = None,
         version_pins: Sequence[VersionPinSpec] | None = None,
         debias: bool = False,
     ) -> xr.Dataset:
@@ -413,9 +455,10 @@ class PowerForecast:
 
             Relative tokens and integer offsets are resolved by querying
             available init times filtered by ``zone_keys``,
-            ``psr_types``, and ``version``, so ``"latest"`` always refers
-            to the most recent run where *all* requested zone/PSR-type
-            combinations have data for that serving selection.
+            ``psr_types``, ``version``, and ``regime``, so ``"latest"``
+            always refers to the most recent run where *all* requested
+            zone/PSR-type combinations have data for that serving
+            selection.
 
         **Time range mode** (time-centric):
             Specify ``start_time`` and/or ``end_time`` to filter by the
@@ -438,16 +481,23 @@ class PowerForecast:
             version: Default model version for all (zone, psr) cells:
                 ``"stable"`` (API default when omitted), ``"latest"``, or a
                 concrete run id from :meth:`get_versions`. Overridden per
-                cell by ``version_pins``.
+                cell by ``version_pins``. Aliases resolve against ``regime``.
+            regime: Product those aliases resolve against: ``"curtailed"``
+                (actual production, API default) or ``"uncurtailed"``
+                (potential, sparse). A concrete run id ignores ``regime``.
+                Walk-forward ``debias`` cannot be combined with
+                ``regime="uncurtailed"``.
             version_pins: Optional per-(zone_key, psr_type) overrides. Each
                 mapping must include ``zone_key``, ``psr_type``, and
-                ``version`` (alias or run id).
+                ``version`` (alias or run id). Optional ``regime`` overrides
+                the request regime for that cell's alias lookup.
             debias: Apply walk-forward additive MW debiasing. Wind uses
                 eight weeks of history and solar uses four weeks to
                 estimate the bias for each init time and lead; that bias
                 is subtracted from the current forecast, then the window
                 moves ahead. Defaults to ``False`` so raw predictions
-                remain unchanged.
+                remain unchanged. Not available with
+                ``regime="uncurtailed"`` (or an uncurtailed version pin).
 
         Returns:
             ``xarray.Dataset`` with dimensions ``(zone_key, psr_type, time)``
@@ -455,8 +505,10 @@ class PowerForecast:
 
         Raises:
             ValueError: If both horizon and time-range parameters are given,
-                if neither mode is specified, or if ``version`` /
-                ``version_pins`` use internal channel names.
+                if neither mode is specified, if ``version`` /
+                ``version_pins`` use internal channel names, if
+                ``regime`` is not ``curtailed`` / ``uncurtailed``, or if
+                ``debias`` is combined with an uncurtailed regime.
             RuntimeError: If the API request fails.
 
         Examples:
@@ -488,6 +540,14 @@ class PowerForecast:
             ...     init_time="latest",
             ...     version=stable.model_version,
             ...     debias=True,
+            ... )
+            >>>
+            >>> # Uncurtailed (potential) German solar
+            >>> ds = client.power_forecast.get_data(
+            ...     zone_keys=["DE"],
+            ...     psr_types=["Solar"],
+            ...     init_time="latest",
+            ...     regime="uncurtailed",
             ... )
             >>>
             >>> # Mix aliases per cell
@@ -526,7 +586,11 @@ class PowerForecast:
             )
 
         self._validate_version(version)
+        self._validate_regime(regime)
         normalized_pins = self._normalize_version_pins(version_pins)
+        self._reject_uncurtailed_debias(
+            debias=debias, regime=regime, version_pins=normalized_pins
+        )
 
         if psr_types is not None and zone_keys:
             self._validate_psr_types(zone_keys, psr_types)
@@ -538,6 +602,7 @@ class PowerForecast:
                 zone_keys,
                 psr_types,
                 version=version,
+                regime=regime,
             )
 
         body = self._build_query_body(
@@ -549,6 +614,7 @@ class PowerForecast:
             end_time=end_time,
             time_zone=time_zone,
             version=version,
+            regime=regime,
             version_pins=normalized_pins,
             debias=debias,
         )
@@ -579,6 +645,7 @@ class PowerForecast:
         end_date: datetime | None = None,
         max_init_times: int = 365,
         version: VersionSpec | None = None,
+        regime: RegimeSpec | None = None,
         version_pins: Sequence[VersionPinSpec] | None = None,
         debias: bool = False,
     ) -> xr.Dataset:
@@ -629,13 +696,16 @@ class PowerForecast:
                 depth).
             version: Serving selection forwarded to :meth:`get_data` /
                 :meth:`get_init_times` (``stable`` / ``latest`` / run id).
+            regime: Product those aliases resolve against, forwarded to
+                :meth:`get_data` / :meth:`get_init_times`.
             version_pins: Optional per-(zone, psr) overrides forwarded to
                 :meth:`get_data`.
             debias: Apply walk-forward additive MW debiasing to every
                 fetched run. Wind uses eight weeks of history and solar
                 uses four weeks to estimate the bias; that bias is
                 subtracted from the current forecast, then the window
-                moves ahead. Defaults to ``False``.
+                moves ahead. Defaults to ``False``. Not available with
+                ``regime="uncurtailed"``.
 
         Returns:
             ``xarray.Dataset`` with dims ``(zone_key, psr_type, time)`` and
@@ -659,6 +729,10 @@ class PowerForecast:
             raise ValueError("init_hour must be in the range 0..23")
         if not isinstance(init_minute, int) or not 0 <= init_minute <= 59:
             raise ValueError("init_minute must be in the range 0..59")
+        self._validate_regime(regime)
+        self._reject_uncurtailed_debias(
+            debias=debias, regime=regime, version_pins=version_pins
+        )
 
         tz = ZoneInfo(time_zone)
 
@@ -679,6 +753,7 @@ class PowerForecast:
                 end_date=end_date,
                 end_lead_minutes=end_lead_minutes,
                 version=version,
+                regime=regime,
                 version_pins=version_pins,
                 debias=debias,
             )
@@ -693,6 +768,7 @@ class PowerForecast:
                 end_lead_minutes=end_lead_minutes,
                 max_init_times=max_init_times,
                 version=version,
+                regime=regime,
                 version_pins=version_pins,
                 debias=debias,
             )
@@ -718,6 +794,7 @@ class PowerForecast:
         end_lead_minutes: int,
         max_init_times: int,
         version: VersionSpec | None = None,
+        regime: RegimeSpec | None = None,
         version_pins: Sequence[VersionPinSpec] | None = None,
         debias: bool = False,
     ) -> pd.DataFrame:
@@ -727,6 +804,7 @@ class PowerForecast:
             psr_type=psr_types,
             limit=max_init_times,
             version=version,
+            regime=regime,
         )
         matching_inits: list[str | int | datetime] = []
         for info in init_infos:
@@ -751,6 +829,7 @@ class PowerForecast:
             max_prediction_timedelta=end_lead_minutes,
             time_zone=time_zone,
             version=version,
+            regime=regime,
             version_pins=version_pins,
             debias=debias,
         )
@@ -771,6 +850,7 @@ class PowerForecast:
         end_date: datetime | None,
         end_lead_minutes: int,
         version: VersionSpec | None = None,
+        regime: RegimeSpec | None = None,
         version_pins: Sequence[VersionPinSpec] | None = None,
         debias: bool = False,
     ) -> pd.DataFrame:
@@ -798,6 +878,7 @@ class PowerForecast:
             max_prediction_timedelta=end_lead_minutes,
             time_zone=time_zone,
             version=version,
+            regime=regime,
             version_pins=version_pins,
             debias=debias,
         )
@@ -1014,12 +1095,14 @@ class PowerForecast:
         psr_types: list[str] | None,
         *,
         version: VersionSpec | None = None,
+        regime: RegimeSpec | None = None,
     ) -> InitTimeSpec:
         """Resolve relative init_time tokens against available init times.
 
         Queries ``GET /init-times`` filtered by the requested zones,
-        PSR types, and serving ``version`` so that ``"latest"`` maps to the
-        newest run where all selected combinations have completed data.
+        PSR types, serving ``version``, and ``regime`` so that ``"latest"``
+        maps to the newest run where all selected combinations have
+        completed data.
         """
         items = spec if isinstance(spec, list) else [spec]
 
@@ -1034,7 +1117,11 @@ class PowerForecast:
                 max_offset = offset
 
         available = self._fetch_available_init_times(
-            zone_keys, psr_types, limit=max_offset + 1, version=version
+            zone_keys,
+            psr_types,
+            limit=max_offset + 1,
+            version=version,
+            regime=regime,
         )
 
         resolved = [self._resolve_single(v, available) for v in items]
@@ -1050,6 +1137,7 @@ class PowerForecast:
         limit: int,
         *,
         version: VersionSpec | None = None,
+        regime: RegimeSpec | None = None,
     ) -> list[datetime]:
         """Get available init times filtered by zone and PSR types.
 
@@ -1061,6 +1149,7 @@ class PowerForecast:
             psr_type=psr_types,
             limit=limit,
             version=version,
+            regime=regime,
         )
         return [info.init_time for info in infos]
 
@@ -1125,6 +1214,31 @@ class PowerForecast:
             raise ValueError("use 'stable' or 'latest', not internal channel names")
 
     @staticmethod
+    def _validate_regime(regime: str | None) -> None:
+        if regime is None:
+            return
+        if regime not in _VALID_REGIMES:
+            raise ValueError("regime must be 'curtailed' or 'uncurtailed'")
+
+    @staticmethod
+    def _reject_uncurtailed_debias(
+        *,
+        debias: bool,
+        regime: str | None,
+        version_pins: Sequence[Mapping[str, str]] | None,
+    ) -> None:
+        if not debias:
+            return
+        pin_uncurtailed = any(
+            pin.get("regime") == "uncurtailed" for pin in version_pins or []
+        )
+        if regime == "uncurtailed" or pin_uncurtailed:
+            raise ValueError(
+                "debias cannot be combined with regime='uncurtailed': "
+                "walk-forward debias is fitted on metered actuals"
+            )
+
+    @staticmethod
     def _normalize_version_pins(
         version_pins: Sequence[VersionPinSpec] | None,
     ) -> list[dict[str, str]] | None:
@@ -1149,13 +1263,16 @@ class PowerForecast:
             if not isinstance(version, str) or not version:
                 raise ValueError("version_pins.version must be a non-empty string")
             PowerForecast._validate_version(version)
-            normalized.append(
-                {
-                    "zone_key": zone_key,
-                    "psr_type": psr_type,
-                    "version": version,
-                }
-            )
+            pin_body: dict[str, str] = {
+                "zone_key": zone_key,
+                "psr_type": psr_type,
+                "version": version,
+            }
+            if "regime" in pin:
+                pin_regime = pin["regime"]
+                PowerForecast._validate_regime(pin_regime)
+                pin_body["regime"] = pin_regime
+            normalized.append(pin_body)
         return normalized
 
     @staticmethod
@@ -1168,6 +1285,7 @@ class PowerForecast:
         end_time: datetime | None,
         time_zone: str | None,
         version: VersionSpec | None = None,
+        regime: RegimeSpec | None = None,
         version_pins: list[dict[str, str]] | None = None,
         debias: bool = False,
     ) -> dict:
@@ -1190,6 +1308,8 @@ class PowerForecast:
             body["time_zone"] = time_zone
         if version is not None:
             body["version"] = version
+        if regime is not None:
+            body["regime"] = regime
         if version_pins is not None:
             body["version_pins"] = version_pins
         if debias:
