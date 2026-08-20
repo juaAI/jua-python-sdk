@@ -1,3 +1,9 @@
+## v0.41.0 (2026-08-20)
+
+### Feat
+
+- **RunDefinition**: add dissemination_day_offset + availability helper
+
 ## v0.40.0 (2026-08-19)
 
 ### Feat
