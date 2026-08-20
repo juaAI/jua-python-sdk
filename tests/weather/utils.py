@@ -20,19 +20,34 @@ from jua.weather.statistics import Statistics
 from jua.weather.variables import Variables
 
 
-def create_mock_arrow_response(df: pd.DataFrame) -> requests.Response:
+def create_mock_arrow_response(
+    df: pd.DataFrame,
+    timestamp_units: dict[str, Literal["s", "ms", "us", "ns"]] | None = None,
+) -> requests.Response:
     """Create a mock requests.Response with Arrow IPC stream data.
 
     Args:
         df: DataFrame with columns: init_time, model, prediction_timedelta,
             latitude, longitude, and variable columns. For point queries, also
             include a 'point' column with integer indices.
+        timestamp_units: Optional Arrow timestamp units to apply by column.
 
     Returns:
         Mock Response object with Arrow data in response body.
     """
     # Convert DataFrame to Arrow Table
     table = pa.Table.from_pandas(df)
+    for column, unit in (timestamp_units or {}).items():
+        index = table.schema.get_field_index(column)
+        field = table.schema.field(index)
+        if not pa.types.is_timestamp(field.type):
+            raise TypeError(f"{column} is not a timestamp column")
+        timestamp_type = pa.timestamp(unit, tz=field.type.tz)
+        table = table.set_column(
+            index,
+            field.with_type(timestamp_type),
+            table.column(index).cast(timestamp_type),
+        )
 
     # Serialize to Arrow IPC stream format
     buffer = BytesIO()

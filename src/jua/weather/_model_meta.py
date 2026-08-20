@@ -9,17 +9,19 @@ class TemporalResolution:
     """Internal class to store model temporal resolution
 
     Used for models with variable temporal resolution, such as EPT2.
+    Resolutions are expressed in hours and may be fractional (e.g. ``0.5``
+    for a 30-minute cadence such as EPT2 Helios).
 
     Attributes:
-        default: The default temporal resolution for the model.
-        segments: The resolution of the model for prediction_timedelta ranges.
+        base: The default temporal resolution for the model, in hours.
+        special: The resolution of the model for prediction_timedelta ranges.
             Defined as `(resolution, from_hour, to_hour)`, where the model has a
             prediction every `resolution` hours when the prediction_timedelta is
             in the interval [`from_hour`, `to_hour`].
     """
 
-    base: int
-    special: tuple[tuple[int, int, int], ...] = tuple()
+    base: float
+    special: tuple[tuple[float, int, int], ...] = tuple()
 
     def __post_init__(self) -> None:
         """Checks that the special cases make sense"""
@@ -45,6 +47,9 @@ class TemporalResolution:
     def num_prediction_timedeltas(self, from_hour: int, to_hour: int) -> int:
         """Determines the number of `prediction_timedeltas` in an interval.
 
+        Iterates internally in minutes so that sub-hourly resolutions
+        (e.g. a 30-minute cadence) are counted correctly.
+
         Attributes:
             from_hour: The start hour for the interval
             to_hour: The end hour for the interval
@@ -56,13 +61,15 @@ class TemporalResolution:
             )
 
         num_timedeltas = 0
-        for h in range(from_hour, to_hour + 1):
+        for minute in range(from_hour * 60, to_hour * 60 + 1):
+            hour = minute / 60
             resolution = self.base
             for s_res, s_start, s_end in self.special:
-                if s_start <= h <= s_end:
+                if s_start <= hour <= s_end:
                     resolution = s_res
                     break
-            if h % resolution == 0:
+            resolution_minutes = round(resolution * 60)
+            if minute % resolution_minutes == 0:
                 num_timedeltas += 1
 
         return num_timedeltas
@@ -134,6 +141,7 @@ _MODEL_META_INFO[Models.EPT2_EARLY] = ModelMetaInfo(
 _MODEL_META_INFO[Models.EPT2_HRRR] = ModelMetaInfo(
     has_grid_access=True,
     full_forecasted_hours=48,
+    has_statistics=True,
     num_lats=3600,
     num_lons=7200,
     forecasts_per_day=24,
@@ -152,6 +160,19 @@ _MODEL_META_INFO[Models.EPT2_REASONING] = ModelMetaInfo(
     forecast_name_mapping="ept-2-reasoning",
     full_forecasted_hours=480,
     temporal_resolution=TemporalResolution(base=6, special=((1, 0, 10 * 24),)),
+)
+_MODEL_META_INFO[Models.EPT2_HELIOS] = ModelMetaInfo(
+    has_grid_access=True,
+    full_forecasted_hours=48,
+    forecasts_per_day=48,
+    temporal_resolution=TemporalResolution(base=0.5),
+)
+_MODEL_META_INFO[Models.EPT2_EUROPA] = ModelMetaInfo(
+    has_grid_access=True,
+    full_forecasted_hours=48,
+    has_statistics=True,
+    forecasts_per_day=24,
+    temporal_resolution=TemporalResolution(base=1),
 )
 _MODEL_META_INFO[Models.AIFS] = ModelMetaInfo(
     has_grid_access=True,
@@ -215,11 +236,19 @@ _MODEL_META_INFO[Models.ICON_GLOBAL] = ModelMetaInfo(
         special=((1, 0, 78),),
     ),
 )
-_MODEL_META_INFO[Models.ECMWF_AIFS_ENSEMBLE] = ModelMetaInfo(
-    forecast_name_mapping="ecmwf_aifs025_ensemble",
+_MODEL_META_INFO[Models.AIFS_ENS] = ModelMetaInfo(
+    has_grid_access=True,
+    full_forecasted_hours=360,
+    has_statistics=True,
+    # 0.25 degree grid (1440x720 after south-pole drop) — matches the default
+    # num_lats=720 / num_lons=1440, so no override needed.
+    temporal_resolution=TemporalResolution(base=6),
+)
+_MODEL_META_INFO[Models.ECMWF_IFS_ENSEMBLE] = ModelMetaInfo(
     full_forecasted_hours=360,
     has_forecast_file_access=False,
     has_statistics=True,
+    temporal_resolution=TemporalResolution(base=6, special=((3, 0, 144),)),
 )
 
 

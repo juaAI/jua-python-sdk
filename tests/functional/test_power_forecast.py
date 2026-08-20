@@ -76,6 +76,29 @@ class TestMetadata:
             "Intersection of multiple PSR types should not exceed a single type"
         )
 
+    def test_get_init_times_time_window(self, pf):
+        """Time-window mode returns init times bounded by start/end and is not
+        capped at the 1000-item count limit."""
+        from datetime import datetime, timedelta, timezone
+
+        end = datetime.now(timezone.utc)
+        start = end - timedelta(days=30)
+
+        init_times = pf.get_init_times(
+            zone_key="DE", psr_type="Solar", start_time=start, end_time=end
+        )
+
+        assert isinstance(init_times, list)
+        assert len(init_times) > 0
+
+        def _as_utc(dt):
+            # The endpoint may return naive datetimes; treat them as UTC.
+            return dt.replace(tzinfo=timezone.utc) if dt.tzinfo is None else dt
+
+        assert all(start <= _as_utc(it.init_time) < end for it in init_times)
+        # A 30-day window exceeds the legacy 1000-item count cap.
+        assert len(init_times) > 1000
+
 
 class TestGetData:
     """Tests for power forecast data retrieval."""
@@ -189,4 +212,32 @@ class TestGetData:
                 init_time="latest",
                 max_prediction_timedelta=120,
                 start_time=datetime.now(timezone.utc),
+            )
+
+    def test_get_data_unavailable_load_hints_market_aggregates(self, pf):
+        """Requesting Load for a zone without a demand model raises a clear
+        error that points to market_aggregates' population-weighted load_mw.
+
+        Only DE exposes a Load PSR type today; other zones (e.g. FR) should
+        get an actionable hint instead of a cryptic init-time error.
+        """
+        if "Load" in pf.get_psr_types(zone_key="FR"):
+            pytest.skip("FR unexpectedly exposes a Load PSR type")
+
+        with pytest.raises(ValueError, match="market_aggregates"):
+            pf.get_data(
+                zone_keys=["FR"],
+                psr_types=["Load"],
+                init_time="latest",
+                max_prediction_timedelta=120,
+            )
+
+    def test_get_data_unavailable_psr_type_lists_available(self, pf):
+        """An unavailable PSR type error lists what the zone does serve."""
+        with pytest.raises(ValueError, match="not available from power_forecast"):
+            pf.get_data(
+                zone_keys=["FR"],
+                psr_types=["Not A Real Type"],
+                init_time="latest",
+                max_prediction_timedelta=120,
             )

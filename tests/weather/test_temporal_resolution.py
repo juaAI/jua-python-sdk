@@ -13,11 +13,13 @@ from jua.weather._model_meta import TemporalResolution
             ((1, 0, 24), (3, 24, 48)),
             [((0, 48), 33), ((0, 72), 37)],
         ),
+        # Sub-hourly (30min) resolution: 2 steps per hour
+        (0.5, tuple(), [((0, 1), 3), ((0, 2), 5), ((0, 48), 97)]),
     ],
 )
 def test_temporal_resolution(
-    base: int,
-    special: tuple[tuple[int, int, int]],
+    base: float,
+    special: tuple[tuple[float, int, int]],
     test_cases: list[tuple[int, int], int],
 ) -> None:
     tr = TemporalResolution(base=base, special=special)

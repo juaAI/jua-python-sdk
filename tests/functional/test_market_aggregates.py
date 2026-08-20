@@ -417,6 +417,39 @@ def test_compare_runs_mw_solar(client: JuaClient):
         pytest.fail(f"Failed to retrieve solar MW data: {e}")
 
 
+def test_compare_runs_mw_load(client: JuaClient):
+    """Test predicted electricity demand (population weighting -> load_mw).
+
+    Demand is available for many zones beyond Germany, so this also checks a
+    couple of other zones return load.
+
+    Args:
+        client: JuaClient instance
+    """
+    try:
+        for zone in (MarketZones.DE, MarketZones.FR, MarketZones.GB):
+            market = client.market_aggregates.get_market(market_zone=zone)
+            model_runs = [ModelRuns(Models.EPT2, 0)]
+
+            ds = market.compare_runs_mw(
+                weighting="population",
+                model_runs=model_runs,
+                max_lead_time=48,
+            )
+
+            assert ds is not None, f"No data returned for load MW ({zone.zone_name})"
+            assert "model_run" in ds.dims, "Missing model_run dimension"
+            assert "time" in ds.dims, "Missing time dimension"
+            assert "load_mw" in ds.data_vars, "Missing load_mw variable"
+            assert ds.attrs.get("unit") == "MW"
+            assert ds.attrs.get("weighting") == "population"
+
+            print(f"✓ Load MW ({zone.zone_name}): retrieved predicted demand")
+
+    except Exception as e:
+        pytest.fail(f"Failed to retrieve load MW data: {e}")
+
+
 def test_get_mw_zones(client: JuaClient):
     """Test discovering which market zones support MW output.
 
@@ -428,6 +461,11 @@ def test_get_mw_zones(client: JuaClient):
 
         assert isinstance(zones, dict), "Expected dict from get_mw_zones()"
         assert len(zones) > 0, "No MW zones returned"
+        # Generation and demand outputs are all reported.
+        for key in ("wind", "solar", "load"):
+            assert key in zones, f"Missing '{key}' in mw-zones"
+        # Demand is broadly available, including the core EU zones + GB.
+        assert {"DE", "FR", "NL", "BE", "GB"} <= set(zones["load"])
 
         print("✓ MW zones: Successfully retrieved supported zones")
         print(f"  Categories: {list(zones.keys())}")

@@ -36,10 +36,20 @@ DEFAULT_FORECAST_DATE = datetime(2025, 10, 20, 0, 0, 0)
 MODEL_SPECIFIC_FORECAST_DATES = {
     Models.EPT2_REASONING: datetime(2025, 11, 23, 0, 0, 0),
     Models.ICON_EU: datetime(2026, 2, 9, 0, 0, 0),
+    # AIFS ENS (ECMWF Open Data) backfill starts mid-2025 and is sparse at the
+    # edges; the default 2025-10-20 isn't present. Use a verified mid-history
+    # init time.
+    Models.AIFS_ENS: datetime(2026, 3, 3, 0, 0, 0),
 }
 
-ALL_MODELS = list(Models)
-INTERNAL_MODELS = [m for m in Models if get_model_meta_info(m).has_grid_access]
+SOLAR_ONLY_MODELS = {Models.EPT2_HELIOS}
+
+ALL_MODELS = [m for m in Models if m not in SOLAR_ONLY_MODELS]
+INTERNAL_MODELS = [
+    m
+    for m in Models
+    if get_model_meta_info(m).has_grid_access and m not in SOLAR_ONLY_MODELS
+]
 
 
 def get_forecast_date(model: Models) -> datetime:
@@ -170,7 +180,7 @@ def test_latest_forecast(client: JuaClient, model: Models):
         )
 
 
-@pytest.mark.parametrize("model", [Models.EPT2_E])
+@pytest.mark.parametrize("model", [Models.EPT2_E, Models.EPT2_HRRR, Models.EPT2_EUROPA])
 def test_latest_forecast_with_stats(client: JuaClient, model: Models):
     """Test retrieving the latest forecast with statistics.
 

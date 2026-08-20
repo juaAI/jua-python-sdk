@@ -22,6 +22,7 @@ def main():
             "zone_keys": zones,
             "init_time": ["latest-3", "latest-4"],
             "max_prediction_timedelta": 4320,
+            "debias": True,
         },
         requires_auth=True,
     )

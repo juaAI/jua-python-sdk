@@ -1,3 +1,143 @@
+## v0.40.0 (2026-08-19)
+
+### Feat
+
+- **power_forecast**: add serving regime selection
+
+## v0.39.0 (2026-08-18)
+
+### Feat
+
+- **weather**: normalize forecast datetimes to milliseconds
+
+## v0.38.0 (2026-08-14)
+
+### Feat
+
+- **power**: expose opt-in MW debiasing
+
+## v0.37.0 (2026-07-20)
+
+### Feat
+
+- **power_forecast**: support exact minute-level day-ahead init times
+
+## v0.36.0 (2026-07-20)
+
+### BREAKING CHANGE
+
+- Models.ECMWF_AIFS_ENSEMBLE is removed. Use Models.AIFS_ENS
+(hosted, grid access) instead. Note aifs_ens does not serve 500hPa geopotential.
+
+### Feat
+
+- **models**: remove retired ecmwf_aifs025_ensemble
+
+## v0.35.0 (2026-07-17)
+
+### Feat
+
+- **power_forecast**: expose stable/latest serving version selection
+
+## v0.34.0 (2026-07-10)
+
+### Feat
+
+- **models**: enable ensemble statistics for EPT2_HRRR and EPT2_EUROPA
+
+## v0.33.0 (2026-06-26)
+
+### Feat
+
+- **models**: replace ecmwf_aifs025_ensemble with hosted aifs_ens
+
+### Refactor
+
+- **models**: keep ecmwf_aifs025_ensemble; add aifs_ens additively
+
+## v0.32.0 (2026-06-17)
+
+### Feat
+
+- **power_forecast**: validate PSR types with actionable demand hint
+- **market_aggregates**: add demand (load) MW output
+- **market_data**: add GB transmission/embedded wind split
+
+### Fix
+
+- **market_aggregates**: support multi-zone MW output
+
+## v0.31.0 (2026-06-05)
+
+### Feat
+
+- **market_data**: add zone-addressed market data (ENTSOE + UK power)
+
+### Fix
+
+- **market_data**: correct imbalance prices and unavailable-variable handling
+- **power_forecast**: handle DST mixed-offset timestamps in day-ahead stitching
+
+## v0.30.0 (2026-06-05)
+
+### Feat
+
+- **models**: support sub-hourly temporal resolution for Helios
+- add example for helios
+- **models**: add EPT2_HELIOS and EPT2_EUROPA with meta; feat(variables): add 30min ssrd/fdir variables; docs: note 30min resolution for Helios in meta
+
+### Fix
+
+- **models**: correct Helios/Europa forecast hours and update frequency
+- **models**: simplify Helios/Europa meta to match HRRR pattern
+- **tests**: exclude solar-only Helios from generic forecast tests
+- **ci**: handle force push in commit message check
+- resolve merge conflict in CHANGELOG.md
+- fix models name
+
+### Refactor
+
+- **examples**: replace Helios grid example with point comparison
+
+## v0.29.0 (2026-06-04)
+
+### Feat
+
+- **power_forecast**: add time-window mode to get_init_times
+
+## v0.28.0 (2026-06-03)
+
+### Feat
+
+- **power_forecast**: add date range to get_day_ahead_timeseries
+- **power_forecast**: add get_day_ahead_timeseries() to stitch day-ahead window by init-hour; include unit test covering 09:00 -> 15..39h selection
+
+### Refactor
+
+- **power_forecast**: drop redundant UTC conversions in day-ahead clip
+
+## v0.27.0 (2026-06-02)
+
+### Feat
+
+- **api**: size connection pool for concurrent shared-session requests
+- **api**: add permissive HTTP retry policy for transient failures
+
+### Fix
+
+- **api**: ignore missing requests.adapters stubs for mypy lint hook
+
+## v0.26.0 (2026-05-28)
+
+### Feat
+
+- **variables**: add WIND_SPEED_OF_GUST_AT_HEIGHT_LEVEL_10M_MAX
+- **models**: add ECMWF_IFS_ENSEMBLE
+
+### Fix
+
+- **variables**: drop emcwf_code for wind gust 10m max
+
 ## v0.25.0 (2026-05-08)
 
 ### Feat

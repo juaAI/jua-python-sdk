@@ -129,6 +129,7 @@ def main():
         weighting="wind_capacity",
         model_runs=[ModelRuns(Models.EPT2, [0, 1])],
         max_lead_time=48,
+        debias=True,
     )
     print(f"MW dataset:\n{mw_data}")
 
@@ -137,14 +138,30 @@ def main():
         weighting="solar_capacity",
         model_runs=[ModelRuns(Models.EPT2, 0)],
         max_lead_time=24,
+        debias=True,
     )
     print(f"Solar MW dataset:\n{solar_mw}")
 
-    # Example: Discover MW-capable zones
+    # Example: predicted electricity demand (population weighting -> load_mw).
+    # Demand is available well beyond Germany, so query a few zones at once.
+    print("\nExample: predicted demand (load) for DE, FR, GB")
+    eu = client.market_aggregates.get_market(
+        market_zone=[MarketZones.DE, MarketZones.FR, MarketZones.GB]
+    )
+    load_mw = eu.compare_runs_mw(
+        weighting="population",
+        model_runs=[ModelRuns(Models.EPT2, 0)],
+        max_lead_time=48,
+        debias=True,
+    )
+    print(f"Load (demand) MW dataset:\n{load_mw}")
+
+    # Example: Discover MW-capable zones (generation and demand)
     print("\nExample: MW-capable market zones")
     mw_zones = client.market_aggregates.get_mw_zones()
     print(f"Wind MW zones: {mw_zones['wind']}")
     print(f"Solar MW zones: {mw_zones['solar']}")
+    print(f"Load (demand) MW zones: {mw_zones['load']}")
 
 
 if __name__ == "__main__":
