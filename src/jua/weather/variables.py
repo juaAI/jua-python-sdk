@@ -196,6 +196,12 @@ class Variables(Enum):
         None,
         None,
     )
+    SEA_SURFACE_TEMPERATURE = Variable(
+        "sea_surface_temperature",
+        "K",
+        None,
+        None,
+    )
     SURFACE_DOWNWELLING_SHORTWAVE_FLUX_SUM_1H = Variable(
         "surface_downwelling_shortwave_flux_sum_1h", "J / m^2", "ssrd", None
     )
@@ -238,6 +244,12 @@ class Variables(Enum):
     )
     PRECIPITATION_AMOUNT_SUM_6H = Variable(
         "precipitation_amount_sum_6h", "mm / m^2", None, None
+    )
+    PREDOMINANT_PRECIPITATION_TYPE_AT_SURFACE = Variable(
+        "predominant_precipitation_type_at_surface", "categorical", None, None
+    )
+    ATMOSPHERE_CONVECTIVE_AVAILABLE_POTENTIAL_ENERGY = Variable(
+        "atmosphere_convective_available_potential_energy", "J / kg", None, None
     )
 
     CLOUD_AREA_FRACTION_AT_ENTIRE_ATMOSPHERE = Variable(
