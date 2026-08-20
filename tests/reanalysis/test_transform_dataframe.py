@@ -83,9 +83,7 @@ def test_grid_query_values_land_on_the_right_cell():
         & (df["longitude"] == 13.25),
         _TEMP,
     ].iloc[0]
-    actual = ds[_TEMP].sel(
-        time="2024-01-15T01:00:00", latitude=52.25, longitude=13.25
-    )
+    actual = ds[_TEMP].sel(time="2024-01-15T01:00:00", latitude=52.25, longitude=13.25)
     assert float(actual) == pytest.approx(expected)
 
 

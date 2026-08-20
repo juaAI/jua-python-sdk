@@ -116,7 +116,7 @@ def test_build_time_arg_accepts_slice():
 
 def test_build_time_arg_rejects_latest():
     """The API documents "latest" but returns 500 for it, so we reject early."""
-    with pytest.raises(ValueError, match="no \"latest\" selector"):
+    with pytest.raises(ValueError, match='no "latest" selector'):
         build_time_arg("latest")  # type: ignore[arg-type]
 
 

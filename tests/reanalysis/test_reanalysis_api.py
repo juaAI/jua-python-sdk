@@ -75,7 +75,9 @@ def test_get_data_rejects_oversized_request():
     client = JuaClient()
     with pytest.raises(ValueError, match="too large for a single call"):
         client.reanalysis.get_data(
-            time=slice(datetime(2024, 1, 1, tzinfo=UTC), datetime(2024, 12, 31, tzinfo=UTC)),
+            time=slice(
+                datetime(2024, 1, 1, tzinfo=UTC), datetime(2024, 12, 31, tzinfo=UTC)
+            ),
             variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
             latitude=slice(90, -90),
             longitude=slice(-180, 180),
