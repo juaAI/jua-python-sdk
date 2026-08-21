@@ -1,3 +1,9 @@
+## v0.41.1 (2026-08-21)
+
+### Fix
+
+- **settings**: update frontend hostname to platform.jua.ai
+
 ## v0.41.0 (2026-08-20)
 
 ### Feat
