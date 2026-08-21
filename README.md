@@ -27,8 +27,8 @@ uv init && uv add jua
 
 ### Authentication
 
-Simply run `jua auth` to authenticate via your web browser. Make sure you are already logged in the [developer portal](https://developer.jua.ai).
-Alternatively, generate an API key from the [Jua dashboard](https://developer.jua.ai/api-keys) and save it to `~/.jua/default/api-key.json`.
+Simply run `jua auth` to authenticate via your web browser. Make sure you are already logged in the [Jua platform](https://platform.jua.ai).
+Alternatively, generate an API key from the [Jua platform](https://platform.jua.ai/api-keys) and save it to `~/.jua/default/api-key.json`.
 
 ### Datetime resolution
 
