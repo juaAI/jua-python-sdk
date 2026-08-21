@@ -53,7 +53,7 @@ class JuaSettings(BaseSettings):
     """
 
     frontend_url: str = Field(
-        default="https://athena.jua.ai",
+        default="https://platform.jua.ai",
         description="Base URL for the JUA developer frontend",
     )
 
