@@ -1,3 +1,9 @@
+## v0.41.2 (2026-08-28)
+
+### Fix
+
+- **weather**: preserve sub-hourly lead times in the lazy cache
+
 ## v0.41.1 (2026-08-21)
 
 ### Fix
