@@ -959,5 +959,53 @@ class TestCaching:
         assert data.shape[0] == 3, f"Expected shape[0]=3, got {data.shape[0]}"
 
 
+class TestSubhourlyLazyLoading:
+    """Helios-style 30-minute lead times must not become NaN in the lazy cache."""
+
+    def test_half_hour_steps_are_populated(self):
+        latitudes = np.linspace(40.0, 41.0, 8)
+        longitudes = np.linspace(6.0, 7.0, 8)
+        variable = Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M.name
+        mock_qe = MockQueryEngine(
+            max_lead_time=2,
+            latitudes=latitudes,
+            longitudes=longitudes,
+            variables=[variable],
+            timedelta_step_minutes=30,
+        )
+        requested_payloads = []
+        original_load_raw = mock_qe.load_raw_forecast
+
+        def tracked_load_raw(*args, **kwargs):
+            payload = args[0] if args else kwargs.get("payload")
+            requested_payloads.append(payload)
+            return original_load_raw(*args, **kwargs)
+
+        mock_qe.load_raw_forecast = tracked_load_raw
+
+        ds = xr.open_dataset(
+            Models.EPT2_HELIOS,
+            engine="jua_query_engine",
+            query_engine=mock_qe,
+            init_time=[datetime(2025, 1, 1, 0, 0)],
+            prediction_timedelta=slice(0, 2),
+            latitude=slice(40.0, 41.0),
+            longitude=slice(6.0, 7.0),
+            variables=[variable],
+        )
+
+        values = ds[variable].isel(init_time=0, latitude=0, longitude=0).values
+        timedeltas = ds.prediction_timedelta.values
+        expected_tds = [
+            np.timedelta64(minutes, "m") for minutes in (0, 30, 60, 90, 120)
+        ]
+
+        np.testing.assert_array_equal(timedeltas, expected_tds)
+        assert requested_payloads, "lazy access should fetch data"
+        assert requested_payloads[0].prediction_timedelta == [0, 30, 60, 90, 120]
+        assert values.shape == (5,)
+        assert not np.isnan(values).any()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

@@ -145,10 +145,9 @@ class ForecastCache:
         self._grid_chunk = grid_chunk
         self._max_init_times_per_query = max_init_times_per_query
 
-        # Parsed params for API queries
-        self._pred_td_hours = [
-            int(td / np.timedelta64(1, "h")) for td in self._prediction_timedeltas
-        ]
+        # Native timedeltas for API queries. Integer hours would truncate
+        # sub-hourly lead times (e.g. Helios 30-minute steps) to whole hours.
+        self._pred_td_query = list(self._prediction_timedeltas)
 
         # Cache stores merged bboxes: bbox_id -> BBoxCache
         self._bbox_cache: dict[str, BBoxCache] = {}
@@ -392,7 +391,7 @@ class ForecastCache:
                     init_time=build_init_time_arg(init_times_dt),
                     geo=GeoFilter(type="bounding_box", value=bounding_boxes),
                     prediction_timedelta=build_prediction_timedelta(
-                        self._pred_td_hours
+                        self._pred_td_query
                     ),
                     variables=self._variables,
                 ),
