@@ -155,6 +155,61 @@ plt.show()
 
 ![Europe Hindcast](content/readme/hindcast_zurich.png)
 
+### Accessing ERA5 reanalysis
+
+ERA5 is a reconstruction of past weather rather than a forecast, so it has a single `time` dimension: there is no `init_time` or `prediction_timedelta`. Use it for historical analysis, for training and validating models, and for scoring forecasts against what actually happened.
+
+```python
+from datetime import datetime
+
+from jua import JuaClient
+from jua.types.geo import LatLon
+from jua.weather import Variables
+
+client = JuaClient()
+
+# A hourly time series for two cities
+zurich = LatLon(lat=47.3769, lon=8.5417)
+london = LatLon(lat=51.5074, lon=-0.1278)
+data = client.reanalysis.get_data(
+    time=slice(datetime(2024, 1, 1), datetime(2024, 2, 1)),
+    variables=[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M],
+    points=[zurich, london],
+)
+
+# Dimensions are (points, time); both the requested and the actual grid
+# coordinates are kept as coordinates.
+ds = data.to_xarray()
+data[Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M].isel(points=0).to_celcius().plot()
+```
+
+To download a region rather than points, pass `latitude` / `longitude` slices. The result has dimensions `(time, latitude, longitude)` and can be written straight to Zarr:
+
+```python
+germany = client.reanalysis.get_data(
+    time=slice(datetime(2024, 6, 1), datetime(2024, 7, 1)),
+    variables=[
+        Variables.AIR_TEMPERATURE_AT_HEIGHT_LEVEL_2M,
+        Variables.WIND_SPEED_AT_HEIGHT_LEVEL_100M,
+    ],
+    latitude=slice(55, 47),
+    longitude=slice(5, 15),
+)
+germany.save()  # ~/.jua/datasets/arco_era5/<name>.zarr
+```
+
+Discover what is available:
+
+```python
+client.reanalysis.get_variables()   # the 21 variables ERA5 serves
+client.reanalysis.get_metadata()    # grid resolution, temporal resolution, units
+```
+
+Two things to know:
+
+- **ERA5 is published with a lag of roughly five days**, so recent timestamps do not exist yet. `time` is required and there is no `"latest"` selector.
+- **A single request is capped at 5 million rows** (rows = points x hourly timesteps). That is about five months of hourly data over a Germany-sized box, or under five hours of the full global grid. Oversized requests raise a `ValueError` with the estimate before any request is sent, so split long ranges into chunks.
+
 ### Accessing Market Aggregates
 
 The `AggregateVariables` enum provides the following variables:
