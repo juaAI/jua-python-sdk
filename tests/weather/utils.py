@@ -211,6 +211,7 @@ class MockQueryEngine:
         latitudes: np.ndarray,
         longitudes: np.ndarray,
         variables: list[Variables] | list[str],
+        timedelta_step_minutes: int = 60,
     ):
         """Initialize mock query engine with coordinate definitions.
 
@@ -220,6 +221,8 @@ class MockQueryEngine:
             latitudes: Array of latitude values
             longitudes: Array of longitude values
             variables: List of variable names
+            timedelta_step_minutes: Lead-time cadence in minutes. Defaults to
+                hourly (60). Use 30 to mimic Helios-style sub-hourly output.
         """
         # Generate 4 init times per day from 2023-01-01 to 2025-11-01
         init_time_list = []
@@ -230,7 +233,12 @@ class MockQueryEngine:
 
         # Convert to numpy array with datetime64
         self.init_times = np.array(init_time_list, dtype="datetime64[ns]")
-        self.prediction_timedeltas = np.arange(0, 60 * (max_lead_time + 1), 60)
+        # Inclusive of max_lead_time hours for any positive step.
+        self.prediction_timedeltas = np.arange(
+            0,
+            60 * max_lead_time + timedelta_step_minutes,
+            timedelta_step_minutes,
+        )
         self.latitudes = np.sort(np.asarray(latitudes))
         self.longitudes = np.sort(np.asarray(longitudes))
         self.variables = [v.name if isinstance(v, Variables) else v for v in variables]

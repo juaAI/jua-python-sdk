@@ -1,7 +1,9 @@
 import numpy as np
+import pandas as pd
 import pytest
 
 from jua.weather._lazy_loading.cache import BBoxCache, ForecastCache, MergedBBox
+from jua.weather._query_engine import QueryEngine
 from jua.weather.models import Models
 
 
@@ -196,3 +198,82 @@ def test_positional_index_rejects_array_out_of_bounds():
     cache = _make_cache()
     with pytest.raises(IndexError):
         cache._positional_to_indices(np.array([0, 47, 48]), 48)
+
+
+def test_cache_keeps_subhourly_timedeltas_for_query():
+    """Integer-hour conversion would map 0.5h and 1.5h onto 0h and 1h."""
+    pred_tds = [np.timedelta64(minutes, "m") for minutes in (0, 30, 60, 90)]
+    cache = ForecastCache(
+        query_engine=_DummyQueryEngine(),
+        model=Models.EPT2_HELIOS,
+        variables=[],
+        init_times=[np.datetime64("2024-01-01T00")],
+        prediction_timedeltas=pred_tds,
+        latitudes=np.array([0.0, 1.0]),
+        longitudes=np.array([0.0, 1.0]),
+        original_kwargs={},
+        grid_chunk=2,
+    )
+    truncated_hours = [int(td / np.timedelta64(1, "h")) for td in pred_tds]
+    assert truncated_hours == [0, 0, 1, 1]
+    query_minutes = [int(td / np.timedelta64(1, "m")) for td in cache._pred_td_query]
+    assert query_minutes == [0, 30, 60, 90]
+
+
+def test_fetch_preserves_subhourly_prediction_timedeltas():
+    """Lazy cache must request and return 30-minute lead times without NaNs."""
+    pred_tds = [np.timedelta64(minutes, "m") for minutes in (0, 30, 60, 90, 120)]
+
+    class _SubhourlyQueryEngine:
+        def __init__(self):
+            self.payloads = []
+
+        def load_raw_forecast(self, payload, stream=False, print_progress=False):
+            self.payloads.append(payload)
+            rows = []
+            for td in pred_tds:
+                minutes = int(td / np.timedelta64(1, "m"))
+                rows.append(
+                    {
+                        "init_time": pd.Timestamp("2024-01-01T00"),
+                        "prediction_timedelta": pd.Timedelta(minutes=minutes),
+                        "latitude": 0.0,
+                        "longitude": 0.0,
+                        "dummy": float(minutes),
+                    }
+                )
+            df = pd.DataFrame(rows)
+            df["init_time"] = df["init_time"].astype("datetime64[ns]")
+            df["prediction_timedelta"] = df["prediction_timedelta"].astype(
+                "timedelta64[ns]"
+            )
+            return df
+
+        def transform_dataframe(self, df, points=None, statistics=None):
+            return QueryEngine.transform_dataframe(df, points, statistics)
+
+    qe = _SubhourlyQueryEngine()
+    cache = ForecastCache(
+        query_engine=qe,
+        model=Models.EPT2_HELIOS,
+        variables=["dummy"],
+        init_times=[np.datetime64("2024-01-01T00")],
+        prediction_timedeltas=pred_tds,
+        latitudes=np.array([0.0]),
+        longitudes=np.array([0.0]),
+        increasing_lats=True,
+        increasing_lons=True,
+        original_kwargs={},
+        grid_chunk=2,
+    )
+
+    out = cache.get_variable(
+        "dummy",
+        (0, slice(None), np.array([0]), np.array([0])),
+    )
+
+    assert len(qe.payloads) == 1
+    assert qe.payloads[0].prediction_timedelta == [0, 30, 60, 90, 120]
+    assert out.shape == (1, 5, 1, 1)
+    np.testing.assert_array_equal(out[0, :, 0, 0], [0.0, 30.0, 60.0, 90.0, 120.0])
+    assert not np.isnan(out).any()
