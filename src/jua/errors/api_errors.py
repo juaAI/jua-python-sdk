@@ -26,16 +26,20 @@ class NotAuthenticatedError(JuaError):
 class UnauthorizedError(JuaError):
     """Error raised when API requests are rejected due to insufficient permissions."""
 
-    def __init__(self, status_code: int | None = None):
-        """Initialize with optional status code.
+    def __init__(self, status_code: int | None = None, details: str | None = None):
+        """Initialize with optional status code and the server's reason.
 
         Args:
             status_code: HTTP status code from the failed request.
+            details: Why the server refused, when it said so. A permission
+                refusal (e.g. a feature the account does not have) is not
+                fixed by checking the API key, so it is shown as sent.
         """
         super().__init__(
             "Unauthorized",
-            details="Please check your API key and try again.",
+            details=details or "Please check your API key and try again.",
         )
+        self.status_code = status_code
 
 
 class NotFoundError(JuaError):

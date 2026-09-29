@@ -106,6 +106,7 @@ class Model:
         stream: bool | None = None,
         print_progress: bool | None = None,
         lazy_load: bool = False,
+        include_ensemble_members: bool = False,
     ) -> JuaDataset:
         """Retrieve forecasts for this model.
 
@@ -178,6 +179,12 @@ class Model:
                     high enough to load the entire created Dataset at once, even though
                     no credits are charged until data is actually loaded.
 
+            include_ensemble_members: For ensemble models, return every ensemble
+                member instead of the ensemble mean, as an `ensemble_member`
+                dimension. Member names are stable across queries. Not every
+                member produces every variable; members without a variable are
+                NaN for it. Cannot be combined with `statistics` or `lazy_load`.
+
         Returns:
             JuaDataset containing the forecast data matching your selection criteria.
 
@@ -209,6 +216,13 @@ class Model:
             ...     ],
             ...     max_lead_time=24,
             ... )
+            >>>
+            >>> # Get every EPT-2e ensemble member for Berlin
+            >>> members = client.weather.get_model(Models.EPT2_E).get_forecasts(
+            ...     points=LatLon(lat=52.52, lon=13.405),
+            ...     max_lead_time=240,
+            ...     include_ensemble_members=True,
+            ... )
         """
         if statistics:
             self._check_model_has_stats()
@@ -231,6 +245,8 @@ class Model:
         if lazy_load:
             if statistics:
                 raise ValueError(f"Cannot `lazy_load` with stats: {statistics}.")
+            if include_ensemble_members:
+                raise ValueError("Cannot `lazy_load` with `include_ensemble_members`.")
             if points is not None:
                 raise ValueError("Cannot `lazy_load` points: load the data directly.")
             if not isinstance(latitude, slice):
@@ -277,6 +293,7 @@ class Model:
             method=method,
             stream=stream,
             print_progress=print_progress,
+            include_ensemble_members=include_ensemble_members,
         )
         return JuaDataset(
             settings=self._client.settings,

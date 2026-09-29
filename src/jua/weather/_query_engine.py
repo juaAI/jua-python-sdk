@@ -46,6 +46,14 @@ def _normalize_datetime_columns_to_milliseconds(df: pd.DataFrame) -> None:
             df[column] = df[column].dt.as_unit("ms")
 
 
+def _member_sort_key(member: str) -> tuple[str, int]:
+    """Order `ept2_e_2` before `ept2_e_10` (a plain string sort would not)."""
+    prefix, _, index = str(member).rpartition("_")
+    if index.isdigit():
+        return prefix, int(index)
+    return str(member), -1
+
+
 class QueryEngine:
     """Internal API client for Jua's weather services.
 
@@ -289,6 +297,7 @@ class QueryEngine:
         method: Literal["nearest", "bilinear"] = "nearest",
         stream: bool | None = None,
         print_progress: bool | None = None,
+        include_ensemble_members: bool = False,
     ) -> ForecastData:
         """Get a forecast for a specific model and initialization time.
 
@@ -332,6 +341,10 @@ class QueryEngine:
             print_progress: Whether to display a progress bar during data loading.
                 If None, uses the client's default setting. Only works when stream=True.
 
+            include_ensemble_members: For ensemble models, return every ensemble
+                member instead of the ensemble mean, as an `ensemble_member`
+                dimension. Cannot be combined with `statistics`.
+
         Returns:
             Forecast data.
 
@@ -350,6 +363,19 @@ class QueryEngine:
                 f"There is no access to grid slices with {model}. You can only make "
                 "point queries."
             )
+        if include_ensemble_members:
+            if not model_meta.has_statistics:
+                ensembles = ", ".join(
+                    m.value for m in Models if get_model_meta_info(m).has_statistics
+                )
+                raise ValueError(
+                    f"{model.value} has no ensemble members. "
+                    f"`include_ensemble_members` needs an ensemble model: {ensembles}."
+                )
+            if statistics:
+                raise ValueError(
+                    "`include_ensemble_members` cannot be combined with `statistics`."
+                )
 
         stats: list[Statistics] = []
         if statistics is not None:
@@ -372,6 +398,7 @@ class QueryEngine:
                 prediction_timedelta=build_prediction_timedelta(prediction_timedelta),
                 variables=variables,
                 aggregation=aggregation,
+                include_ensemble_members=include_ensemble_members or None,
             ),
             stream=geo.type != "point" if stream is None else stream,
             print_progress=print_progress,
@@ -507,10 +534,17 @@ class QueryEngine:
                   into a single `temperature` variable with shape (..., stat)
                 - The `stat` coordinate contains statistic keys (e.g., "mean", "max")
 
+            **With ensemble members** (the frame has an `ensemble_member` column):
+                - Adds a trailing `ensemble_member` dimension, ordered by member
+                  index (`ept2_e_0`, `ept2_e_1`, ..., `ept2_e_10`)
+                - Members that do not produce a variable are NaN for it
+
         Note:
             - All data variables are converted to float32 for memory efficiency
             - Init time encoding is set to milliseconds since epoch
         """
+        member_index = ["ensemble_member"] if "ensemble_member" in df.columns else []
+
         # Set the correct index
         if points is not None:
             # Map point indices to requested lat/lon and point objects
@@ -544,7 +578,7 @@ class QueryEngine:
             ]
             df.drop(cols_to_drop, inplace=True, axis=1)
             df.set_index(
-                ["points", "init_time", "prediction_timedelta"],
+                ["points", "init_time", "prediction_timedelta", *member_index],
                 inplace=True,
             )
 
@@ -567,12 +601,25 @@ class QueryEngine:
             )
         else:
             df.set_index(
-                ["init_time", "prediction_timedelta", "latitude", "longitude"],
+                [
+                    "init_time",
+                    "prediction_timedelta",
+                    "latitude",
+                    "longitude",
+                    *member_index,
+                ],
                 inplace=True,
             )
             # Remove duplicates, if there are any (remove once duplicates are handeled)
             df = df.loc[~df.index.duplicated()]
             ds = xr.Dataset.from_dataframe(df)
+
+        if member_index:
+            members = list(ds.ensemble_member.values)
+            order = sorted(
+                range(len(members)), key=lambda i: _member_sort_key(members[i])
+            )
+            ds = ds.isel(ensemble_member=order)
 
         # Set the dtype for all data_vars to float32
         for var in ds.data_vars:
