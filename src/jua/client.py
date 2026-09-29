@@ -16,6 +16,7 @@ class JuaClient:
         market_aggregates: Property that provides access to market aggregate services.
         market_data: Property that provides access to zone-addressed market data
             (renewable generation, load, day-ahead forecasts, and prices).
+        reanalysis: Property that provides access to reanalysis datasets (ERA5).
 
     Examples:
         >>> from jua import JuaClient
@@ -26,6 +27,8 @@ class JuaClient:
         >>> aggregates = client.market_aggregates.compare_runs(...)
         >>> # Access market data by zone
         >>> df = client.market_data.get_data(market_zone="DE", ...)
+        >>> # Access ERA5 reanalysis
+        >>> data = client.reanalysis.get_data(time=..., points=...)
     """
 
     @validate_call
@@ -50,6 +53,7 @@ class JuaClient:
         self._market_aggregates = None
         self._power_forecast = None
         self._market_data = None
+        self._reanalysis = None
 
         if jua_log_level is not None:
             logging.getLogger("jua").setLevel(jua_log_level)
@@ -107,6 +111,19 @@ class JuaClient:
 
             self._market_data = MarketData(self)
         return self._market_data
+
+    @property
+    def reanalysis(self):
+        """Access to Jua's reanalysis datasets (ERA5).
+
+        Returns:
+            Reanalysis client interface for querying historical reanalysis data.
+        """
+        if self._reanalysis is None:
+            from jua.reanalysis import Reanalysis
+
+            self._reanalysis = Reanalysis(self)
+        return self._reanalysis
 
     def __enter__(self):
         return self

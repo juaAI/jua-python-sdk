@@ -1,8 +1,13 @@
 from pathlib import Path
-from typing import Any
+from typing import TYPE_CHECKING, Any
 
 import xarray as xr
 from pydantic import validate_call
+
+if TYPE_CHECKING:
+    # Imported for typing only: jua.reanalysis imports this module, so a runtime
+    # import here would be circular.
+    from jua.reanalysis.models import ReanalysisModels
 
 from jua._utils.optional_progress_bar import OptionalProgressBar
 from jua._utils.spinner import Spinner
@@ -21,10 +26,10 @@ logger = get_logger(__name__)
 
 
 class JuaDataset:
-    """Weather dataset containing forecast or hindcast data from a Jua model.
+    """Weather dataset returned by a Jua query.
 
-    JuaDataset is the primary container for weather data returned by forecast and
-    hindcast queries.
+    JuaDataset is the primary container for weather data returned by forecast,
+    hindcast, and reanalysis queries.
 
     Use `to_xarray` to get the data as an xarray dataset.
 
@@ -55,7 +60,7 @@ class JuaDataset:
         settings: JuaSettings,
         dataset_name: str,
         raw_data: xr.Dataset,
-        model: Models,
+        model: "Models | ReanalysisModels",
     ):
         """Initialize a JuaDataset.
 
@@ -63,7 +68,9 @@ class JuaDataset:
             settings: Client settings.
             dataset_name: Name identifier for the dataset.
             raw_data: The underlying xarray Dataset.
-            model: The model that produced this data.
+            model: The model or dataset that produced this data. Only its
+                `.value` is used, as the subdirectory under `save()`'s default
+                output path.
         """
         self._settings = settings
         self._dataset_name = dataset_name
