@@ -1,3 +1,13 @@
+## v0.42.0 (2026-09-29)
+
+### Feat
+
+- **weather**: add include_ensemble_members to get_forecasts
+
+### Fix
+
+- **errors**: show the server's reason on 403 and a clear error for members on deterministic models
+
 ## v0.41.2 (2026-08-28)
 
 ### Fix
