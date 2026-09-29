@@ -53,6 +53,7 @@ class ForecastQueryPayload(BaseModel):
     aggregation: list[str] | None = None
     variables: list[str] | None = None
     group_by: list[str] | None = None
+    include_ensemble_members: bool | None = None
 
     def num_requested_points(self) -> int:
         """Estimate number of requested data rows for this payload.
