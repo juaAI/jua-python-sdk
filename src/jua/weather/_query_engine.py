@@ -365,7 +365,13 @@ class QueryEngine:
             )
         if include_ensemble_members:
             if not model_meta.has_statistics:
-                raise ValueError(f"{model} is not an ensemble model.")
+                ensembles = ", ".join(
+                    m.value for m in Models if get_model_meta_info(m).has_statistics
+                )
+                raise ValueError(
+                    f"{model.value} has no ensemble members. "
+                    f"`include_ensemble_members` needs an ensemble model: {ensembles}."
+                )
             if statistics:
                 raise ValueError(
                     "`include_ensemble_members` cannot be combined with `statistics`."

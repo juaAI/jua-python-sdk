@@ -1,13 +1,15 @@
 """Model.get_forecasts(include_ensemble_members=True) with mocked API responses."""
 
 from datetime import datetime
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import numpy as np
 import pandas as pd
 import pytest
+import requests
 
 from jua.client import JuaClient
+from jua.errors.api_errors import UnauthorizedError
 from jua.types.geo import LatLon
 from jua.weather import Model, Models, Variables
 from tests.weather.utils import create_mock_arrow_response
@@ -104,10 +106,52 @@ def test_flag_is_not_sent_by_default(mock_client):
 def test_rejects_deterministic_models(mock_client):
     model = Model(client=mock_client, model=Models.EPT2)
 
-    with pytest.raises(ValueError, match="No statistics are available"):
+    with pytest.raises(ValueError, match="ept2 has no ensemble members") as raised:
         model.get_forecasts(
             points=LatLon(lat=52.52, lon=13.405), include_ensemble_members=True
         )
+    assert "ept2_e" in str(raised.value)
+
+
+def _forbidden(body: dict) -> Mock:
+    response = Mock(spec=requests.Response)
+    response.ok = False
+    response.status_code = 403
+    response.json.return_value = body
+    return response
+
+
+def test_a_members_refusal_shows_the_servers_reason(mock_client):
+    """Without the members feature, query-engine answers 403 with a reason.
+
+    The SDK used to replace it with "check your API key", which sends the
+    caller after the wrong fix.
+    """
+    model = Model(client=mock_client, model=Models.EPT2_E)
+    refused = _forbidden(
+        {"detail": "Ensemble members are not accessible for model ept2_e."}
+    )
+
+    with patch.object(model._query_engine._api._session, "post", return_value=refused):
+        with pytest.raises(UnauthorizedError) as raised:
+            model.get_forecasts(
+                points=LatLon(lat=52.52, lon=13.405),
+                include_ensemble_members=True,
+                stream=False,
+            )
+
+    assert "not accessible for model ept2_e" in str(raised.value)
+    assert "API key" not in str(raised.value)
+
+
+def test_a_403_without_a_reason_keeps_the_api_key_hint(mock_client):
+    model = Model(client=mock_client, model=Models.EPT2_E)
+
+    with patch.object(
+        model._query_engine._api._session, "post", return_value=_forbidden({})
+    ):
+        with pytest.raises(UnauthorizedError, match="check your API key"):
+            model.get_forecasts(points=LatLon(lat=52.52, lon=13.405), stream=False)
 
 
 def test_rejects_statistics_together_with_members(mock_client):

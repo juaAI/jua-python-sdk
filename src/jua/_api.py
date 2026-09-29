@@ -89,7 +89,9 @@ class API:
             raise NotAuthenticatedError(response.status_code)
 
         if response.status_code == 403:
-            raise UnauthorizedError(response.status_code)
+            raise UnauthorizedError(
+                response.status_code, details=_error_detail(response)
+            )
 
         if response.status_code == 404:
             raise NotFoundError(response.status_code)
@@ -277,3 +279,19 @@ def _get_user_agent() -> str:
     except importlib.metadata.PackageNotFoundError:
         jua_version = "unknown"
     return f"jua-python-sdk/{jua_version}"
+
+
+def _error_detail(response: requests.Response) -> str | None:
+    """The server's reason from a `{"detail": ...}` error body, if it sent one.
+
+    `detail` is a sentence on v1 routes and `{code, message}` on v2 ones.
+    """
+    try:
+        detail = response.json().get("detail")
+    except (JSONDecodeError, ValueError, AttributeError):
+        return None
+    if isinstance(detail, dict):
+        detail = detail.get("message")
+    if isinstance(detail, str) and detail.strip():
+        return detail.strip()
+    return None

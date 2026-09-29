@@ -224,7 +224,7 @@ class Model:
             ...     include_ensemble_members=True,
             ... )
         """
-        if statistics or include_ensemble_members:
+        if statistics:
             self._check_model_has_stats()
 
         if variables is None:
