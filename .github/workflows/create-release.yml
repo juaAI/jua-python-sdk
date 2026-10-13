@@ -16,7 +16,11 @@ jobs:
     runs-on: ubuntu-latest
     name: "Bump version and create changelog with commitizen"
     needs: [ci-checks]
-    environment: pypi-release
+    # Uses the environment only for the JUABOT secrets. The PyPI upload in
+    # publish.yml is the deployment, so do not record one here.
+    environment:
+      name: pypi-release
+      deployment: false
     permissions:
       id-token: write
       contents: write
